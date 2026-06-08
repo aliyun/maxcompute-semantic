@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.ODPSError",
+  "code": "InvalidAccessKeyId",
+  "message": "The Access Key ID does not exist"
+}

@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.ODPSError",
+  "code": "NoSuchObject",
+  "message": "Project not found - 'nonexistent_project_xyz'"
+}

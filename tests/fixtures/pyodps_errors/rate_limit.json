@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.ODPSError",
+  "code": "Throttling",
+  "message": "Request was throttled due to exceeding quota"
+}

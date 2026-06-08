@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.NoSuchObject",
+  "code": "NoSuchSchema",
+  "message": "Schema not found - 'nonexistent_schema'"
+}

@@ -1,0 +1,14 @@
+maxcompute-semantic
+Copyright 2024-2026, Alibaba Cloud and its affiliates.
+Licensed under the Apache License, Version 2.0
+
+This product contains the following third-party components:
+
+click - BSD-3-Clause - Copyright Pallets
+sqlglot - MIT - Copyright Tobias Kohn
+pyodps - Apache-2.0 - Copyright Alibaba Cloud
+ruamel.yaml - MIT - Copyright Anthon van der Neut
+filelock - Unlicense - Copyright Benedikt Schmitt
+pyarrow - Apache-2.0 - Copyright The Apache Software Foundation
+iterfzf - GPLv3 - Copyright Hong Minhee
+requests - Apache-2.0 - Copyright Kenneth Reitz

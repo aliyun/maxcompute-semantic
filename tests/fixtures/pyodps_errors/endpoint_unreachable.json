@@ -1,0 +1,5 @@
+{
+  "exception_class": "ConnectionError",
+  "code": "ConnectionError",
+  "message": "Failed to connect to endpoint http://service.odps.aliyun.com/api - Connection refused"
+}

@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.NoPermission",
+  "code": "NoPermission",
+  "message": "Access Denied - SELECT on Table 'meta_dev.restricted_table'"
+}

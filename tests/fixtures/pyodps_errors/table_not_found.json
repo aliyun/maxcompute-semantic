@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.NoSuchObject",
+  "code": "NoSuchObject",
+  "message": "Table not found - 'meta_dev.does_not_exist'"
+}

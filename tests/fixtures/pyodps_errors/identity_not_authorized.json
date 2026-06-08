@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.ODPSError",
+  "code": "IdentityNotAuthorized",
+  "message": "identity not authorized: ODPS user not found - 'unknown_user'"
+}

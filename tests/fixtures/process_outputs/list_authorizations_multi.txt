@@ -1,0 +1,4 @@
+BUC_USER_ID             BUC_USER_TYPE    BUC_ACCOUNT_NAME
+-----------             -------------    ----------------
+292165                  employee         jiexian.hc
+WORKER_1725969166792    department       acni_odps_test_account_z

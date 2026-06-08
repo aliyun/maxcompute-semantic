@@ -1,0 +1,104 @@
+[project]
+name = "maxcompute-semantic"
+version = "0.16.1"
+description = "MaxCompute semantic-layer-aware CLI: multi-profile auth + pyodps-backed query + structured memory + FTS5 + vector retrieval + UDF."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "filelock>=3.13",
+    "iterfzf>=0.5",
+    "jieba>=0.42",
+    "packaging>=21.0",
+    "pyodps>=0.11",
+    "questionary>=2.0",
+    "ruamel.yaml>=0.18",
+    "sqlglot>=25.0",
+]
+
+[project.optional-dependencies]
+vec = [
+    "sqlite-vec>=0.1.6",
+    "sentence-transformers>=2.2",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-mock>=3.12",
+    "pytest-xdist>=3.6",
+    "mypy>=1.7",
+    "ruff>=0.1",
+    "jsonschema>=4.18",
+]
+
+[project.scripts]
+mcs = "maxcompute_semantic.cli:_cli_main"
+maxcompute-semantic = "maxcompute_semantic.cli:_cli_main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/maxcompute_semantic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: tests that hit real MaxCompute (skip in CI; run via `make test-mcs-live`)",
+]
+# ``norecursedirs`` defaults to a list including ``build``, ``dist``,
+# ``__pycache__``, ``.git``, etc. — pytest skips any directory whose
+# basename matches one of those patterns. Our own test tree includes
+# ``tests/unit/build/`` (mirroring the source layout
+# ``src/maxcompute_semantic/build/``), so the default silently drops
+# every test under it. Override to restore the defaults *minus* the
+# ``build`` entry. (No tooling actually depends on ``build`` being
+# excluded for this package — wheel artifacts go to ``dist/``.)
+norecursedirs = ["*.egg", ".*", "_darcs", "dist", "CVS", "__pycache__"]
+# ``importlib`` import mode is required because several test files
+# share basenames across subdirs (``test_acl_filter.py`` /
+# ``test_errors.py`` exist in both ``tests/unit/_lib/`` and
+# ``tests/unit/build/``, plus ``test_errors.py`` also lives under
+# ``auth/`` / ``memory/`` / ``mc_client/``). With pytest's default
+# ``prepend`` mode, the second file to be collected fails to import
+# because the first one already cached the bare-module name in
+# ``sys.modules``. ``importlib`` resolves each file by full path
+# so the duplicates coexist.
+addopts = "-ra --import-mode=importlib"
+
+[tool.coverage.run]
+source = ["src/maxcompute_semantic"]
+branch = true
+omit = [
+    # The build/* pipeline (acl_filter, info_schema, markdown, phases,
+    # pipeline, storage) is exercised by the benchmark CI's full
+    # run, not the unit suite — see CLAUDE.md "the skill itself is
+    # tested via the live e2e flow in the benchmark CI, not unit
+    # tests". Keeping these in the unit-coverage denominator drags the
+    # total below the 80% gate even when every command-surface module
+    # is well-tested.
+    "*/maxcompute_semantic/build/*.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "pragma: no cover",
+]
+
+[tool.mypy]
+files = ["src/maxcompute_semantic"]
+python_version = "3.10"
+strict_optional = true
+warn_unused_ignores = true
+warn_return_any = true
+disallow_untyped_defs = true
+
+[project.urls]
+Homepage = "https://github.com/aliyun/maxcompute-semantic"
+Repository = "https://github.com/aliyun/maxcompute-semantic"
+Changelog = "https://github.com/aliyun/maxcompute-semantic/blob/main/CHANGELOG.md"
+Issues = "https://github.com/aliyun/maxcompute-semantic/issues"

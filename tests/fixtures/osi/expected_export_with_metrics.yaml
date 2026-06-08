@@ -1,0 +1,29 @@
+semantic_model:
+  - datasets:
+      - fields:
+          - expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: id
+            name: id
+          - custom_extensions:
+              - data: '{"agg": "SUM", "measure": {"agg": "SUM"}, "physical_type":
+                  "BIGINT", "semantic_role": "measure"}'
+                vendor_name: MAXCOMPUTE_SEMANTIC
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: amount
+            name: amount
+        name: warehouse__orders
+        source: warehouse.orders
+    metrics:
+      - ai_context: Sum across all rows.
+        description: Gross
+        expression:
+          dialects:
+            - dialect: ANSI_SQL
+              expression: SUM(orders.amount)
+        name: total_revenue
+    name: demo
+version: 0.2.0.dev0

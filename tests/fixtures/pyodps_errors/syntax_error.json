@@ -1,0 +1,5 @@
+{
+  "exception_class": "odps.errors.ODPSError",
+  "code": "OdpsTaskError",
+  "message": "Parse exception - invalid token 'FROMX'"
+}

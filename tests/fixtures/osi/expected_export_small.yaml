@@ -1,0 +1,61 @@
+semantic_model:
+  - datasets:
+      - fields:
+          - custom_extensions:
+              - data: '{"id_type": "primary", "physical_type": "BIGINT", "semantic_role":
+                  "identifier"}'
+                vendor_name: MAXCOMPUTE_SEMANTIC
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: id
+            name: id
+          - expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: name
+            name: name
+        name: warehouse__customers
+        primary_key:
+          - id
+        source: warehouse.customers
+      - ai_context: Order line items, one row per ordered SKU.
+        fields:
+          - expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: order_id
+            name: order_id
+          - custom_extensions:
+              - data: '{"id_type": "foreign", "physical_type": "BIGINT", "references_target":
+                  "customers.id", "semantic_role": "identifier"}'
+                vendor_name: MAXCOMPUTE_SEMANTIC
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: customer_id
+            name: customer_id
+          - custom_extensions:
+              - data: '{"is_partition": true, "physical_type": "DATE", "semantic_role":
+                  "dimension"}'
+                vendor_name: MAXCOMPUTE_SEMANTIC
+            description: Date the order was placed.
+            dimension:
+              is_time: true
+            expression:
+              dialects:
+                - dialect: ANSI_SQL
+                  expression: order_date
+            name: order_date
+        name: warehouse__orders
+        source: warehouse.orders
+    name: demo
+    relationships:
+      - from: warehouse__orders
+        from_columns:
+          - customer_id
+        name: warehouse__orders__customer_id__to__warehouse__customers__id
+        to: warehouse__customers
+        to_columns:
+          - id
+version: 0.2.0.dev0
