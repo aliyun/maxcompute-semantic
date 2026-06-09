@@ -4,6 +4,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/maxcompute-semantic)](https://pypi.org/project/maxcompute-semantic/)
 [![License](https://img.shields.io/github/license/aliyun/maxcompute-semantic)](LICENSE)
 [![CI](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml/badge.svg)](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml)
+[![English](https://img.shields.io/badge/lang-English-blue)](README.md)
+[![中文](https://img.shields.io/badge/lang-中文-red)](README.zh-cn.md)
 
 **Give your AI agent a semantic understanding of your MaxCompute data.**
 
