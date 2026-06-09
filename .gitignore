@@ -14,3 +14,4 @@ dist/
 htmlcov/
 .pytest_cache/
 *.whl
+site/CHANGELOG.md

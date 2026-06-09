@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<link rel="alternate" hreflang="en" href="../docs.html">
+<link rel="alternate" hreflang="zh-CN" href="docs.html">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mcs · documentation</title>
+<script>
+  (function() {
+    try {
+      var pref = localStorage.getItem('theme') || 'auto';
+      var resolved = pref === 'auto'
+        ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : pref;
+      document.documentElement.setAttribute('data-theme', resolved);
+      document.documentElement.setAttribute('data-theme-pref', pref);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.setAttribute('data-theme-pref', 'auto');
+    }
+  })();
+</script>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('../fonts/jetbrains-mono-variable.woff2') format('woff2-variations');
+  }
+
+  :root,
+  :root[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --bg-tile: #111111;
+    --bg-deep: #050505;
+    --ink: #ededed;
+    --ink-strong: #ffffff;
+    --ink-muted: #6e6e6e;
+    --ink-faint: #3a3a3a;
+    --rule: #1f1f1f;
+    --rule-strong: #2a2a2a;
+    --accent: #a3e635;
+    --accent-soft: rgba(163, 230, 53, 0.12);
+    --warn: #f97316;
+    --noise: 0.04;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-tile: #ffffff;
+    --bg-deep: #f3f2eb;
+    --ink: #1a1a1a;
+    --ink-strong: #0a0a0a;
+    --ink-muted: #6b6b66;
+    --ink-faint: #c8c6bb;
+    --rule: #1a1a1a;
+    --rule-strong: #0a0a0a;
+    --accent: #3f6212;
+    --accent-soft: rgba(63, 98, 18, 0.08);
+    --warn: #c2410c;
+    --noise: 0.02;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'PingFang SC', 'Microsoft YaHei', monospace;
+    font-feature-settings: 'ss01', 'ss02', 'calt' 1, 'liga' 1;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+      radial-gradient(rgba(0, 0, 0, var(--noise)) 1px, transparent 1px),
+      radial-gradient(rgba(255, 255, 255, calc(var(--noise) * 0.5)) 1px, transparent 1px);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 1px 1px;
+  }
+
+  a { color: var(--ink-strong); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+  /* ── Frame & topbar (same as index.html) ── */
+  .frame { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+  .topbar { border-bottom: 1px solid var(--rule); background: var(--bg); position: sticky; top: 0; z-index: 50; }
+  .topbar-inner { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .brand { display: inline-flex; align-items: baseline; gap: 10px; color: var(--ink-strong); text-decoration: none; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+  .brand:hover { color: var(--ink-strong); text-decoration: none; }
+  .brand .mark { display: inline-block; width: 10px; height: 10px; background: var(--accent); }
+  .brand .ver { color: var(--ink-muted); font-size: 11px; font-weight: 400; letter-spacing: 0; }
+  .nav-links { display: flex; align-items: center; gap: 26px; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .nav-links a { color: var(--ink-muted); text-decoration: none; }
+  .nav-links a:hover { color: var(--ink-strong); }
+  .nav-links a.active { color: var(--ink-strong); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+  .theme-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-muted); letter-spacing: 0.5px; text-transform: lowercase; }
+  .theme-switch .label { color: var(--ink-faint); }
+  .theme-switch button { background: none; border: none; color: var(--ink-muted); font-family: inherit; font-size: inherit; cursor: pointer; padding: 2px 4px; letter-spacing: inherit; text-transform: inherit; }
+  .theme-switch button:hover { color: var(--ink-strong); }
+  .theme-switch button.active { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .theme-switch .sep { color: var(--ink-faint); padding: 0 1px; }
+
+  /* ── Docs layout: sidebar + main ── */
+  .docs { display: grid; grid-template-columns: 220px 1fr; gap: 64px; padding: 48px 0 96px; }
+  .docs-aside { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 8px; }
+  .docs-main { max-width: 760px; min-width: 0; }
+
+  /* ── Sidebar TOC ── */
+  .toc { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+  .toc-section { margin-bottom: 4px; }
+  .toc-section > a {
+    display: block;
+    padding: 6px 12px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    letter-spacing: 0.3px;
+  }
+  .toc-section > a:hover { color: var(--ink-strong); }
+  .toc-section.active > a { color: var(--ink-strong); border-left-color: var(--accent); font-weight: 700; }
+  .toc-sub { list-style: none; padding: 0; margin: 2px 0 6px; display: none; }
+  .toc-section.active .toc-sub { display: block; }
+  .toc-sub li a {
+    display: block;
+    padding: 4px 12px 4px 26px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 11px;
+    border-left: 2px solid transparent;
+  }
+  .toc-sub li a:hover { color: var(--ink-strong); }
+  .toc-sub li a.active { color: var(--accent); border-left-color: var(--accent); }
+
+  /* ── Mobile TOC accordion (≤860px) ── */
+  .toc-mobile { display: none; border: 1px solid var(--rule-strong); background: var(--bg-tile); margin-bottom: 32px; }
+  .toc-mobile-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; color: var(--ink-strong); font-family: inherit; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 14px 18px; cursor: pointer; }
+  .toc-mobile-toggle .chev { color: var(--accent); transition: transform 0.18s; }
+  .toc-mobile[open] .toc-mobile-toggle .chev { transform: rotate(90deg); }
+  .toc-mobile-body { display: none; padding: 4px 18px 18px; border-top: 1px solid var(--rule-strong); }
+  .toc-mobile[open] .toc-mobile-body { display: block; }
+
+  /* ── Headings ── */
+  .docs-main h1 { font-size: 32px; font-weight: 700; color: var(--ink-strong); letter-spacing: -0.8px; margin-bottom: 12px; }
+  .docs-main .lead { color: var(--ink-muted); font-size: 14px; margin-bottom: 56px; }
+  .docs-main h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.4px;
+    margin: 64px 0 8px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    scroll-margin-top: 80px;
+  }
+  .docs-main h2 .num { color: var(--accent); margin-right: 10px; font-size: 14px; vertical-align: 2px; }
+  .docs-main h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .docs-main h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    margin: 36px 0 8px;
+    scroll-margin-top: 80px;
+  }
+  .docs-main h3 .num { color: var(--ink-muted); margin-right: 8px; font-weight: 400; }
+
+  /* ── Body copy ── */
+  .docs-main p { margin: 12px 0; }
+  .docs-main p code,
+  .docs-main li code,
+  .docs-main td code {
+    color: var(--ink-strong);
+    background: var(--bg-deep);
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    font-size: 0.92em;
+    white-space: nowrap;
+  }
+  .docs-main strong { color: var(--ink-strong); font-weight: 700; }
+  .docs-main ul, .docs-main ol { margin: 12px 0 12px 24px; }
+  .docs-main li { margin: 6px 0; }
+
+  /* ── Code blocks ── */
+  .code-block {
+    position: relative;
+    background: var(--bg-deep);
+    border: 1px solid var(--rule-strong);
+    border-left-width: 1px;
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding: 16px 20px 16px 24px;
+    margin: 16px 0 20px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code-block .prompt { color: var(--accent); font-weight: 700; user-select: none; margin-right: 6px; }
+  .code-block .comment { color: var(--ink-muted); }
+  .code-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: all 0.12s;
+  }
+  .code-block:hover .code-copy { opacity: 1; }
+  .code-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Tables ── */
+  .docs-main table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+  .docs-main th, .docs-main td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .docs-main th {
+    color: var(--ink-strong);
+    font-weight: 700;
+    border-bottom-color: var(--rule-strong);
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  /* ── Callout card (.card-note) ── */
+  .card-note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 18px;
+    margin: 18px 0;
+    font-size: 13px;
+  }
+  .card-note strong { display: block; color: var(--ink-strong); margin-bottom: 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── Concept diagram (mono ASCII for simple Latin-only flows) ── */
+  .concept-diagram {
+    background: var(--bg-deep);
+    border: 1px solid var(--rule-strong);
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding: 18px 22px;
+    margin: 20px 0 24px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* ── Concept stage (matches index.html [00] aesthetic) ── */
+  .concept-stage {
+    position: relative;
+    background: var(--bg-deep);
+    border-left: 3px solid var(--accent);
+    padding: 26px 28px 22px 32px;
+    margin: 20px 0 24px;
+    color: var(--ink);
+  }
+  .concept-stage::before {
+    content: "// concept map";
+    position: absolute;
+    top: -7px; left: 22px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+  }
+  .cs-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--ink-strong);
+    letter-spacing: -0.3px;
+    margin: 4px 0 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .cs-hero-actor {
+    color: var(--ink-muted);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .cs-hero-noun {
+    color: var(--accent);
+    font-weight: 700;
+    position: relative;
+  }
+  .cs-hero-noun::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -3px;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.35;
+  }
+  .cs-hero-op {
+    color: var(--ink-faint);
+    font-weight: 400;
+    margin: 0 2px;
+  }
+  .cs-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .cs-col { display: flex; flex-direction: column; gap: 10px; }
+  .cs-anchor {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.2px;
+  }
+  .cs-anchor-tag {
+    color: var(--accent);
+    margin-right: 6px;
+    font-weight: 700;
+  }
+  .cs-props {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .cs-props li {
+    display: grid;
+    grid-template-columns: 52px 14px 1fr;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    align-items: baseline;
+  }
+  .cs-key { color: var(--accent); font-weight: 600; }
+  .cs-sep { color: var(--ink-faint); }
+  .cs-val { color: var(--ink); }
+  .cs-link {
+    display: flex; flex-direction: column;
+    align-items: stretch; justify-content: flex-start;
+    padding-top: 12px;
+    min-width: 96px;
+  }
+  .cs-verb {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .cs-flow {
+    position: relative; display: block;
+    height: 1px;
+    margin-right: 8px;
+  }
+  .cs-flow-line {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      var(--accent) 12%,
+      var(--accent) 92%,
+      transparent 100%);
+  }
+  .cs-flow::after {
+    content: "";
+    position: absolute;
+    right: -8px; top: 50%;
+    transform: translateY(-50%);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 7px solid var(--accent);
+  }
+  .cs-formula {
+    margin: 22px 0 0;
+    padding-top: 16px;
+    border-top: 1px dashed var(--rule);
+    font-size: 12px;
+    color: var(--ink-muted);
+    letter-spacing: 0.2px;
+  }
+  .cs-formula-label {
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .cs-formula .cs-ref {
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0 1px;
+  }
+  .cs-formula em {
+    font-style: normal;
+    color: var(--ink);
+  }
+  .cs-example {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--ink-muted);
+    padding-left: 14px;
+    position: relative;
+  }
+  .cs-example::before {
+    content: "例";
+    position: absolute; left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  @media (max-width: 720px) {
+    .concept-stage { padding: 22px 18px 18px 22px; }
+    .cs-hero { font-size: 16px; margin-bottom: 18px; padding-bottom: 16px; }
+    .cs-hero-actor { font-size: 12px; }
+    .cs-grid { grid-template-columns: 1fr; gap: 0; }
+    .cs-link {
+      padding: 12px 0; flex-direction: row;
+      align-items: center; width: auto;
+      min-width: 0; gap: 10px;
+    }
+    .cs-verb { margin: 0; flex: 0 0 auto; }
+    .cs-flow { width: 40px; flex: 0 0 40px; margin: 0; }
+  }
+
+  /* ── Inline "why this step" note (lighter than .card-note) ── */
+  .step-why {
+    border-left: 2px solid var(--ink-faint);
+    padding: 4px 0 4px 12px;
+    margin: 8px 0 12px;
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+  .step-why::before { content: "ⓘ  "; color: var(--accent); font-weight: 700; }
+  .step-why code { color: var(--ink); }
+
+  /* ── Footer ── */
+  .footer {
+    border-top: 1px solid var(--rule);
+    margin-top: 0;
+    padding: 32px 0;
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer .left { display: inline-flex; align-items: center; gap: 10px; }
+  .footer .left .mark { display: inline-block; width: 8px; height: 8px; background: var(--accent); }
+  .footer a { color: var(--ink); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+  .footer .right { color: var(--ink-faint); }
+
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    .frame { padding: 0 22px; }
+    .nav-links { gap: 16px; }
+    .theme-switch { display: none; }
+    .docs { grid-template-columns: 1fr; gap: 0; padding: 32px 0 64px; }
+    .docs-aside { display: none; }
+    .toc-mobile { display: block; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+
+  .lang-select {
+    position: relative;
+    display: inline-flex;
+  }
+  .lang-current {
+    background: none;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .lang-current:hover { color: var(--ink-strong); border-color: var(--ink-strong); }
+  .lang-current .chev { font-size: 9px; margin-left: 2px; }
+  .lang-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule-strong);
+    min-width: 120px;
+    z-index: 100;
+  }
+  .lang-select.open .lang-menu { display: block; }
+  .lang-menu a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+  .lang-menu a:hover { color: var(--ink-strong); background: var(--bg-deep); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="frame topbar-inner">
+    <a href="index.html" class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span>mcs</span>
+      <!-- v0.16 replaced by .github/workflows/pages.yml at deploy time; do not hand-edit -->
+      <span class="ver">v0.16</span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">home</a>
+      <a href="docs.html" class="active">docs</a>
+      <a href="release-notes.html">release notes</a>
+      <div class="theme-switch" role="group" aria-label="切换主题">
+        <span class="label">theme:</span>
+        <button type="button" data-theme-pref-btn="dark" onclick="setTheme('dark')">dark</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="light" onclick="setTheme('light')">light</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="auto" onclick="setTheme('auto')">auto</button>
+      </div>
+      <div class="lang-select">
+        <button type="button" class="lang-current" onclick="this.parentElement.classList.toggle('open')">中文 <span class="chev">▾</span></button>
+        <div class="lang-menu">
+          <a href="../docs.html" data-lang="en">English</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="frame docs">
+  <aside class="docs-aside" aria-label="文档目录">
+    <ul class="toc">
+      <li class="toc-section" data-section="concept">
+        <a href="#concept">[00] 概念</a>
+      </li>
+      <li class="toc-section" data-section="quickstart">
+        <a href="#quickstart">[01] 快速入门</a>
+      </li>
+      <li class="toc-section" data-section="profile">
+        <a href="#profile">[02] Profile</a>
+        <ul class="toc-sub">
+          <li><a href="#profile-resolve">2.1 解析链</a></li>
+          <li><a href="#profile-create">2.2 创建</a></li>
+          <li><a href="#profile-link">2.3 cwd 绑定</a></li>
+          <li><a href="#profile-inspect">2.4 查看 / whoami</a></li>
+          <li><a href="#profile-version">2.5 版本管理</a></li>
+          <li><a href="#profile-export">2.6 导出 / OSI</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="query">
+        <a href="#query">[03] 主流查询</a>
+        <ul class="toc-sub">
+          <li><a href="#build">3.1 build</a></li>
+          <li><a href="#package-proposals">3.2 package proposals</a></li>
+          <li><a href="#annotate">3.3 语义标注</a></li>
+          <li><a href="#metric-verb">3.4 metric</a></li>
+          <li><a href="#sql">3.5 sql</a></li>
+          <li><a href="#sql-flags">3.6 project / schema / profile</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="advanced">
+        <a href="#advanced">[04] 进阶</a>
+        <ul class="toc-sub">
+          <li><a href="#memory">4.1 memory</a></li>
+          <li><a href="#udf">4.2 udf</a></li>
+          <li><a href="#meta">4.3 meta</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="ops">
+        <a href="#ops">[05] 运维排查</a>
+        <ul class="toc-sub">
+          <li><a href="#doctor">5.1 doctor</a></li>
+          <li><a href="#skill-install">5.2 skill install</a></li>
+          <li><a href="#tier">5.3 tier</a></li>
+          <li><a href="#env">5.4 环境变量</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="agent">
+        <a href="#agent">[06] Agent 话术</a>
+        <ul class="toc-sub">
+          <li><a href="#agent-trigger">6.1 唤起</a></li>
+          <li><a href="#agent-prompts">6.2 示例</a></li>
+          <li><a href="#agent-meta">6.3 报 bug / 自检</a></li>
+        </ul>
+      </li>
+    </ul>
+  </aside>
+
+  <main class="docs-main">
+    <details class="toc-mobile">
+      <summary class="toc-mobile-toggle">
+        <span>目录</span>
+        <span class="chev">›</span>
+      </summary>
+      <div class="toc-mobile-body">
+        <ul style="list-style:none;padding:0;margin:0;font-size:12px;">
+          <li style="margin:6px 0;"><a href="#concept">[00] 概念</a></li>
+          <li style="margin:6px 0;"><a href="#quickstart">[01] 快速入门</a></li>
+          <li style="margin:6px 0;"><a href="#profile">[02] Profile</a></li>
+          <li style="margin:6px 0;"><a href="#query">[03] 主流查询</a></li>
+          <li style="margin:6px 0;"><a href="#advanced">[04] 进阶</a></li>
+          <li style="margin:6px 0;"><a href="#ops">[05] 运维排查</a></li>
+          <li style="margin:6px 0;"><a href="#agent">[06] Agent 话术</a></li>
+        </ul>
+      </div>
+    </details>
+
+    <h1>文档</h1>
+    <p class="lead">面向最终用户的中文使用文档。每节给"何时用、怎么用、一个像样的例子"。完整参数表请跑 <code>mcs &lt;cmd&gt; --help</code>。</p>
+
+    <section id="concept">
+      <h2><span class="num">[00]</span>概念：profile、语义包、业务场景</h2>
+      <p>用 mcs 之前先认这三个名词，后面所有命令都围着它们转。</p>
+
+      <div class="concept-stage">
+        <p class="cs-hero">
+          <span class="cs-hero-actor">你配</span>
+          <span class="cs-hero-noun">profile</span>
+          <span class="cs-hero-op">→</span>
+          <span class="cs-hero-actor">mcs 出</span>
+          <span class="cs-hero-noun">语义包</span>
+          <span class="cs-hero-op">→</span>
+          <span class="cs-hero-actor">agent 直读它</span>
+          <span class="cs-hero-noun">写 SQL</span>
+        </p>
+
+        <div class="cs-grid">
+          <div class="cs-col">
+            <div class="cs-anchor"><span class="cs-anchor-tag">[A]</span>profile</div>
+            <ul class="cs-props">
+              <li><span class="cs-key">身份</span><span class="cs-sep">→</span><span class="cs-val">AK / 免密</span></li>
+              <li><span class="cs-key">场景</span><span class="cs-sep">→</span><span class="cs-val">description</span></li>
+              <li><span class="cs-key">选表</span><span class="cs-sep">→</span><span class="cs-val">sources × N</span></li>
+            </ul>
+          </div>
+          <div class="cs-link" aria-hidden="true">
+            <span class="cs-verb">mcs build</span>
+            <span class="cs-flow"><span class="cs-flow-line"></span></span>
+          </div>
+          <div class="cs-col">
+            <div class="cs-anchor"><span class="cs-anchor-tag">[B]</span>语义包</div>
+            <ul class="cs-props">
+              <li><span class="cs-key">内容</span><span class="cs-sep">→</span><span class="cs-val">表 / 列 / JOIN / UDF</span></li>
+              <li><span class="cs-key">位置</span><span class="cs-sep">→</span><span class="cs-val">本地文件夹</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="cs-formula"><span class="cs-formula-label">业务场景</span> = <span class="cs-ref">[A]</span> + <span class="cs-ref">[B]</span> + 累积的 <em>语义标注</em> / <em>memory</em></p>
+        <p class="cs-example">「数仓 A 月度分析」= dwd / dws 的 12 张表 + GMV 口径备忘</p>
+      </div>
+
+      <ul>
+        <li><strong>profile</strong> —— 一份配置，回答两个问题：<em>我是谁</em>（AK 还是免密、解析成哪个 RAM 主体）+ <em>我看哪些表</em>（一个或多个 source，每个 source 是一组 <code>project.schema.tables</code>）。一台机器可以有任意多个 profile。</li>
+        <li><strong>语义包</strong> —— <code>mcs build</code> 把 profile 圈起来的所有表扫一遍，采样几行、推 JOIN 关系、发现 UDF，落到本地一个文件夹。agent 写 SQL 之前先读这个包，不用每次现去翻 MaxCompute meta。</li>
+        <li><strong>业务场景</strong> —— 不是 mcs 里的实体，是用法约定：<em>一个业务边界对应一个 profile</em>（数仓 A 一个、营销 B 一个、跨域口径再一个）。同一个 profile 下累积的语义标注（通过 proposal 队列写入）和 memory（验证过的 SQL）都跟着这条业务线走。</li>
+      </ul>
+
+      <div class="card-note">
+        <strong>身份认证的目的</strong>
+        mcs 用的是<em>你的</em> RAM 权限去 list 表、跑 SQL、扫元数据——不是一个共享账号。所以 <code>mcs build</code> 出来的语义包只覆盖<em>你能看到</em>的表；换一个 AK 去 build，语义包内容就不一样。这也是为什么向导第一步要选 auth：决定了后面所有事情的视野。
+      </div>
+
+      <div class="card-note">
+        <strong>下一步</strong>
+        <a href="#quickstart">[01] 快速入门</a> 5 分钟跑通；想深挖 profile 的解析链 / cwd 绑定 / 版本管理看 <a href="#profile">[02] Profile</a>。
+      </div>
+    </section>
+
+    <section id="quickstart">
+      <h2><span class="num">[01]</span>快速入门</h2>
+      <p>5 分钟，从 0 到第一条 SQL。</p>
+
+      <h3 id="qs-install"><span class="num">1.</span>装 mcs</h3>
+      <p>让 agent 装是最快的路径，它会顺手把 skill 也装好。把下面这段话发给 agent：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> 帮我安装 mcs，先读完这个指南再逐步执行：curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md</pre>
+      <p>或者自己装：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> uv tool install maxcompute-semantic</pre>
+      <p>装好以后跑 <code>mcs --version</code> 确认。如果 <code>~/.local/bin</code> 不在 PATH 里，需要加上（见 <a href="https://github.com/aliyun/maxcompute-semantic#install">README</a>）。</p>
+
+      <h3 id="qs-profile"><span class="num">2.</span>创建 profile</h3>
+      <div class="step-why">一个业务场景对应一个 profile，回答「我是谁 + 看哪些表」两件事。详见 <a href="#concept">[00] 概念</a>。</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile create</pre>
+      <p>向导会问：profile 名字、要接的 MaxCompute project、AK 还是免密、endpoint 区域。所有字段都能后改（<code>mcs profile update</code>）。</p>
+      <p>
+        For AK auth, prefer environment-variable references or ProcessAuth/ncs. For
+        non-interactive literal-AK setup, pass <code>--ak-literal</code> with
+        <code>--ak-id</code> and pipe one secret line with
+        <code>--ak-secret-stdin</code>; avoid <code>--ak-secret</code> unless
+        shell-history exposure is acceptable.
+      </p>
+
+      <h3 id="qs-link"><span class="num">3.</span>把当前目录绑到 profile</h3>
+      <div class="step-why">绑了之后这个目录里跑 <code>mcs</code> 命令默认认这个 profile，agent 也认——不用每次 <code>--profile</code>。</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> cd ~/work/my-data-project
+<span class="prompt">$</span> mcs link bind &lt;profile-name&gt;</pre>
+      <p>查看 / 解绑：<code>mcs link status</code>、<code>mcs link unlink</code>。</p>
+
+      <h3 id="qs-build"><span class="num">4.</span>跑一次 build（生成语义包）</h3>
+      <div class="step-why">把 profile 圈起来的所有表扫一遍，生成 agent 写 SQL 时要读的本地知识库——表结构、采样、JOIN 关系、UDF 全在里面。几分钟跑完，之后 agent 查询不用每次现翻 MaxCompute 元数据。</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs build</pre>
+      <p>跑完后 <code>mcs status --tables</code> 看采到的表 / 列 / JOIN 数量。表结构变了重跑 <code>mcs build --refresh</code> 只更新变过的表。<strong>不是必须步骤</strong>：跳过也行，agent 没语义包时走 cold-start（<code>mcs meta list-tables</code> / <code>describe-table</code>）现问元数据——能用但每次更慢。</p>
+
+      <h3 id="qs-ask"><span class="num">5.</span>开始问</h3>
+      <div class="step-why">agent 读上一步生成的语义包写 SQL，然后走 <code>mcs sql cost</code> 估价、<code>mcs sql execute</code> 执行。<code>mcs build</code> 是一次性 onboarding 动作，不会出现在查询流里。</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> 用 mcs 查一下上个月 orders 表的 GMV</pre>
+      <p>agent 会自动调 <code>mcs sql cost</code> 估价、<code>mcs sql execute</code> 执行、再用人话总结结果给你。如果不放心可以直接终端跑 <code>mcs sql execute "..."</code>。</p>
+
+      <div class="card-note">
+        <strong>下一步</strong>
+        想搞懂 profile 的解析机制（多 profile / cwd 绑定 / 环境变量到底谁优先），看 <a href="#profile">[02] Profile</a>。想直接看怎么把 SQL 跑得又准又省钱，跳到 <a href="#query">[03] 主流查询</a>。
+      </div>
+    </section>
+    <section id="profile">
+      <h2><span class="num">[02]</span>Profile：身份、组织与版本</h2>
+      <p>profile 是 mcs 的"我是谁、我连哪儿"的单一抽象。一份 profile 包含：MaxCompute 计算 project、endpoint、认证方式（AK / 免密）、要扫描的 source 列表（每个 source 是一组 <code>project.schema.tables</code>）、成本阈值。</p>
+
+      <pre class="concept-diagram">profile ──build──▶ 语义包 ──reads──▶ agent 写 SQL
+   │
+   └─ 圈起一个业务场景（一组 source + 一份身份 + 配套语义标注/memory）</pre>
+
+      <h3 id="profile-resolve"><span class="num">2.1</span>解析链：当前是哪个 profile？</h3>
+      <p>每个 <code>mcs</code> 命令按这个顺序找 profile，命中即用：</p>
+      <ol>
+        <li>显式 <code>--profile X</code> 标志</li>
+        <li>环境变量 <code>MCS_PROFILE</code></li>
+        <li>当前目录的 <code>mcs link bind</code> 绑定</li>
+        <li>标准 ODPS 环境变量四元组（<code>ALIBABA_CLOUD_ACCESS_KEY_ID</code> 等）—— 构造一个内存里的临时 profile</li>
+      </ol>
+      <p>想知道当下是哪个：<code>mcs profile show</code>。</p>
+
+      <h3 id="profile-create"><span class="num">2.2</span>创建：wizard 与多源 DataSource</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile create</pre>
+      <p>交互向导一步步问：名字、compute project、endpoint、auth、要纳入语义包的 sources。一个 profile 可以挂多个 source（比如同时扫数仓的 <code>dwd</code> 和 <code>ads</code>，或者跨两个 project），<code>mcs build</code> 会一次走完所有 source。对 agent 流程，向导会先问你这个语义包要解决什么场景（业务问题、领域、关心的指标），把它记成 profile 的 <code>description</code>；选表时 agent 会根据这个场景描述从 <code>mcs meta list-tables</code> 的结果里推荐候选表，你在候选基础上增删即可，不用从几百张表里盲选。<code>mcs build</code> 会把这段描述写进语义包的 <code>_overview.md</code>。</p>
+      <p>
+        For AK auth, prefer environment-variable references or ProcessAuth/ncs. For
+        non-interactive literal-AK setup, pass <code>--ak-literal</code> with
+        <code>--ak-id</code> and pipe one secret line with
+        <code>--ak-secret-stdin</code>; avoid <code>--ak-secret</code> unless
+        shell-history exposure is acceptable.
+      </p>
+      <p>
+        复用 maxc / odpscmd 配置时用 <code>mcs profile import-creds</code>。如果外部配置里是非 ncs
+        的 <code>ProcessAuth</code> helper，CLI 会先显示完整命令并要求显式信任；确认这条本地命令可信后，
+        再用 <code>--trust-process-command</code> 导入。
+      </p>
+      <p>已经创建过、想后改字段：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile update &lt;name&gt;</pre>
+      <p>会进多级 picker：<code>compute_project</code> / <code>endpoint</code> / <code>auth</code> / <code>cost_thresholds</code> / <code>tags</code> / <code>sources</code>，选哪行改哪行。</p>
+
+      <h3 id="profile-link"><span class="num">2.3</span>cwd 绑定：mcs link bind</h3>
+      <p>把一个目录绑到一个 profile，之后这个目录里 <code>mcs</code> 命令默认认这个 profile：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> cd ~/work/biz-A
+<span class="prompt">$</span> mcs link bind biz-A-prod
+<span class="comment"># 之后在这个目录跑任何 mcs 命令都默认 biz-A-prod profile</span></pre>
+      <p>查看 / 解绑：<code>mcs link status</code>、<code>mcs link unlink</code>。绑定存的是当前目录到 profile 名字的映射，跟着工作目录走，shell 重启不丢。</p>
+
+      <h3 id="profile-inspect"><span class="num">2.4</span>查看与切换：show / whoami</h3>
+      <table>
+        <thead><tr><th>命令</th><th>看什么</th></tr></thead>
+        <tbody>
+          <tr><td><code>mcs profile list</code></td><td>本机所有 profile 名字</td></tr>
+          <tr><td><code>mcs profile show [name]</code></td><td>静态配置（compute project / sources / 阈值 / 版本）— 不走网络</td></tr>
+          <tr><td><code>mcs profile whoami [name]</code></td><td>实时打 ODPS 问"我现在是哪个 RAM 主体" — 每次都打服务器</td></tr>
+        </tbody>
+      </table>
+      <p>调试"我的 AK 到底解析到了谁"用 <code>whoami</code>；只是看配置用 <code>show</code>。</p>
+
+      <h3 id="profile-version"><span class="num">2.5</span>版本管理：log / diff / fork / reset</h3>
+      <p>每个 profile 的数据目录是一个独立 git 仓库。<code>mcs build</code> / <code>package apply/reject</code> / <code>memory</code> / <code>udf</code> / <code>profile import</code> 每写一次都自动 commit 一笔。</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile log -n 10           <span class="comment"># 最近 10 次写入</span>
+<span class="prompt">$</span> mcs profile diff HEAD~1 HEAD     <span class="comment"># 上一次写入改了啥</span>
+<span class="prompt">$</span> mcs profile reset --to HEAD~1    <span class="comment"># 误操作回滚</span>
+<span class="prompt">$</span> mcs profile fork exp --from HEAD <span class="comment"># 拉个分支做 A/B</span></pre>
+      <p>不想要这套自动版本（比如 CI 跑批），设环境变量 <code>MCS_NO_VERSIONING=1</code>，写入照常但不 commit。</p>
+
+      <h3 id="profile-export"><span class="num">2.6</span>导出与分享：profile export</h3>
+      <p>把一份 profile 的语义包打包成一个文件，方便发给同事或迁机。默认产物是 mcs 自己的 tar.gz 归档，可以用 <code>mcs profile import</code> 原样还原。</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile export &lt;name&gt;                  <span class="comment"># 默认写到 ./&lt;name&gt;.tar.gz</span>
+<span class="prompt">$</span> mcs profile export &lt;name&gt; --osi            <span class="comment"># 改写 OSI YAML</span></pre>
+      <p>
+        With <code>--osi</code>, the same command emits
+        <a href="https://open-semantic-interchange.org/" target="_blank" rel="noopener">OSI</a>
+        (Open Semantic Interchange) YAML instead of a tar.gz archive — useful for
+        feeding the profile's semantic model into external OSI-aware tooling.
+        Output conforms to OSI core schema v0.2.0.dev0. The mcs-native tar.gz
+        export is still the default; <code>--osi</code> opts into the YAML path.
+      </p>
+    </section>
+    <section id="query">
+      <h2><span class="num">[03]</span>主流查询：build · package · sql</h2>
+      <p>使用 mcs 的主路径：先 <strong>build</strong> 出语义包；build 证据生成的语义建议进 <strong>package proposal</strong> 队列审核后 apply 写入；最后用 <strong>sql</strong> 跑、估价、看计划。</p>
+
+      <h3 id="build"><span class="num">3.1</span>mcs build：什么时候跑、--refresh / --fresh / --parallel</h3>
+      <p>把 profile 里 sources 列表覆盖的所有表 scan 一遍，采样几行，推断 JOIN 关系，发现 UDF，落地到本地语义包。后续 agent 写 SQL 之前先读这个包，少走弯路。</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs build                  <span class="comment"># 第一次全量；被中断后再跑会自动续传，跳过已建好的表</span>
+<span class="prompt">$</span> mcs build --fresh          <span class="comment"># 强制从头全量重建，忽略续传状态</span>
+<span class="prompt">$</span> mcs build --refresh        <span class="comment"># 增量：rebuild schema 或数据变了的表（也补齐被中断遗留的未完成表）</span>
+<span class="prompt">$</span> mcs build --refresh --refresh-min-age-hours 6  <span class="comment"># 数据变了就重采的节流：上次采样超 N 小时才重采（默认 24，0 = 不节流）</span>
+<span class="prompt">$</span> mcs build --parallel 8     <span class="comment"># 并发 8 个表同时采样（默认 auto = min(表数, 32)）</span></pre>
+      <div class="card-note">
+        <strong>何时跑</strong>
+        新建完 profile 跑一次；build 中途被打断了直接再跑 <code>mcs build</code> 就从断点续传；上游表 schema 或<strong>数据</strong>变了之后跑 <code>--refresh</code>（会重采数据变过的表，<code>--refresh-min-age-hours</code> 控制重采频率）；想忽略续传从头全量重来用 <code>--fresh</code>。<code>mcs status --tables</code> 的 <code>data_modified_at</code> / <code>last_sampled_at</code> 能看哪些表落后于源。日常查询 <strong>不需要</strong> 反复 build。
+      </div>
+      <div class="card-note">
+        <strong>build 后的语义建议先审核</strong>
+        <code>mcs build</code> 会留下可解释的语义建议，但默认不直接改语义层。agent 做 post-build enrich 时会先把这些建议转成 <code>mcs package</code> proposal，让你看证据后再 apply / reject。
+      </div>
+
+      <h3 id="package-proposals"><span class="num">3.2</span>mcs package：审核 build 生成的语义建议</h3>
+      <p>build / refresh 之后，agent 可以把采样、历史 SQL、字段分布里推出来的高置信建议放进 proposal 队列，也可以把自己审过的 <code>ai_context</code>、列描述和列角色修正作为 YAML proposal 提交。proposal 是"待审核补丁"：看得到目标列、建议内容、证据和置信度；只有 apply 后才会写进语义包，reject 会把决策也记录下来。</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs package propose --from-suggestions
+<span class="prompt">$</span> mcs package propose --from-stdin      <span class="comment"># 从 YAML 创建 ai_context / column_description / column_semantics proposals</span>
+<span class="prompt">$</span> mcs package list-proposals
+<span class="prompt">$</span> mcs package show-proposal &lt;id&gt;
+<span class="prompt">$</span> mcs package apply &lt;id&gt;
+<span class="prompt">$</span> mcs package reject &lt;id&gt; --reason "not correct for this domain"</pre>
+      <p>这是生成式语义建议的默认路径：先 <code>propose --from-suggestions</code>，再用 <code>propose --from-stdin</code> 补 agent 审过的表语义、列描述或 role 修正；如果同一轮 enrich 里需要纠正早先 reject 的 agent YAML proposal，<code>--from-stdin</code> 会把它重新放回 <code>suggested</code> 队列。然后逐条 <code>show-proposal</code> 看证据，正确的 <code>apply</code>，不符合业务口径的 <code>reject</code> 并写原因。agent 的 <code>enrich</code> runtime skill 也走这条链路。</p>
+      <div class="card-note">
+        <strong>为什么走 proposal 队列</strong>
+        自动建议常常是"看起来合理"，但业务口径可能差一个枚举、一个粒度或一个时间字段。proposal 让生成建议和写入语义包之间多一道审核门，profile 的自动 git 历史里也会留下 apply / reject 记录。
+      </div>
+
+      <h3 id="annotate"><span class="num">3.3</span>语义标注：全部通过 proposal 队列</h3>
+      <p>所有语义标注写入都通过 <code>mcs package propose</code> → 审核 → <code>mcs package apply</code>，没有直写入口。可以标注的业务语义包括：</p>
+      <ul>
+        <li><code>ai_context</code> —— 这张表是干嘛的（一段自然语言描述）</li>
+        <li><code>dimensions</code> / <code>measures</code> / <code>identifiers</code> —— 列的角色分类</li>
+        <li>每列的 <code>semantic_description</code> —— 这列是啥（语义解释，不是字段名重述）</li>
+      </ul>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs package propose --from-stdin <span class="comment"># 提交待审核的语义标注 proposal</span>
+<span class="prompt">$</span> mcs package list-proposals <span class="comment"># 查看待审核队列</span>
+<span class="prompt">$</span> mcs package apply &lt;id&gt; <span class="comment"># 审核通过后写入</span></pre>
+      <p>看哪些表标了哪些没标：<code>mcs status --tables</code>，最后一列是 <code>Annotated: yes/no/partial</code>。</p>
+
+      <h3 id="metric-verb"><span class="num">3.4</span>mcs metric：自上而下命名业务指标</h3>
+      <p>
+        把"用户每月已支付订单总金额"这类<strong>有业务名字、会反复用</strong>的算法
+        显式登记下来，下次问到直接复用，不用每次重新拼 SQL。
+        metric 是 profile 全局的 <code>UNIQUE(name)</code>，跨 source 也只能有一个
+        <code>total_revenue</code>。
+      </p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs metric add total_revenue --expression "SUM(orders.amount)"
+<span class="prompt">$</span> mcs metric list
+<span class="prompt">$</span> mcs metric show total_revenue
+<span class="prompt">$</span> mcs metric edit total_revenue --description "..."
+<span class="prompt">$</span> mcs metric remove total_revenue</pre>
+      <div class="card-note">
+        <strong>measure vs metric</strong>
+        <code>--role measure</code> 是<strong>列级</strong>属性（"这列能 SUM"）；
+        <code>mcs metric add</code> 是<strong>顶层实体</strong>（"这个数有业务名字"）。
+        两者不冲突：measure 标在列上，metric 注册在 profile 全局。
+      </div>
+      <p>批量导入也支持：<code>mcs package propose --from-stdin</code> 接受顶层的 <code>metrics:</code> 列表（和 <code>tables:</code> 并列），通过 proposal 队列审核后写入。</p>
+      <p>OSI 导出（<code>mcs profile export --osi</code>）会把这些 metric 写到 <code>semantic_model.metrics[]</code>，下游 OSI 工具直接读得到。</p>
+
+      <h3 id="sql"><span class="num">3.5</span>mcs sql：review / execute / async / cost / explain</h3>
+      <p>这些动词覆盖"跑 SQL"的全部场景：</p>
+      <table>
+        <thead><tr><th>命令</th><th>用途</th><th>何时用</th></tr></thead>
+        <tbody>
+          <tr><td><code>sql review</code></td><td>本地静态审查 SQL（不走 MaxCompute）</td><td>execute 之前先扫一遍，避免低级错误浪费一次往返</td></tr>
+          <tr><td><code>sql execute</code></td><td>同步执行并返回结果</td><td>探针、小结果、明确低成本的查询</td></tr>
+          <tr><td><code>sql submit/status/wait/result/cancel</code></td><td>异步提交和轮询 MaxCompute instance</td><td>正式分析、大表 JOIN/聚合、confirm 成本或可能超时的查询</td></tr>
+          <tr><td><code>sql cost</code></td><td>估价 + 给"过 / 不过"判定</td><td>大表查询前先看一眼</td></tr>
+          <tr><td><code>sql explain</code></td><td>出执行计划</td><td>优化 SQL 时</td></tr>
+        </tbody>
+      </table>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs sql review  "SELECT IIF(x &gt; 0, 1, 0) FROM orders"
+<span class="comment"># → issues[0].rule = dialect.sqlite-iif · 建议改写成 CASE WHEN</span>
+<span class="prompt">$</span> mcs sql execute "SELECT COUNT(*) FROM orders WHERE ds = '20260520'"
+<span class="prompt">$</span> mcs sql submit -y "SELECT * FROM big_a JOIN big_b ON big_a.id = big_b.id"
+<span class="prompt">$</span> mcs sql wait &lt;instance_id&gt;   <span class="comment"># 看 lifecycle_state / successful</span>
+<span class="prompt">$</span> mcs sql result &lt;instance_id&gt; <span class="comment"># lifecycle_state == "success" 后再取 rows</span>
+<span class="prompt">$</span> mcs sql result --offset 10000 &lt;instance_id&gt; <span class="comment"># has_more=true 时取下一页</span>
+<span class="prompt">$</span> mcs sql cost    "SELECT * FROM orders"
+<span class="comment"># → verdict: confirm · cost 12.4 CNY · 大表全扫，建议加分区</span>
+<span class="prompt">$</span> mcs sql explain "SELECT ds, SUM(amount) FROM orders GROUP BY ds"</pre>
+      <div class="card-note">
+        <strong>review 输出两层</strong>
+        <code>issues</code>（error / warning，方言不兼容、表/列不存在之类的硬错误）和 <code>hints</code>（info，未声明的 JOIN、维度被聚合等"可能误用"的提示）。agent 工作流是先 <code>review</code> 修掉所有 issues、看 hints 决定是否继续，再走 <code>execute</code>；这一步不耗 MaxCompute 配额。
+      </div>
+      <div class="card-note">
+        <strong>没有语义包也可以 review</strong>
+        未 build 的 profile 会返回 <code>review_mode: syntax_only</code> 和 <code>semantic_checks_skipped: true</code>，仍然检查 SQLite 方言、不可用函数、3 级项目裸表名等不依赖语义包的问题；表/列存在性、JOIN/聚合等语义检查会跳过。不要为了补全 review 在查询中途跑 <code>mcs build</code>。
+      </div>
+      <div class="card-note">
+        <strong>cost 的 verdict 三档</strong>
+        <code>ok</code>（低于 <code>confirm_cny</code> 阈值，安全）/ <code>confirm</code>（在 confirm 和 blocked 之间，agent 会请用户确认）/ <code>blocked</code>（超过 <code>blocked_cny</code>，agent 默认不执行）。默认 confirm=10 CNY，blocked=100 CNY；改阈值进 <code>mcs profile update</code> 找 <code>cost_thresholds</code>。
+      </div>
+      <div class="card-note">
+        <strong>execute / submit 默认只读</strong>
+        <code>mcs sql execute</code> 和 <code>mcs sql submit</code> 默认拒绝 DML/DDL、<code>SET</code> 这类 session mutation，以及无法识别为读查询的语句；用户明确要求写入时才传 <code>--allow-write</code>，且仍会经过 cost gate。
+      </div>
+      <div class="card-note">
+        <strong>按 verdict 和 SQL 形态选执行方式</strong>
+        不让 agent 猜"短查询"：<code>blocked</code> 不跑；<code>confirm</code> 先问用户，确认后优先走 <code>submit</code> / <code>wait</code> / <code>result</code>；<code>ok</code> 也要继续看 SQL 形态，只有探针、小结果、显式小 <code>LIMIT</code> 或紧分区 lookup/aggregation 才用 <code>execute</code>。正式分析、大表扫描/JOIN/聚合、没有紧分区或 <code>LIMIT</code> 的 SQL、曾经 timeout 的 SQL，即使 <code>ok</code> 也走异步。异步结果要看 <code>lifecycle_state</code>、<code>successful</code> 和 <code>task_statuses</code>，确认 <code>lifecycle_state == "success"</code> 后再取 rows。
+      </div>
+      <div class="card-note">
+        <strong>结果返回默认最多 10000 行</strong>
+        <code>sql execute</code> 和 <code>sql result</code> 不会改写提交的 SQL，也不会自动加 <code>LIMIT</code>；它们只在 reader 输出侧分页。JSON 会返回 <code>result_max_rows</code>、<code>result_offset</code>、<code>has_more</code>、<code>truncated</code> 和 <code>next_offset</code>。需要下一页时传 <code>--offset &lt;next_offset&gt;</code>，需要调整页大小时传 <code>--max-rows N</code>，传 <code>--max-rows 0</code> 可关闭上限。
+      </div>
+      <p>注意：<code>mcs sql cost</code> 即使 <code>blocked</code> 也以 exit code 0 返回 —— verdict 在 JSON 输出的 <code>verdict</code> 字段里，写脚本要读字段不要读 exit code。</p>
+
+      <h3 id="sql-flags"><span class="num">3.6</span>--project / --schema / --profile 的传法</h3>
+      <p>三个标志意思完全不同，最容易记混：</p>
+      <table>
+        <thead><tr><th>标志</th><th>含义</th><th>什么时候要传</th></tr></thead>
+        <tbody>
+          <tr><td><code>--profile X</code></td><td>用哪份本地 profile 配置</td><td>cwd 没绑 / 想临时换 profile 时</td></tr>
+          <tr><td><code>--project P</code></td><td>目标 MaxCompute project</td><td>profile 跨多个 project 且你想指定其中一个时</td></tr>
+          <tr><td><code>--schema S</code></td><td>3 级 project 的 schema 名</td><td>几乎不用 —— mcs 会自动探测并缓存，只在探测错的极少数情况兜底</td></tr>
+        </tbody>
+      </table>
+      <p>2 级 project（没开 schema）跟 3 级 project 的差别 mcs 自动处理，你写 <code>orders</code> 它会变成 <code>my_proj.orders</code> 或 <code>my_proj.default.orders</code>，不用记。</p>
+    </section>
+    <section id="advanced">
+      <h2><span class="num">[04]</span>进阶：memory · udf · meta</h2>
+      <p>这一节是给已经走完主路径、想让 mcs 越用越准的人。</p>
+
+      <h3 id="memory"><span class="num">4.1</span>memory：verify / fail / note / recall</h3>
+      <p>memory 是查询经验库。每问一次 / 每错一次，都可以记下来，下次类似问题就有了参考。三个写入动词 + 一个读取动词：</p>
+      <table>
+        <thead><tr><th>动词</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>memory verify --question Q --sql S --tables T1,T2</code></td><td>记一条"问题 → 正确 SQL"</td></tr>
+          <tr><td><code>memory fail --question Q --sql S --error-msg M</code></td><td>记一条"这么写跑挂了 + 错误信息"，下次 agent 看到类似问题会避开</td></tr>
+          <tr><td><code>memory note '&lt;TEXT&gt;'</code></td><td>自由记一条业务知识（不一定是 SQL）</td></tr>
+          <tr><td><code>memory recall '&lt;keyword&gt;'</code></td><td>BM25 + 向量混合检索三种条目</td></tr>
+        </tbody>
+      </table>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs memory verify \
+    --question "上个月 GMV" \
+    --sql "SELECT SUM(amount) FROM orders WHERE ds BETWEEN '20260401' AND '20260430'" \
+    --tables orders
+<span class="prompt">$</span> mcs memory recall "GMV"</pre>
+      <p>管理：<code>memory list</code> 看全部，<code>memory show &lt;id&gt;</code> 看单条，<code>memory remove &lt;id&gt;</code> 删一条，<code>memory clear</code> 清空（默认只清用户写入，不清自动生成的）。</p>
+      <div class="card-note">
+        <strong>跑 benchmark 时记得关</strong>
+        跑评测（比如 Bird NL2SQL）时设 <code>MCS_NO_HISTORY=1</code>，避免历史经验"漏题"，<code>mcs build</code> 的 history miner 阶段会跳过。
+      </div>
+
+      <h3 id="udf"><span class="num">4.2</span>udf：list / show / search / create / test / remove</h3>
+      <p>读侧（任何人可跑）：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs udf list
+<span class="prompt">$</span> mcs udf show parse_user_agent
+<span class="prompt">$</span> mcs udf search "json"</pre>
+      <p>写侧（要确认 / 需要写权限）：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs udf create my_fn --inline-python my_fn.py --description "解析订单号前缀"
+<span class="prompt">$</span> mcs udf test   my_fn --args '1, "abc"'
+<span class="prompt">$</span> mcs udf remove my_fn --delete-resources</pre>
+      <p><code>udf test --args</code> 只接受 literal：数字、<code>NULL</code>、<code>TRUE/FALSE</code> 和带引号字符串；不会把裸标识符、表达式或分号片段拼进 SQL。当前 <code>create</code> 只支持 inline Python；要挂 jar / resource 的 UDF 走 <code>mcs sql execute --allow-write 'CREATE FUNCTION ...'</code>，仍需用户确认且仍过 cost gate。</p>
+
+      <h3 id="meta"><span class="num">4.3</span>meta：list-tables / describe-table</h3>
+      <p>不依赖语义包、直接打 MaxCompute 元数据的"原始"接口。冷启动（还没 build）、临时查不在 sources 里的表时用：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs meta list-tables --project my_proj
+<span class="prompt">$</span> mcs meta describe-table --project my_proj orders</pre>
+      <p>已经 build 过的表，用 <code>mcs show --table orders</code> 更好 —— 带样例 SQL、JOIN 关系、注释，是语义包里"凝固"的版本。</p>
+    </section>
+    <section id="ops">
+      <h2><span class="num">[05]</span>运维与排查</h2>
+      <p>遇到错的时候、装到新机器的时候、想知道环境啥状态的时候看这里。</p>
+
+      <h3 id="doctor"><span class="num">5.1</span>mcs doctor：一键自检 + JSON 输出</h3>
+      <p>一条命令把 profile / 认证 / 网络 / 语义包 / skill 装得对不对全部检查一遍：</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs doctor                <span class="comment"># 全部检查，含网络</span>
+<span class="prompt">$</span> mcs doctor --offline      <span class="comment"># 不打 ODPS，只看本地配置 / 包 / skill</span>
+<span class="prompt">$</span> mcs -f json doctor        <span class="comment"># 给 agent 解析的 JSON 输出，含每条 remediation</span></pre>
+      <p>典型用法：装完一遍 <code>mcs doctor</code> 看绿；出错时第一反应 <code>mcs -f json doctor</code> 看哪条红了。agent 调用 doctor 后会按 JSON 里的 <code>remediation</code> 字段一步步引导你修。</p>
+
+      <h3 id="skill-install"><span class="num">5.2</span>skill install：55 平台、--all / --detect</h3>
+      <p>把 SKILL.md 软链到你的 agent 工具的 skills 目录。软链而不是拷贝，所以 mcs 升级时 skill 自动同步，不会版本漂移。</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs skill install                       <span class="comment"># 默认装到 .agents/skills/ (项目级)</span>
+<span class="prompt">$</span> mcs skill install -g                    <span class="comment"># 装到全局 (~/.agents/skills/)</span>
+<span class="prompt">$</span> mcs skill install -p claude-code -g     <span class="comment"># 指定 Claude Code 全局</span>
+<span class="prompt">$</span> mcs skill install --all                 <span class="comment"># 装到全部 55+ 平台</span>
+<span class="prompt">$</span> mcs skill install --detect              <span class="comment"># 只装到本机检测到的 agent</span></pre>
+      <p>常用平台对应表：</p>
+      <table>
+        <thead><tr><th>Agent</th><th><code>-p</code> 名字</th></tr></thead>
+        <tbody>
+          <tr><td>通用</td><td><code>agents</code> （默认）</td></tr>
+          <tr><td>Claude Code</td><td><code>claude-code</code></td></tr>
+          <tr><td>Cursor</td><td><code>cursor</code></td></tr>
+          <tr><td>OpenAI Codex</td><td><code>codex</code></td></tr>
+          <tr><td>Gemini CLI</td><td><code>gemini-cli</code></td></tr>
+          <tr><td>Qwen Code</td><td><code>qwen-code</code></td></tr>
+          <tr><td>OpenCode</td><td><code>opencode</code></td></tr>
+          <tr><td>Windsurf</td><td><code>windsurf</code></td></tr>
+          <tr><td>Trae</td><td><code>trae</code></td></tr>
+        </tbody>
+      </table>
+      <p>完整 55+ 平台清单：<code>mcs skill list</code>。其它操作：<code>mcs skill update</code> / <code>uninstall</code> / <code>path</code> / <code>diff</code>。</p>
+      <div class="card-note">
+        <strong>runtime skill 由 CLI 输出</strong>
+        装到 agent 的 <code>SKILL.md</code> 现在只是很薄的 discovery stub；真实工作流用 <code>mcs skill get query</code> / <code>build</code> / <code>enrich</code> 等命令按当前 mcs 版本输出。回答数据问题时只加载 <code>query</code>，显式构建或刷新语义包时才加载 <code>build</code>，避免 query 流程误走 <code>mcs build</code>。
+      </div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs skill catalog
+<span class="prompt">$</span> mcs skill get query
+<span class="prompt">$</span> mcs skill get query --full
+<span class="prompt">$</span> mcs skill get build</pre>
+
+      <h3 id="tier"><span class="num">5.3</span>2 级 vs 3 级 tier 自动探测</h3>
+      <p>MaxCompute project 有两种寻址：2 级（<code>project.table</code>）和 3 级（<code>project.schema.table</code>）。mcs 第一次访问一个 project 时自动探一次，结果缓存到 <code>tier_cache/&lt;project&gt;</code>，之后无需 <code>SET odps.namespace.schema</code>，也不用 <code>--schema</code>。</p>
+      <p>探错了想强制重测：删掉 <code>~/.local/share/maxcompute-semantic/data/&lt;profile&gt;/tier_cache/&lt;project&gt;</code> 这个一字节小文件即可。极端兜底：所有 <code>mcs</code> 命令都接受 <code>--schema S</code> 显式覆盖。</p>
+
+      <h3 id="env"><span class="num">5.4</span>常用环境变量</h3>
+      <table>
+        <thead><tr><th>变量</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><code>MCS_PROFILE</code></td><td>解析链第 2 档：在没绑 cwd / 没 <code>--profile</code> 时指定 profile</td></tr>
+          <tr><td><code>MCS_NO_HISTORY=1</code></td><td>跳过 <code>mcs build</code> 的 history 挖掘 —— 跑评测时必开</td></tr>
+          <tr><td><code>MCS_NO_VERSIONING=1</code></td><td>关闭 profile 自动 git commit —— 跑 CI 批跑时可开</td></tr>
+          <tr><td><code>MCS_DATA_DIR</code></td><td>改本地数据目录（默认 <code>~/.local/share/maxcompute-semantic/</code>）</td></tr>
+          <tr><td><code>ALIBABA_CLOUD_ACCESS_KEY_ID</code> 等四件套</td><td>解析链第 4 档：完全不用 profile 时的兜底</td></tr>
+        </tbody>
+      </table>
+      <p>truthy 值大小写不敏感：<code>1</code> / <code>true</code> / <code>yes</code> / <code>on</code>。</p>
+    </section>
+    <section id="agent">
+      <h2><span class="num">[06]</span>给 Agent 的"对话脚本"</h2>
+      <p>mcs 装上 skill 之后，你跟 agent 说话就够了 —— agent 会自动调 <code>mcs</code> 命令。这一节给的是"该说什么"的范本。</p>
+
+      <h3 id="agent-trigger"><span class="num">6.1</span>唤起 skill 的话术</h3>
+      <p>大多数 agent 见到下面这类关键词会自动加载 maxcompute-semantic skill：</p>
+      <ul>
+        <li>明说品牌名：<strong>"用 mcs"、"用 maxcompute"、"用 ODPS"</strong></li>
+        <li>显式调 skill：<strong>"/maxcompute-semantic ..."</strong>（Claude Code / Codex 等支持斜杠的 agent）</li>
+        <li>动词触发：<strong>"查一下"、"建表"、"算个"、"统计一下" + 一张你的 MaxCompute 表名</strong></li>
+      </ul>
+      <p>如果 agent 没唤起 skill（直接生成了不能跑的 SQL），最稳的兜底是显式提："请加载 maxcompute-semantic skill 再回答"。</p>
+
+      <h3 id="agent-prompts"><span class="num">6.2</span>常见任务示例</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> 用 mcs 查一下上个月 orders 表的 GMV
+<span class="prompt">agent&gt;</span> ODPS 上 products 这张表是干嘛的？字段都什么意思？
+<span class="prompt">agent&gt;</span> 上次问过的 DAU 算法还记得吗？把那条 SQL 重跑一下
+<span class="prompt">agent&gt;</span> 这条 SQL 估一下要花多少钱：&lt;贴 SQL&gt;
+<span class="prompt">agent&gt;</span> 把刚才这条跑通的 SQL 记到 mcs memory 里，问题叫 "月度活跃用户"</pre>
+      <p>agent 会按需调 <code>sql cost</code> 估价，用 <code>sql execute</code> 跑探针/小结果查询，或用 <code>sql submit</code> / <code>sql wait</code> / <code>sql result</code> 跑正式分析、confirm 成本和可能超时的查询；也会用 <code>show --table</code> 查结构、<code>memory recall</code> 找历史、<code>memory verify</code> 沉淀新经验。</p>
+
+      <h3 id="agent-meta"><span class="num">6.3</span>让 agent 报 bug / 自检</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> 帮我报一个 mcs 的 bug：&lt;描述现象&gt;
+<span class="prompt">agent&gt;</span> mcs 环境检查一下</pre>
+      <p>报 bug 时 skill 会按 Aone 工单规范走 —— 自动加 <code>[maxcompute-semantic]</code> 前缀、设关联项目 2155299、把版本号和 doctor 输出附进去。环境检查会跑 <code>mcs -f json doctor</code> 并把红条目用人话讲给你听。</p>
+    </section>
+  </main>
+</div>
+
+<div class="frame">
+  <footer class="footer">
+    <span class="left">
+      <span class="mark" aria-hidden="true"></span>
+      <span>mcs</span>
+      <span style="color: var(--ink-faint);">·</span>
+      <span>MaxCompute Semantic CLI</span>
+    </span>
+    <span class="right">Apache-2.0 · <a href="index.html">回首页</a> · <a href="release-notes.html">release notes</a></span>
+  </footer>
+</div>
+
+<script>
+function setTheme(pref) {
+  localStorage.setItem('theme', pref);
+  applyTheme(pref);
+}
+function applyTheme(pref) {
+  var resolved = pref === 'auto'
+    ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+    : pref;
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute('data-theme-pref', pref);
+  var btns = document.querySelectorAll('[data-theme-pref-btn]');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('data-theme-pref-btn') === pref) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+}
+(function() {
+  var pref = localStorage.getItem('theme') || 'auto';
+  applyTheme(pref);
+})();
+if (window.matchMedia) {
+  var mql = window.matchMedia('(prefers-color-scheme: light)');
+  if (mql.addEventListener) {
+    mql.addEventListener('change', function() {
+      if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme('auto');
+    });
+  }
+}
+
+function copyCodeBlock(btn) {
+  var pre = btn.parentElement;
+  var clone = pre.cloneNode(true);
+  var copy = clone.querySelector('.code-copy');
+  if (copy) copy.remove();
+  var text = clone.textContent;
+  function flash() {
+    var original = btn.textContent;
+    btn.textContent = 'copied';
+    setTimeout(function() { btn.textContent = original; }, 1500);
+  }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(flash);
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    flash();
+  }
+}
+(function() {
+  var sections = document.querySelectorAll('.docs-main section[id]');
+  var subHeads = document.querySelectorAll('.docs-main section h3[id]');
+  var sectionLinks = {};
+  var subLinks = {};
+  document.querySelectorAll('.toc-section').forEach(function(li) {
+    sectionLinks[li.getAttribute('data-section')] = li;
+  });
+  document.querySelectorAll('.toc-sub a').forEach(function(a) {
+    var id = a.getAttribute('href').slice(1);
+    subLinks[id] = a;
+  });
+
+  function setActiveSection(id) {
+    Object.keys(sectionLinks).forEach(function(k) {
+      sectionLinks[k].classList.toggle('active', k === id);
+    });
+  }
+  function setActiveSub(id) {
+    Object.keys(subLinks).forEach(function(k) {
+      subLinks[k].classList.toggle('active', k === id);
+    });
+  }
+
+  if (!('IntersectionObserver' in window)) return;
+
+  var sectionObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) setActiveSection(e.target.id);
+    });
+  }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+  sections.forEach(function(s) { sectionObserver.observe(s); });
+
+  var subObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) setActiveSub(e.target.id);
+    });
+  }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+  subHeads.forEach(function(h) { subObserver.observe(h); });
+
+  if (sections.length) setActiveSection(sections[0].id);
+})();
+</script>
+
+<script>document.addEventListener("click",function(e){var t=e.target.closest("[data-lang]");if(t){localStorage.setItem("mcs-lang",t.dataset.lang);return}if(!e.target.closest(".lang-select")){document.querySelectorAll(".lang-select.open").forEach(function(el){el.classList.remove("open")})}})</script>
+</body>
+</html>

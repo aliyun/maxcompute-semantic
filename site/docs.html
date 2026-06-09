@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="alternate" hreflang="en" href="docs.html">
+<link rel="alternate" hreflang="zh-CN" href="zh-cn/docs.html">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mcs · documentation</title>
+<script>
+  (function() {
+    try {
+      var pref = localStorage.getItem('theme') || 'auto';
+      var resolved = pref === 'auto'
+        ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : pref;
+      document.documentElement.setAttribute('data-theme', resolved);
+      document.documentElement.setAttribute('data-theme-pref', pref);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.setAttribute('data-theme-pref', 'auto');
+    }
+  })();
+  (function() {
+    try {
+      if (localStorage.getItem('mcs-lang')) return;
+      var langs = navigator.languages || [navigator.language || navigator.userLanguage || 'en'];
+      var first = langs.find(function(l) { return /^(zh|en)/i.test(l); }) || 'en';
+      if (/^zh/i.test(first)) location.replace('zh-cn/' + (location.pathname.split('/').pop() || 'index.html'));
+    } catch (e) {}
+  })();
+</script>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('fonts/jetbrains-mono-variable.woff2') format('woff2-variations');
+  }
+
+  :root,
+  :root[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --bg-tile: #111111;
+    --bg-deep: #050505;
+    --ink: #ededed;
+    --ink-strong: #ffffff;
+    --ink-muted: #6e6e6e;
+    --ink-faint: #3a3a3a;
+    --rule: #1f1f1f;
+    --rule-strong: #2a2a2a;
+    --accent: #a3e635;
+    --accent-soft: rgba(163, 230, 53, 0.12);
+    --warn: #f97316;
+    --noise: 0.04;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-tile: #ffffff;
+    --bg-deep: #f3f2eb;
+    --ink: #1a1a1a;
+    --ink-strong: #0a0a0a;
+    --ink-muted: #6b6b66;
+    --ink-faint: #c8c6bb;
+    --rule: #1a1a1a;
+    --rule-strong: #0a0a0a;
+    --accent: #3f6212;
+    --accent-soft: rgba(63, 98, 18, 0.08);
+    --warn: #c2410c;
+    --noise: 0.02;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'PingFang SC', 'Microsoft YaHei', monospace;
+    font-feature-settings: 'ss01', 'ss02', 'calt' 1, 'liga' 1;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+      radial-gradient(rgba(0, 0, 0, var(--noise)) 1px, transparent 1px),
+      radial-gradient(rgba(255, 255, 255, calc(var(--noise) * 0.5)) 1px, transparent 1px);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 1px 1px;
+  }
+
+  a { color: var(--ink-strong); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+  /* ── Frame & topbar (same as index.html) ── */
+  .frame { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+  .topbar { border-bottom: 1px solid var(--rule); background: var(--bg); position: sticky; top: 0; z-index: 50; }
+  .topbar-inner { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .brand { display: inline-flex; align-items: baseline; gap: 10px; color: var(--ink-strong); text-decoration: none; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+  .brand:hover { color: var(--ink-strong); text-decoration: none; }
+  .brand .mark { display: inline-block; width: 10px; height: 10px; background: var(--accent); }
+  .brand .ver { color: var(--ink-muted); font-size: 11px; font-weight: 400; letter-spacing: 0; }
+  .nav-links { display: flex; align-items: center; gap: 26px; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .nav-links a { color: var(--ink-muted); text-decoration: none; }
+  .nav-links a:hover { color: var(--ink-strong); }
+  .nav-links a.active { color: var(--ink-strong); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+  .theme-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-muted); letter-spacing: 0.5px; text-transform: lowercase; }
+  .theme-switch .label { color: var(--ink-faint); }
+  .theme-switch button { background: none; border: none; color: var(--ink-muted); font-family: inherit; font-size: inherit; cursor: pointer; padding: 2px 4px; letter-spacing: inherit; text-transform: inherit; }
+  .theme-switch button:hover { color: var(--ink-strong); }
+  .theme-switch button.active { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .theme-switch .sep { color: var(--ink-faint); padding: 0 1px; }
+
+  /* ── Docs layout: sidebar + main ── */
+  .docs { display: grid; grid-template-columns: 220px 1fr; gap: 64px; padding: 48px 0 96px; }
+  .docs-aside { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 8px; }
+  .docs-main { max-width: 760px; min-width: 0; }
+
+  /* ── Sidebar TOC ── */
+  .toc { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+  .toc-section { margin-bottom: 4px; }
+  .toc-section > a {
+    display: block;
+    padding: 6px 12px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    letter-spacing: 0.3px;
+  }
+  .toc-section > a:hover { color: var(--ink-strong); }
+  .toc-section.active > a { color: var(--ink-strong); border-left-color: var(--accent); font-weight: 700; }
+  .toc-sub { list-style: none; padding: 0; margin: 2px 0 6px; display: none; }
+  .toc-section.active .toc-sub { display: block; }
+  .toc-sub li a {
+    display: block;
+    padding: 4px 12px 4px 26px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 11px;
+    border-left: 2px solid transparent;
+  }
+  .toc-sub li a:hover { color: var(--ink-strong); }
+  .toc-sub li a.active { color: var(--accent); border-left-color: var(--accent); }
+
+  /* ── Mobile TOC accordion (≤860px) ── */
+  .toc-mobile { display: none; border: 1px solid var(--rule-strong); background: var(--bg-tile); margin-bottom: 32px; }
+  .toc-mobile-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; color: var(--ink-strong); font-family: inherit; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 14px 18px; cursor: pointer; }
+  .toc-mobile-toggle .chev { color: var(--accent); transition: transform 0.18s; }
+  .toc-mobile[open] .toc-mobile-toggle .chev { transform: rotate(90deg); }
+  .toc-mobile-body { display: none; padding: 4px 18px 18px; border-top: 1px solid var(--rule-strong); }
+  .toc-mobile[open] .toc-mobile-body { display: block; }
+
+  /* ── Headings ── */
+  .docs-main h1 { font-size: 32px; font-weight: 700; color: var(--ink-strong); letter-spacing: -0.8px; margin-bottom: 12px; }
+  .docs-main .lead { color: var(--ink-muted); font-size: 14px; margin-bottom: 56px; }
+  .docs-main h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.4px;
+    margin: 64px 0 8px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    scroll-margin-top: 80px;
+  }
+  .docs-main h2 .num { color: var(--accent); margin-right: 10px; font-size: 14px; vertical-align: 2px; }
+  .docs-main h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .docs-main h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    margin: 36px 0 8px;
+    scroll-margin-top: 80px;
+  }
+  .docs-main h3 .num { color: var(--ink-muted); margin-right: 8px; font-weight: 400; }
+
+  /* ── Body copy ── */
+  .docs-main p { margin: 12px 0; }
+  .docs-main p code,
+  .docs-main li code,
+  .docs-main td code {
+    color: var(--ink-strong);
+    background: var(--bg-deep);
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    font-size: 0.92em;
+    white-space: nowrap;
+  }
+  .docs-main strong { color: var(--ink-strong); font-weight: 700; }
+  .docs-main ul, .docs-main ol { margin: 12px 0 12px 24px; }
+  .docs-main li { margin: 6px 0; }
+
+  /* ── Code blocks ── */
+  .code-block {
+    position: relative;
+    background: var(--bg-deep);
+    border: 1px solid var(--rule-strong);
+    border-left-width: 1px;
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding: 16px 20px 16px 24px;
+    margin: 16px 0 20px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code-block .prompt { color: var(--accent); font-weight: 700; user-select: none; margin-right: 6px; }
+  .code-block .comment { color: var(--ink-muted); }
+  .code-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 3px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: all 0.12s;
+  }
+  .code-block:hover .code-copy { opacity: 1; }
+  .code-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Tables ── */
+  .docs-main table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13px;
+  }
+  .docs-main th, .docs-main td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .docs-main th {
+    color: var(--ink-strong);
+    font-weight: 700;
+    border-bottom-color: var(--rule-strong);
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  /* ── Callout card (.card-note) ── */
+  .card-note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 18px;
+    margin: 18px 0;
+    font-size: 13px;
+  }
+  .card-note strong { display: block; color: var(--ink-strong); margin-bottom: 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── Concept diagram (mono ASCII for simple Latin-only flows) ── */
+  .concept-diagram {
+    background: var(--bg-deep);
+    border: 1px solid var(--rule-strong);
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding: 18px 22px;
+    margin: 20px 0 24px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* ── Concept stage (matches index.html [00] aesthetic) ── */
+  .concept-stage {
+    position: relative;
+    background: var(--bg-deep);
+    border-left: 3px solid var(--accent);
+    padding: 26px 28px 22px 32px;
+    margin: 20px 0 24px;
+    color: var(--ink);
+  }
+  .concept-stage::before {
+    content: "// concept map";
+    position: absolute;
+    top: -7px; left: 22px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+  }
+  .cs-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--ink-strong);
+    letter-spacing: -0.3px;
+    margin: 4px 0 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .cs-hero-actor {
+    color: var(--ink-muted);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .cs-hero-noun {
+    color: var(--accent);
+    font-weight: 700;
+    position: relative;
+  }
+  .cs-hero-noun::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -3px;
+    height: 1px;
+    background: var(--accent);
+    opacity: 0.35;
+  }
+  .cs-hero-op {
+    color: var(--ink-faint);
+    font-weight: 400;
+    margin: 0 2px;
+  }
+  .cs-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .cs-col { display: flex; flex-direction: column; gap: 10px; }
+  .cs-anchor {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.2px;
+  }
+  .cs-anchor-tag {
+    color: var(--accent);
+    margin-right: 6px;
+    font-weight: 700;
+  }
+  .cs-props {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .cs-props li {
+    display: grid;
+    grid-template-columns: 52px 14px 1fr;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    align-items: baseline;
+  }
+  .cs-key { color: var(--accent); font-weight: 600; }
+  .cs-sep { color: var(--ink-faint); }
+  .cs-val { color: var(--ink); }
+  .cs-link {
+    display: flex; flex-direction: column;
+    align-items: stretch; justify-content: flex-start;
+    padding-top: 12px;
+    min-width: 96px;
+  }
+  .cs-verb {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .cs-flow {
+    position: relative; display: block;
+    height: 1px;
+    margin-right: 8px;
+  }
+  .cs-flow-line {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      var(--accent) 12%,
+      var(--accent) 92%,
+      transparent 100%);
+  }
+  .cs-flow::after {
+    content: "";
+    position: absolute;
+    right: -8px; top: 50%;
+    transform: translateY(-50%);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 7px solid var(--accent);
+  }
+  .cs-formula {
+    margin: 22px 0 0;
+    padding-top: 16px;
+    border-top: 1px dashed var(--rule);
+    font-size: 12px;
+    color: var(--ink-muted);
+    letter-spacing: 0.2px;
+  }
+  .cs-formula-label {
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .cs-formula .cs-ref {
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0 1px;
+  }
+  .cs-formula em {
+    font-style: normal;
+    color: var(--ink);
+  }
+  .cs-example {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--ink-muted);
+    padding-left: 14px;
+    position: relative;
+  }
+  .cs-example::before {
+    content: "e.g.";
+    position: absolute; left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  @media (max-width: 720px) {
+    .concept-stage { padding: 22px 18px 18px 22px; }
+    .cs-hero { font-size: 16px; margin-bottom: 18px; padding-bottom: 16px; }
+    .cs-hero-actor { font-size: 12px; }
+    .cs-grid { grid-template-columns: 1fr; gap: 0; }
+    .cs-link {
+      padding: 12px 0; flex-direction: row;
+      align-items: center; width: auto;
+      min-width: 0; gap: 10px;
+    }
+    .cs-verb { margin: 0; flex: 0 0 auto; }
+    .cs-flow { width: 40px; flex: 0 0 40px; margin: 0; }
+  }
+
+  /* ── Inline "why this step" note (lighter than .card-note) ── */
+  .step-why {
+    border-left: 2px solid var(--ink-faint);
+    padding: 4px 0 4px 12px;
+    margin: 8px 0 12px;
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+  .step-why::before { content: "ⓘ  "; color: var(--accent); font-weight: 700; }
+  .step-why code { color: var(--ink); }
+
+  /* ── Footer ── */
+  .footer {
+    border-top: 1px solid var(--rule);
+    margin-top: 0;
+    padding: 32px 0;
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer .left { display: inline-flex; align-items: center; gap: 10px; }
+  .footer .left .mark { display: inline-block; width: 8px; height: 8px; background: var(--accent); }
+  .footer a { color: var(--ink); text-decoration: none; }
+  .footer a:hover { color: var(--accent); }
+  .footer .right { color: var(--ink-faint); }
+
+  /* ── Lang switch ── */
+
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    .frame { padding: 0 22px; }
+    .nav-links { gap: 16px; }
+    .theme-switch { display: none; }
+    .docs { grid-template-columns: 1fr; gap: 0; padding: 32px 0 64px; }
+    .docs-aside { display: none; }
+    .toc-mobile { display: block; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+
+  .lang-select {
+    position: relative;
+    display: inline-flex;
+  }
+  .lang-current {
+    background: none;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .lang-current:hover { color: var(--ink-strong); border-color: var(--ink-strong); }
+  .lang-current .chev { font-size: 9px; margin-left: 2px; }
+  .lang-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule-strong);
+    min-width: 120px;
+    z-index: 100;
+  }
+  .lang-select.open .lang-menu { display: block; }
+  .lang-menu a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+  .lang-menu a:hover { color: var(--ink-strong); background: var(--bg-deep); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="frame topbar-inner">
+    <a href="index.html" class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span>mcs</span>
+      <!-- v0.16 replaced by .github/workflows/pages.yml at deploy time; do not hand-edit -->
+      <span class="ver">v0.16</span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">home</a>
+      <a href="docs.html" class="active">docs</a>
+      <a href="release-notes.html">release notes</a>
+      <div class="theme-switch" role="group" aria-label="Switch theme">
+        <span class="label">theme:</span>
+        <button type="button" data-theme-pref-btn="dark" onclick="setTheme('dark')">dark</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="light" onclick="setTheme('light')">light</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="auto" onclick="setTheme('auto')">auto</button>
+      </div>
+      <div class="lang-select">
+        <button type="button" class="lang-current" onclick="this.parentElement.classList.toggle('open')">English <span class="chev">▾</span></button>
+        <div class="lang-menu">
+          <a href="zh-cn/docs.html" data-lang="zh-cn">中文 (简体)</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="frame docs">
+  <aside class="docs-aside" aria-label="Table of contents">
+    <ul class="toc">
+      <li class="toc-section" data-section="concept">
+        <a href="#concept">[00] Concepts</a>
+      </li>
+      <li class="toc-section" data-section="quickstart">
+        <a href="#quickstart">[01] Quick Start</a>
+      </li>
+      <li class="toc-section" data-section="profile">
+        <a href="#profile">[02] Profile</a>
+        <ul class="toc-sub">
+          <li><a href="#profile-resolve">2.1 Resolution chain</a></li>
+          <li><a href="#profile-create">2.2 Create</a></li>
+          <li><a href="#profile-link">2.3 cwd binding</a></li>
+          <li><a href="#profile-inspect">2.4 Inspect / whoami</a></li>
+          <li><a href="#profile-version">2.5 Versioning</a></li>
+          <li><a href="#profile-export">2.6 Export / OSI</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="query">
+        <a href="#query">[03] Core Queries</a>
+        <ul class="toc-sub">
+          <li><a href="#build">3.1 build</a></li>
+          <li><a href="#package-proposals">3.2 package proposals</a></li>
+          <li><a href="#annotate">3.3 Semantic annotations</a></li>
+          <li><a href="#metric-verb">3.4 metric</a></li>
+          <li><a href="#sql">3.5 sql</a></li>
+          <li><a href="#sql-flags">3.6 project / schema / profile</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="advanced">
+        <a href="#advanced">[04] Advanced</a>
+        <ul class="toc-sub">
+          <li><a href="#memory">4.1 memory</a></li>
+          <li><a href="#udf">4.2 udf</a></li>
+          <li><a href="#meta">4.3 meta</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="ops">
+        <a href="#ops">[05] Operations</a>
+        <ul class="toc-sub">
+          <li><a href="#doctor">5.1 doctor</a></li>
+          <li><a href="#skill-install">5.2 skill install</a></li>
+          <li><a href="#tier">5.3 tier</a></li>
+          <li><a href="#env">5.4 Environment variables</a></li>
+        </ul>
+      </li>
+      <li class="toc-section" data-section="agent">
+        <a href="#agent">[06] Agent Prompts</a>
+        <ul class="toc-sub">
+          <li><a href="#agent-trigger">6.1 Triggering</a></li>
+          <li><a href="#agent-prompts">6.2 Examples</a></li>
+          <li><a href="#agent-meta">6.3 Report bugs / diagnostics</a></li>
+        </ul>
+      </li>
+    </ul>
+  </aside>
+
+  <main class="docs-main">
+    <details class="toc-mobile">
+      <summary class="toc-mobile-toggle">
+        <span>Table of contents</span>
+        <span class="chev">›</span>
+      </summary>
+      <div class="toc-mobile-body">
+        <ul style="list-style:none;padding:0;margin:0;font-size:12px;">
+          <li style="margin:6px 0;"><a href="#concept">[00] Concepts</a></li>
+          <li style="margin:6px 0;"><a href="#quickstart">[01] Quick Start</a></li>
+          <li style="margin:6px 0;"><a href="#profile">[02] Profile</a></li>
+          <li style="margin:6px 0;"><a href="#query">[03] Core Queries</a></li>
+          <li style="margin:6px 0;"><a href="#advanced">[04] Advanced</a></li>
+          <li style="margin:6px 0;"><a href="#ops">[05] Operations</a></li>
+          <li style="margin:6px 0;"><a href="#agent">[06] Agent Prompts</a></li>
+        </ul>
+      </div>
+    </details>
+
+    <h1>Documentation</h1>
+    <p class="lead">End-user documentation. Each section covers "when to use, how to use, a proper example". For the full parameter list, run <code>mcs &lt;cmd&gt; --help</code>.</p>
+
+    <section id="concept">
+      <h2><span class="num">[00]</span>Concepts: profile, semantic package, business scenario</h2>
+      <p>Learn these three terms before using mcs — every command revolves around them.</p>
+
+      <div class="concept-stage">
+        <p class="cs-hero">
+          <span class="cs-hero-actor">You configure</span>
+          <span class="cs-hero-noun">profile</span>
+          <span class="cs-hero-op">→</span>
+          <span class="cs-hero-actor">mcs produces</span>
+          <span class="cs-hero-noun">semantic package</span>
+          <span class="cs-hero-op">→</span>
+          <span class="cs-hero-actor">agent reads it to</span>
+          <span class="cs-hero-noun">write SQL</span>
+        </p>
+
+        <div class="cs-grid">
+          <div class="cs-col">
+            <div class="cs-anchor"><span class="cs-anchor-tag">[A]</span>profile</div>
+            <ul class="cs-props">
+              <li><span class="cs-key">identity</span><span class="cs-sep">→</span><span class="cs-val">AK / passwordless</span></li>
+              <li><span class="cs-key">scenario</span><span class="cs-sep">→</span><span class="cs-val">description</span></li>
+              <li><span class="cs-key">tables</span><span class="cs-sep">→</span><span class="cs-val">sources × N</span></li>
+            </ul>
+          </div>
+          <div class="cs-link" aria-hidden="true">
+            <span class="cs-verb">mcs build</span>
+            <span class="cs-flow"><span class="cs-flow-line"></span></span>
+          </div>
+          <div class="cs-col">
+            <div class="cs-anchor"><span class="cs-anchor-tag">[B]</span>semantic package</div>
+            <ul class="cs-props">
+              <li><span class="cs-key">contents</span><span class="cs-sep">→</span><span class="cs-val">tables / columns / JOINs / UDFs</span></li>
+              <li><span class="cs-key">location</span><span class="cs-sep">→</span><span class="cs-val">local directory</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <p class="cs-formula"><span class="cs-formula-label">Business scenario</span> = <span class="cs-ref">[A]</span> + <span class="cs-ref">[B]</span> + accumulated <em>semantic annotations</em> / <em>memory</em></p>
+        <p class="cs-example">"Data warehouse A monthly analysis" = 12 tables from dwd / dws + GMV formula notes</p>
+      </div>
+
+      <ul>
+        <li><strong>profile</strong> — a configuration that answers two questions: <em>who am I</em> (AK or passwordless, which RAM principal it resolves to) + <em>which tables do I see</em> (one or more sources, each source being a set of <code>project.schema.tables</code>). A single machine can have any number of profiles.</li>
+        <li><strong>semantic package</strong> — <code>mcs build</code> scans all tables covered by the profile, samples a few rows, infers JOIN relationships, discovers UDFs, and writes them to a local directory. The agent reads this package before writing SQL, so it does not need to query MaxCompute metadata every time.</li>
+        <li><strong>business scenario</strong> — not an entity in mcs, but a usage convention: <em>one business domain maps to one profile</em> (one for data warehouse A, one for marketing B, another for cross-domain metrics). The semantic annotations (written via the proposal queue) and memory (verified SQL) accumulated under one profile all belong to that business line.</li>
+      </ul>
+
+      <div class="card-note">
+        <strong>Purpose of authentication</strong>
+        mcs uses <em>your</em> RAM permissions to list tables, run SQL, and scan metadata — it does not use a shared account. So the semantic package produced by <code>mcs build</code> only covers the tables <em>you can see</em>; building with a different AK will produce a different package. This is why the wizard's first step asks about auth: it determines the scope of everything that follows.
+      </div>
+
+      <div class="card-note">
+        <strong>Next steps</strong>
+        <a href="#quickstart">[01] Quick Start</a> gets you running in 5 minutes; for a deep dive into profile resolution chains / cwd bindings / versioning, see <a href="#profile">[02] Profile</a>.
+      </div>
+    </section>
+
+    <section id="quickstart">
+      <h2><span class="num">[01]</span>Quick Start</h2>
+      <p>5 minutes, from zero to your first SQL.</p>
+
+      <h3 id="qs-install"><span class="num">1.</span>Install mcs</h3>
+      <p>Letting the agent install it is the fastest path — it will also set up the skill. Send this message to your agent:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> Install mcs for me, read this guide fully then follow step by step: curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md</pre>
+      <p>Or install it yourself:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> uv tool install maxcompute-semantic</pre>
+      <p>After installation, run <code>mcs --version</code> to verify. If <code>~/.local/bin</code> is not in your PATH, you need to add it (see <a href="https://github.com/aliyun/maxcompute-semantic#install">README</a>).</p>
+
+      <h3 id="qs-profile"><span class="num">2.</span>Create a profile</h3>
+      <div class="step-why">One business scenario maps to one profile, answering "who am I + which tables do I see". See <a href="#concept">[00] Concepts</a> for details.</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile create</pre>
+      <p>The wizard will ask: profile name, target MaxCompute project, AK or passwordless auth, endpoint region. All fields can be changed later (<code>mcs profile update</code>).</p>
+      <p>
+        For AK auth, prefer environment-variable references or ProcessAuth/ncs. For
+        non-interactive literal-AK setup, pass <code>--ak-literal</code> with
+        <code>--ak-id</code> and pipe one secret line with
+        <code>--ak-secret-stdin</code>; avoid <code>--ak-secret</code> unless
+        shell-history exposure is acceptable.
+      </p>
+
+      <h3 id="qs-link"><span class="num">3.</span>Bind the current directory to a profile</h3>
+      <div class="step-why">Once bound, <code>mcs</code> commands in this directory will default to this profile — the agent will too — no need to pass <code>--profile</code> every time.</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> cd ~/work/my-data-project
+<span class="prompt">$</span> mcs link bind &lt;profile-name&gt;</pre>
+      <p>Check / unbind: <code>mcs link status</code>, <code>mcs link unlink</code>.</p>
+
+      <h3 id="qs-build"><span class="num">4.</span>Run a build (generate the semantic package)</h3>
+      <div class="step-why">Scans all tables covered by the profile and generates the local knowledge base the agent reads before writing SQL — table schemas, sample data, JOIN relationships, and UDFs are all included. Takes a few minutes; afterwards the agent does not need to query MaxCompute metadata on every request.</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs build</pre>
+      <p>After it finishes, run <code>mcs status --tables</code> to see the number of tables / columns / JOINs collected. If table schemas changed, <code>mcs build --refresh</code> only updates modified tables. <strong>Not a required step</strong>: you can skip it — without a semantic package the agent uses cold-start mode (<code>mcs meta list-tables</code> / <code>describe-table</code>) to query metadata live — it works but is slower each time.</p>
+
+      <h3 id="qs-ask"><span class="num">5.</span>Start asking</h3>
+      <div class="step-why">The agent reads the semantic package from the previous step to write SQL, then runs <code>mcs sql cost</code> for cost estimation and <code>mcs sql execute</code> for execution. <code>mcs build</code> is a one-time onboarding step and does not appear in the query flow.</div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> Use mcs to query last month's GMV from the orders table</pre>
+      <p>The agent will automatically call <code>mcs sql cost</code> for cost estimation, <code>mcs sql execute</code> for execution, and summarize the results in plain language. If you want to verify, you can run <code>mcs sql execute "..."</code> directly in the terminal.</p>
+
+      <div class="card-note">
+        <strong>Next steps</strong>
+        To understand the profile resolution mechanism (multi-profile / cwd binding / which environment variable takes precedence), see <a href="#profile">[02] Profile</a>. To jump straight to running SQL accurately and cost-effectively, go to <a href="#query">[03] Core Queries</a>.
+      </div>
+    </section>
+    <section id="profile">
+      <h2><span class="num">[02]</span>Profile: Identity, Organization, and Versioning</h2>
+      <p>A profile is mcs's single abstraction for "who am I, where do I connect". One profile contains: a MaxCompute compute project, an endpoint, an auth method (AK / passwordless), a list of sources to scan (each source is a set of <code>project.schema.tables</code>), and cost thresholds.</p>
+
+      <pre class="concept-diagram">profile ──build──▶ semantic package ──reads──▶ agent writes SQL
+   │
+   └─ scopes a business scenario (a set of sources + an identity + associated annotations/memory)</pre>
+
+      <h3 id="profile-resolve"><span class="num">2.1</span>Resolution chain: which profile is active?</h3>
+      <p>Every <code>mcs</code> command resolves the profile in this order, using the first match:</p>
+      <ol>
+        <li>Explicit <code>--profile X</code> flag</li>
+        <li>Environment variable <code>MCS_PROFILE</code></li>
+        <li>Current directory's <code>mcs link bind</code> binding</li>
+        <li>Standard ODPS environment variable quartet (<code>ALIBABA_CLOUD_ACCESS_KEY_ID</code>, etc.) — constructs an in-memory temporary profile</li>
+      </ol>
+      <p>To see which profile is currently active: <code>mcs profile show</code>.</p>
+
+      <h3 id="profile-create"><span class="num">2.2</span>Create: wizard and multi-source DataSource</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile create</pre>
+      <p>The interactive wizard walks you through: name, compute project, endpoint, auth, and sources to include in the semantic package. A profile can have multiple sources (e.g., scanning both <code>dwd</code> and <code>ads</code> from the data warehouse, or spanning two projects) — <code>mcs build</code> processes all sources in a single pass. In the agent flow, the wizard first asks what scenario this semantic package should address (business questions, domain, metrics of interest) and stores it as the profile's <code>description</code>; when selecting tables, the agent recommends candidates from <code>mcs meta list-tables</code> results based on this scenario description — you add or remove from those candidates instead of picking blindly from hundreds of tables. <code>mcs build</code> writes this description into the semantic package's <code>_overview.md</code>.</p>
+      <p>
+        For AK auth, prefer environment-variable references or ProcessAuth/ncs. For
+        non-interactive literal-AK setup, pass <code>--ak-literal</code> with
+        <code>--ak-id</code> and pipe one secret line with
+        <code>--ak-secret-stdin</code>; avoid <code>--ak-secret</code> unless
+        shell-history exposure is acceptable.
+      </p>
+      <p>
+        To reuse maxc / odpscmd configuration, run <code>mcs profile import-creds</code>. If the external
+        configuration uses a non-ncs <code>ProcessAuth</code> helper, the CLI will display the full command
+        and require explicit trust; after confirming the local command is safe, import with
+        <code>--trust-process-command</code>.
+      </p>
+      <p>Already created a profile and want to change fields:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile update &lt;name&gt;</pre>
+      <p>Opens a multi-level picker: <code>compute_project</code> / <code>endpoint</code> / <code>auth</code> / <code>cost_thresholds</code> / <code>tags</code> / <code>sources</code> — select a row to edit it.</p>
+
+      <h3 id="profile-link"><span class="num">2.3</span>cwd binding: mcs link bind</h3>
+      <p>Bind a directory to a profile so that <code>mcs</code> commands in that directory default to that profile:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> cd ~/work/biz-A
+<span class="prompt">$</span> mcs link bind biz-A-prod
+<span class="comment"># All mcs commands in this directory now default to the biz-A-prod profile</span></pre>
+      <p>Check / unbind: <code>mcs link status</code>, <code>mcs link unlink</code>. The binding maps the current directory to a profile name, follows the working directory, and persists across shell restarts.</p>
+
+      <h3 id="profile-inspect"><span class="num">2.4</span>Inspect and switch: show / whoami</h3>
+      <table>
+        <thead><tr><th>Command</th><th>What it shows</th></tr></thead>
+        <tbody>
+          <tr><td><code>mcs profile list</code></td><td>Names of all profiles on this machine</td></tr>
+          <tr><td><code>mcs profile show [name]</code></td><td>Static config (compute project / sources / thresholds / version) — no network call</td></tr>
+          <tr><td><code>mcs profile whoami [name]</code></td><td>Live ODPS query for "which RAM principal am I right now" — hits the server every time</td></tr>
+        </tbody>
+      </table>
+      <p>Use <code>whoami</code> to debug "which principal does my AK resolve to"; use <code>show</code> to just view the config.</p>
+
+      <h3 id="profile-version"><span class="num">2.5</span>Versioning: log / diff / fork / reset</h3>
+      <p>Each profile's data directory is an independent git repository. Every write from <code>mcs build</code> / <code>package apply/reject</code> / <code>memory</code> / <code>udf</code> / <code>profile import</code> is auto-committed.</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile log -n 10           <span class="comment"># last 10 writes</span>
+<span class="prompt">$</span> mcs profile diff HEAD~1 HEAD     <span class="comment"># what changed in the last write</span>
+<span class="prompt">$</span> mcs profile reset --to HEAD~1    <span class="comment"># rollback a mistake</span>
+<span class="prompt">$</span> mcs profile fork exp --from HEAD <span class="comment"># branch off for A/B testing</span></pre>
+      <p>To disable auto-versioning (e.g., in CI batch runs), set the environment variable <code>MCS_NO_VERSIONING=1</code> — writes still happen but are not committed.</p>
+
+      <h3 id="profile-export"><span class="num">2.6</span>Export and share: profile export</h3>
+      <p>Package a profile's semantic package into a single file for sharing with colleagues or migrating machines. The default output is mcs's own tar.gz archive, which can be restored as-is with <code>mcs profile import</code>.</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs profile export &lt;name&gt;                  <span class="comment"># defaults to ./&lt;name&gt;.tar.gz</span>
+<span class="prompt">$</span> mcs profile export &lt;name&gt; --osi            <span class="comment"># emit OSI YAML instead</span></pre>
+      <p>
+        With <code>--osi</code>, the same command emits
+        <a href="https://open-semantic-interchange.org/" target="_blank" rel="noopener">OSI</a>
+        (Open Semantic Interchange) YAML instead of a tar.gz archive — useful for
+        feeding the profile's semantic model into external OSI-aware tooling.
+        Output conforms to OSI core schema v0.2.0.dev0. The mcs-native tar.gz
+        export is still the default; <code>--osi</code> opts into the YAML path.
+      </p>
+    </section>
+    <section id="query">
+      <h2><span class="num">[03]</span>Core Queries: build · package · sql</h2>
+      <p>The main workflow in mcs: first <strong>build</strong> a semantic package; semantic suggestions generated during build enter the <strong>package proposal</strong> queue for review then apply; finally use <strong>sql</strong> to execute, estimate costs, and view execution plans.</p>
+
+      <h3 id="build"><span class="num">3.1</span>mcs build: when to run, --refresh / --fresh / --parallel</h3>
+      <p>Scans all tables covered by the profile's sources list, samples a few rows, infers JOIN relationships, discovers UDFs, and writes them to the local semantic package. The agent reads this package before writing SQL to avoid unnecessary detours.</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs build                  <span class="comment"># full build on first run; resumes from where it left off if interrupted</span>
+<span class="prompt">$</span> mcs build --fresh          <span class="comment"># force a full rebuild from scratch, ignoring resume state</span>
+<span class="prompt">$</span> mcs build --refresh        <span class="comment"># incremental: rebuild tables whose schema or data changed (also catches up interrupted tables)</span>
+<span class="prompt">$</span> mcs build --refresh --refresh-min-age-hours 6  <span class="comment"># throttle data-change resampling: only resample if last sample is older than N hours (default 24, 0 = no throttle)</span>
+<span class="prompt">$</span> mcs build --parallel 8     <span class="comment"># sample 8 tables concurrently (default auto = min(table_count, 32))</span></pre>
+      <div class="card-note">
+        <strong>When to run</strong>
+        Run once after creating a profile; if interrupted mid-build, just run <code>mcs build</code> again to resume; run <code>--refresh</code> after upstream table schemas or <strong>data</strong> change (resamples tables with modified data; <code>--refresh-min-age-hours</code> controls resampling frequency); use <code>--fresh</code> to start a full rebuild from scratch ignoring resume state. <code>mcs status --tables</code> shows <code>data_modified_at</code> / <code>last_sampled_at</code> to see which tables lag behind their source. Day-to-day queries <strong>do not</strong> require repeated builds.
+      </div>
+      <div class="card-note">
+        <strong>Review semantic suggestions after build</strong>
+        <code>mcs build</code> generates explainable semantic suggestions but does not directly modify the semantic layer by default. When the agent runs post-build enrichment, it first converts these suggestions into <code>mcs package</code> proposals for you to review the evidence before applying or rejecting.
+      </div>
+
+      <h3 id="package-proposals"><span class="num">3.2</span>mcs package: review semantic suggestions from build</h3>
+      <p>After build / refresh, the agent can place high-confidence suggestions derived from samples, historical SQL, and column distributions into the proposal queue. It can also submit reviewed <code>ai_context</code>, column descriptions, and column role corrections as YAML proposals. A proposal is a "pending patch": you can see the target columns, suggested content, evidence, and confidence; only after apply does it write to the semantic package, and reject records the decision too.</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs package propose --from-suggestions
+<span class="prompt">$</span> mcs package propose --from-stdin      <span class="comment"># create ai_context / column_description / column_semantics proposals from YAML</span>
+<span class="prompt">$</span> mcs package list-proposals
+<span class="prompt">$</span> mcs package show-proposal &lt;id&gt;
+<span class="prompt">$</span> mcs package apply &lt;id&gt;
+<span class="prompt">$</span> mcs package reject &lt;id&gt; --reason "not correct for this domain"</pre>
+      <p>This is the default path for generative semantic suggestions: first <code>propose --from-suggestions</code>, then use <code>propose --from-stdin</code> to add agent-reviewed table semantics, column descriptions, or role corrections; if a previously rejected agent YAML proposal needs correcting in the same enrichment round, <code>--from-stdin</code> puts it back into the <code>suggested</code> queue. Then review each one with <code>show-proposal</code> to see the evidence, <code>apply</code> the correct ones, and <code>reject</code> those that do not match business definitions with a reason. The agent's <code>enrich</code> runtime skill also follows this path.</p>
+      <div class="card-note">
+        <strong>Why use a proposal queue</strong>
+        Automated suggestions are often "plausible" but may be off by an enum value, a granularity level, or a time field in business terms. Proposals add a review gate between generating suggestions and writing to the semantic layer, and the profile's auto git history also records the apply / reject decisions.
+      </div>
+
+      <h3 id="annotate"><span class="num">3.3</span>Semantic annotations: all via the proposal queue</h3>
+      <p>All semantic annotation writes go through <code>mcs package propose</code> → review → <code>mcs package apply</code>; there is no direct-write entry point. The business semantics you can annotate include:</p>
+      <ul>
+        <li><code>ai_context</code> — what this table is for (a natural language description)</li>
+        <li><code>dimensions</code> / <code>measures</code> / <code>identifiers</code> — role classification for columns</li>
+        <li>Per-column <code>semantic_description</code> — what this column means (a semantic explanation, not a restatement of the column name)</li>
+      </ul>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs package propose --from-stdin <span class="comment"># submit a semantic annotation proposal for review</span>
+<span class="prompt">$</span> mcs package list-proposals <span class="comment"># view the review queue</span>
+<span class="prompt">$</span> mcs package apply &lt;id&gt; <span class="comment"># write after approval</span></pre>
+      <p>See which tables are annotated: <code>mcs status --tables</code> — the last column shows <code>Annotated: yes/no/partial</code>.</p>
+
+      <h3 id="metric-verb"><span class="num">3.4</span>mcs metric: top-down named business metrics</h3>
+      <p>
+        Explicitly register algorithms like "total paid order amount per user per month"
+        that <strong>have a business name and are used repeatedly</strong>,
+        so they can be reused directly next time without re-composing the SQL.
+        A metric is profile-global with <code>UNIQUE(name)</code> — even across sources
+        there can be only one <code>total_revenue</code>.
+      </p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs metric add total_revenue --expression "SUM(orders.amount)"
+<span class="prompt">$</span> mcs metric list
+<span class="prompt">$</span> mcs metric show total_revenue
+<span class="prompt">$</span> mcs metric edit total_revenue --description "..."
+<span class="prompt">$</span> mcs metric remove total_revenue</pre>
+      <div class="card-note">
+        <strong>measure vs metric</strong>
+        <code>--role measure</code> is a <strong>column-level</strong> attribute ("this column can be SUMmed");
+        <code>mcs metric add</code> is a <strong>top-level entity</strong> ("this number has a business name").
+        The two do not conflict: measures are tagged on columns, metrics are registered at the profile level.
+      </div>
+      <p>Bulk import is also supported: <code>mcs package propose --from-stdin</code> accepts a top-level <code>metrics:</code> list (alongside <code>tables:</code>) and writes them via the proposal queue after review.</p>
+      <p>OSI export (<code>mcs profile export --osi</code>) writes these metrics to <code>semantic_model.metrics[]</code>, so downstream OSI tools can read them directly.</p>
+
+      <h3 id="sql"><span class="num">3.5</span>mcs sql: review / execute / async / cost / explain</h3>
+      <p>These verbs cover every "run SQL" scenario:</p>
+      <table>
+        <thead><tr><th>Command</th><th>Purpose</th><th>When to use</th></tr></thead>
+        <tbody>
+          <tr><td><code>sql review</code></td><td>Local static SQL review (no MaxCompute round-trip)</td><td>Scan before execute to avoid wasting a round-trip on basic errors</td></tr>
+          <tr><td><code>sql execute</code></td><td>Synchronous execution with results</td><td>Probes, small result sets, queries with clearly low cost</td></tr>
+          <tr><td><code>sql submit/status/wait/result/cancel</code></td><td>Async submit and poll MaxCompute instances</td><td>Production analysis, large table JOINs/aggregations, queries that need cost confirmation or may time out</td></tr>
+          <tr><td><code>sql cost</code></td><td>Cost estimate + pass/fail verdict</td><td>Check before running large-table queries</td></tr>
+          <tr><td><code>sql explain</code></td><td>Execution plan</td><td>When optimizing SQL</td></tr>
+        </tbody>
+      </table>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs sql review  "SELECT IIF(x &gt; 0, 1, 0) FROM orders"
+<span class="comment"># → issues[0].rule = dialect.sqlite-iif · suggests rewriting to CASE WHEN</span>
+<span class="prompt">$</span> mcs sql execute "SELECT COUNT(*) FROM orders WHERE ds = '20260520'"
+<span class="prompt">$</span> mcs sql submit -y "SELECT * FROM big_a JOIN big_b ON big_a.id = big_b.id"
+<span class="prompt">$</span> mcs sql wait &lt;instance_id&gt;   <span class="comment"># check lifecycle_state / successful</span>
+<span class="prompt">$</span> mcs sql result &lt;instance_id&gt; <span class="comment"># fetch rows after lifecycle_state == "success"</span>
+<span class="prompt">$</span> mcs sql result --offset 10000 &lt;instance_id&gt; <span class="comment"># fetch next page when has_more=true</span>
+<span class="prompt">$</span> mcs sql cost    "SELECT * FROM orders"
+<span class="comment"># → verdict: confirm · cost 12.4 CNY · full scan on large table, consider adding partition filter</span>
+<span class="prompt">$</span> mcs sql explain "SELECT ds, SUM(amount) FROM orders GROUP BY ds"</pre>
+      <div class="card-note">
+        <strong>review outputs two layers</strong>
+        <code>issues</code> (error / warning — dialect incompatibilities, missing tables/columns, and other hard errors) and <code>hints</code> (info — undeclared JOINs, dimensions used in aggregations, and other "possible misuse" notes). The agent workflow is: first <code>review</code> and fix all issues, check hints to decide whether to proceed, then run <code>execute</code>; this step does not consume MaxCompute quota.
+      </div>
+      <div class="card-note">
+        <strong>review works without a semantic package</strong>
+        An un-built profile returns <code>review_mode: syntax_only</code> and <code>semantic_checks_skipped: true</code>, still checking SQLite dialect issues, unsupported functions, bare table names in 3-level projects, and other checks that do not depend on the semantic package; table/column existence, JOIN/aggregation, and other semantic checks are skipped. Do not run <code>mcs build</code> mid-query just to complete the review.
+      </div>
+      <div class="card-note">
+        <strong>cost verdict has three levels</strong>
+        <code>ok</code> (below <code>confirm_cny</code> threshold, safe) / <code>confirm</code> (between confirm and blocked — the agent will ask the user to confirm) / <code>blocked</code> (above <code>blocked_cny</code> — the agent will not execute by default). Defaults: confirm=10 CNY, blocked=100 CNY; change thresholds via <code>mcs profile update</code> under <code>cost_thresholds</code>.
+      </div>
+      <div class="card-note">
+        <strong>execute / submit are read-only by default</strong>
+        <code>mcs sql execute</code> and <code>mcs sql submit</code> reject DML/DDL, <code>SET</code> session mutations, and statements that cannot be identified as read queries by default; pass <code>--allow-write</code> only when the user explicitly requests a write, and the cost gate still applies.
+      </div>
+      <div class="card-note">
+        <strong>Choose execution method by verdict and SQL shape</strong>
+        Do not let the agent guess "short query": <code>blocked</code> is not executed; for <code>confirm</code>, ask the user first, then prefer <code>submit</code> / <code>wait</code> / <code>result</code> after confirmation; for <code>ok</code>, also check the SQL shape — only use <code>execute</code> for probes, small results, explicit small <code>LIMIT</code>, or tight partition lookup/aggregation. Production analysis, large table scans/JOINs/aggregations, SQL without tight partitions or <code>LIMIT</code>, and previously timed-out SQL should use async even with <code>ok</code>. For async results, check <code>lifecycle_state</code>, <code>successful</code>, and <code>task_statuses</code>; confirm <code>lifecycle_state == "success"</code> before fetching rows.
+      </div>
+      <div class="card-note">
+        <strong>Results default to a maximum of 10,000 rows</strong>
+        <code>sql execute</code> and <code>sql result</code> do not rewrite the submitted SQL or automatically add <code>LIMIT</code>; they only paginate on the reader output side. JSON responses include <code>result_max_rows</code>, <code>result_offset</code>, <code>has_more</code>, <code>truncated</code>, and <code>next_offset</code>. Pass <code>--offset &lt;next_offset&gt;</code> for the next page, <code>--max-rows N</code> to adjust page size, or <code>--max-rows 0</code> to disable the limit.
+      </div>
+      <p>Note: <code>mcs sql cost</code> returns exit code 0 even when <code>blocked</code> — the verdict is in the <code>verdict</code> field of the JSON output. Scripts should read the field, not the exit code.</p>
+
+      <h3 id="sql-flags"><span class="num">3.6</span>--project / --schema / --profile usage</h3>
+      <p>These three flags have completely different meanings and are easy to confuse:</p>
+      <table>
+        <thead><tr><th>Flag</th><th>Meaning</th><th>When to pass</th></tr></thead>
+        <tbody>
+          <tr><td><code>--profile X</code></td><td>Which local profile config to use</td><td>When cwd is not bound / when you want to temporarily switch profiles</td></tr>
+          <tr><td><code>--project P</code></td><td>Target MaxCompute project</td><td>When the profile spans multiple projects and you want to specify one</td></tr>
+          <tr><td><code>--schema S</code></td><td>Schema name for 3-level projects</td><td>Almost never — mcs auto-detects and caches; only as a fallback when detection is wrong</td></tr>
+        </tbody>
+      </table>
+      <p>The difference between 2-level projects (no schema) and 3-level projects is handled automatically by mcs — you write <code>orders</code> and it becomes <code>my_proj.orders</code> or <code>my_proj.default.orders</code> as appropriate.</p>
+    </section>
+    <section id="advanced">
+      <h2><span class="num">[04]</span>Advanced: memory · udf · meta</h2>
+      <p>This section is for users who have completed the main workflow and want mcs to get more accurate over time.</p>
+
+      <h3 id="memory"><span class="num">4.1</span>memory: verify / fail / note / recall</h3>
+      <p>Memory is the query experience store. Every question asked and every mistake made can be recorded, providing reference for similar questions next time. Three write verbs + one read verb:</p>
+      <table>
+        <thead><tr><th>Verb</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>memory verify --question Q --sql S --tables T1,T2</code></td><td>Record a "question → correct SQL" entry</td></tr>
+          <tr><td><code>memory fail --question Q --sql S --error-msg M</code></td><td>Record a "this SQL failed + error message" entry — the agent will avoid similar patterns next time</td></tr>
+          <tr><td><code>memory note '&lt;TEXT&gt;'</code></td><td>Record free-form domain knowledge (not necessarily SQL)</td></tr>
+          <tr><td><code>memory recall '&lt;keyword&gt;'</code></td><td>BM25 + vector hybrid search across all three entry types</td></tr>
+        </tbody>
+      </table>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs memory verify \
+    --question "last month's GMV" \
+    --sql "SELECT SUM(amount) FROM orders WHERE ds BETWEEN '20260401' AND '20260430'" \
+    --tables orders
+<span class="prompt">$</span> mcs memory recall "GMV"</pre>
+      <p>Management: <code>memory list</code> to view all, <code>memory show &lt;id&gt;</code> to view one, <code>memory remove &lt;id&gt;</code> to delete one, <code>memory clear</code> to clear all (by default only clears user-written entries, not auto-generated ones).</p>
+      <div class="card-note">
+        <strong>Disable during benchmarks</strong>
+        When running benchmarks (e.g., Bird NL2SQL), set <code>MCS_NO_HISTORY=1</code> to prevent historical experience from leaking answers — <code>mcs build</code>'s history miner phase will be skipped.
+      </div>
+
+      <h3 id="udf"><span class="num">4.2</span>udf: list / show / search / create / test / remove</h3>
+      <p>Read side (anyone can run):</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs udf list
+<span class="prompt">$</span> mcs udf show parse_user_agent
+<span class="prompt">$</span> mcs udf search "json"</pre>
+      <p>Write side (requires confirmation / write permissions):</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs udf create my_fn --inline-python my_fn.py --description "parse order number prefix"
+<span class="prompt">$</span> mcs udf test   my_fn --args '1, "abc"'
+<span class="prompt">$</span> mcs udf remove my_fn --delete-resources</pre>
+      <p><code>udf test --args</code> only accepts literals: numbers, <code>NULL</code>, <code>TRUE/FALSE</code>, and quoted strings; it will not splice bare identifiers, expressions, or semicolon fragments into SQL. Currently <code>create</code> only supports inline Python; for jar / resource-based UDFs, use <code>mcs sql execute --allow-write 'CREATE FUNCTION ...'</code>, which still requires user confirmation and goes through the cost gate.</p>
+
+      <h3 id="meta"><span class="num">4.3</span>meta: list-tables / describe-table</h3>
+      <p>A "raw" interface that queries MaxCompute metadata directly without depending on the semantic package. Use during cold start (no build yet) or to inspect tables not in the sources list:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs meta list-tables --project my_proj
+<span class="prompt">$</span> mcs meta describe-table --project my_proj orders</pre>
+      <p>For tables that have already been built, <code>mcs show --table orders</code> is better — it includes sample SQL, JOIN relationships, and annotations, representing the "crystallized" version from the semantic package.</p>
+    </section>
+    <section id="ops">
+      <h2><span class="num">[05]</span>Operations and Troubleshooting</h2>
+      <p>Refer to this section when something goes wrong, when setting up on a new machine, or when you need to check the environment state.</p>
+
+      <h3 id="doctor"><span class="num">5.1</span>mcs doctor: one-command diagnostics + JSON output</h3>
+      <p>A single command that checks everything — profile / auth / network / semantic package / skill installation:</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs doctor                <span class="comment"># full check, including network</span>
+<span class="prompt">$</span> mcs doctor --offline      <span class="comment"># skip ODPS probe, check local config / package / skill only</span>
+<span class="prompt">$</span> mcs -f json doctor        <span class="comment"># JSON output for agent parsing, includes per-check remediation</span></pre>
+      <p>Typical usage: run <code>mcs doctor</code> after installation to see all green; when something breaks, run <code>mcs -f json doctor</code> first to see which check is red. The agent will use the <code>remediation</code> field in the JSON to guide you through the fix step by step.</p>
+
+      <h3 id="skill-install"><span class="num">5.2</span>skill install: 55 platforms, --all / --detect</h3>
+      <p>Symlinks SKILL.md into your agent tool's skills directory. A symlink rather than a copy, so when mcs is upgraded the skill auto-syncs with no version drift.</p>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs skill install                       <span class="comment"># default: project-level .agents/skills/</span>
+<span class="prompt">$</span> mcs skill install -g                    <span class="comment"># global (~/.agents/skills/)</span>
+<span class="prompt">$</span> mcs skill install -p claude-code -g     <span class="comment"># Claude Code global</span>
+<span class="prompt">$</span> mcs skill install --all                 <span class="comment"># install to all 55+ platforms</span>
+<span class="prompt">$</span> mcs skill install --detect              <span class="comment"># install only to detected agents on this machine</span></pre>
+      <p>Common platform mappings:</p>
+      <table>
+        <thead><tr><th>Agent</th><th><code>-p</code> name</th></tr></thead>
+        <tbody>
+          <tr><td>Universal</td><td><code>agents</code> (default)</td></tr>
+          <tr><td>Claude Code</td><td><code>claude-code</code></td></tr>
+          <tr><td>Cursor</td><td><code>cursor</code></td></tr>
+          <tr><td>OpenAI Codex</td><td><code>codex</code></td></tr>
+          <tr><td>Gemini CLI</td><td><code>gemini-cli</code></td></tr>
+          <tr><td>Qwen Code</td><td><code>qwen-code</code></td></tr>
+          <tr><td>OpenCode</td><td><code>opencode</code></td></tr>
+          <tr><td>Windsurf</td><td><code>windsurf</code></td></tr>
+          <tr><td>Trae</td><td><code>trae</code></td></tr>
+        </tbody>
+      </table>
+      <p>Full 55+ platform list: <code>mcs skill list</code>. Other operations: <code>mcs skill update</code> / <code>uninstall</code> / <code>path</code> / <code>diff</code>.</p>
+      <div class="card-note">
+        <strong>Runtime skill is served by the CLI</strong>
+        The <code>SKILL.md</code> installed to the agent is now a thin discovery stub; the actual workflow is output by <code>mcs skill get query</code> / <code>build</code> / <code>enrich</code> commands matching the current mcs version. When answering data questions, only the <code>query</code> skill is loaded; the <code>build</code> skill is only loaded when explicitly building or refreshing the semantic package, to prevent the query flow from mistakenly running <code>mcs build</code>.
+      </div>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">$</span> mcs skill catalog
+<span class="prompt">$</span> mcs skill get query
+<span class="prompt">$</span> mcs skill get query --full
+<span class="prompt">$</span> mcs skill get build</pre>
+
+      <h3 id="tier"><span class="num">5.3</span>2-level vs 3-level tier auto-detection</h3>
+      <p>MaxCompute projects have two addressing modes: 2-level (<code>project.table</code>) and 3-level (<code>project.schema.table</code>). The first time mcs accesses a project, it auto-detects the tier and caches the result in <code>tier_cache/&lt;project&gt;</code> — no need for <code>SET odps.namespace.schema</code> or <code>--schema</code> afterwards.</p>
+      <p>If detection was wrong and you want to force re-detection: delete the one-byte file at <code>~/.local/share/maxcompute-semantic/data/&lt;profile&gt;/tier_cache/&lt;project&gt;</code>. As an extreme fallback: all <code>mcs</code> commands accept <code>--schema S</code> for explicit override.</p>
+
+      <h3 id="env"><span class="num">5.4</span>Common environment variables</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>MCS_PROFILE</code></td><td>Resolution chain tier 2: specifies a profile when cwd is not bound and <code>--profile</code> is not passed</td></tr>
+          <tr><td><code>MCS_NO_HISTORY=1</code></td><td>Skip <code>mcs build</code>'s history mining — required when running benchmarks</td></tr>
+          <tr><td><code>MCS_NO_VERSIONING=1</code></td><td>Disable profile auto git commit — useful for CI batch runs</td></tr>
+          <tr><td><code>MCS_DATA_DIR</code></td><td>Override the local data directory (default <code>~/.local/share/maxcompute-semantic/</code>)</td></tr>
+          <tr><td><code>ALIBABA_CLOUD_ACCESS_KEY_ID</code> and the other three</td><td>Resolution chain tier 4: fallback when not using profiles at all</td></tr>
+        </tbody>
+      </table>
+      <p>Truthy values are case-insensitive: <code>1</code> / <code>true</code> / <code>yes</code> / <code>on</code>.</p>
+    </section>
+    <section id="agent">
+      <h2><span class="num">[06]</span>Agent Conversation Scripts</h2>
+      <p>Once mcs has the skill installed, talking to your agent is all you need — the agent will automatically invoke <code>mcs</code> commands. This section provides templates for "what to say".</p>
+
+      <h3 id="agent-trigger"><span class="num">6.1</span>Triggering the skill</h3>
+      <p>Most agents auto-load the maxcompute-semantic skill when they see keywords like these:</p>
+      <ul>
+        <li>Mention the brand name: <strong>"use mcs", "use maxcompute", "use ODPS"</strong></li>
+        <li>Explicitly invoke the skill: <strong>"/maxcompute-semantic ..."</strong> (agents that support slash commands like Claude Code / Codex)</li>
+        <li>Verb triggers: <strong>"query", "create table", "calculate", "get stats on" + one of your MaxCompute table names</strong></li>
+      </ul>
+      <p>If the agent does not load the skill (and generates non-runnable SQL instead), the most reliable fallback is to say explicitly: "Please load the maxcompute-semantic skill and then answer."</p>
+
+      <h3 id="agent-prompts"><span class="num">6.2</span>Common task examples</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> Use mcs to query last month's GMV from the orders table
+<span class="prompt">agent&gt;</span> What is the products table on ODPS for? What do the fields mean?
+<span class="prompt">agent&gt;</span> Do you remember the DAU formula I asked about last time? Re-run that SQL
+<span class="prompt">agent&gt;</span> Estimate how much this SQL will cost: &lt;paste SQL&gt;
+<span class="prompt">agent&gt;</span> Save the SQL that just worked to mcs memory, with the question "monthly active users"</pre>
+      <p>The agent will call <code>sql cost</code> for cost estimation, use <code>sql execute</code> for probes and small-result queries, or use <code>sql submit</code> / <code>sql wait</code> / <code>sql result</code> for production analysis, cost confirmation, and queries that may time out; it will also use <code>show --table</code> to inspect structure, <code>memory recall</code> to find history, and <code>memory verify</code> to save new experience.</p>
+
+      <h3 id="agent-meta"><span class="num">6.3</span>Have the agent report bugs / run diagnostics</h3>
+      <pre class="code-block"><button class="code-copy" onclick="copyCodeBlock(this)">copy</button><span class="prompt">agent&gt;</span> Report an mcs bug for me: &lt;describe the symptom&gt;
+<span class="prompt">agent&gt;</span> Run an mcs environment check</pre>
+      <p>When reporting a bug, the skill follows the Aone work-item convention — it auto-adds the <code>[maxcompute-semantic]</code> prefix, sets the related project to 2155299, and attaches the version number and doctor output. An environment check runs <code>mcs -f json doctor</code> and explains any red items in plain language.</p>
+    </section>
+  </main>
+</div>
+
+<div class="frame">
+  <footer class="footer">
+    <span class="left">
+      <span class="mark" aria-hidden="true"></span>
+      <span>mcs</span>
+      <span style="color: var(--ink-faint);">·</span>
+      <span>MaxCompute Semantic CLI</span>
+    </span>
+    <span class="right">Apache-2.0 · <a href="index.html">home</a> · <a href="release-notes.html">release notes</a></span>
+  </footer>
+</div>
+
+<script>
+function setTheme(pref) {
+  localStorage.setItem('theme', pref);
+  applyTheme(pref);
+}
+function applyTheme(pref) {
+  var resolved = pref === 'auto'
+    ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+    : pref;
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute('data-theme-pref', pref);
+  var btns = document.querySelectorAll('[data-theme-pref-btn]');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('data-theme-pref-btn') === pref) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+}
+(function() {
+  var pref = localStorage.getItem('theme') || 'auto';
+  applyTheme(pref);
+})();
+if (window.matchMedia) {
+  var mql = window.matchMedia('(prefers-color-scheme: light)');
+  if (mql.addEventListener) {
+    mql.addEventListener('change', function() {
+      if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme('auto');
+    });
+  }
+}
+
+function copyCodeBlock(btn) {
+  var pre = btn.parentElement;
+  var clone = pre.cloneNode(true);
+  var copy = clone.querySelector('.code-copy');
+  if (copy) copy.remove();
+  var text = clone.textContent;
+  function flash() {
+    var original = btn.textContent;
+    btn.textContent = 'copied';
+    setTimeout(function() { btn.textContent = original; }, 1500);
+  }
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(flash);
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    flash();
+  }
+}
+(function() {
+  var sections = document.querySelectorAll('.docs-main section[id]');
+  var subHeads = document.querySelectorAll('.docs-main section h3[id]');
+  var sectionLinks = {};
+  var subLinks = {};
+  document.querySelectorAll('.toc-section').forEach(function(li) {
+    sectionLinks[li.getAttribute('data-section')] = li;
+  });
+  document.querySelectorAll('.toc-sub a').forEach(function(a) {
+    var id = a.getAttribute('href').slice(1);
+    subLinks[id] = a;
+  });
+
+  function setActiveSection(id) {
+    Object.keys(sectionLinks).forEach(function(k) {
+      sectionLinks[k].classList.toggle('active', k === id);
+    });
+  }
+  function setActiveSub(id) {
+    Object.keys(subLinks).forEach(function(k) {
+      subLinks[k].classList.toggle('active', k === id);
+    });
+  }
+
+  if (!('IntersectionObserver' in window)) return;
+
+  var sectionObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) setActiveSection(e.target.id);
+    });
+  }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+  sections.forEach(function(s) { sectionObserver.observe(s); });
+
+  var subObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) setActiveSub(e.target.id);
+    });
+  }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+  subHeads.forEach(function(h) { subObserver.observe(h); });
+
+  if (sections.length) setActiveSection(sections[0].id);
+})();
+</script>
+
+<script>document.addEventListener("click",function(e){var t=e.target.closest("[data-lang]");if(t){localStorage.setItem("mcs-lang",t.dataset.lang);return}if(!e.target.closest(".lang-select")){document.querySelectorAll(".lang-select.open").forEach(function(el){el.classList.remove("open")})}})</script>
+</body>
+</html>

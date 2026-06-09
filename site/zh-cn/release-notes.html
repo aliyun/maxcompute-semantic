@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<link rel="alternate" hreflang="en" href="../release-notes.html">
+<link rel="alternate" hreflang="zh-CN" href="release-notes.html">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>release notes — mcs</title>
+<script>
+  (function() {
+    try {
+      var pref = localStorage.getItem('theme') || 'auto';
+      var resolved = pref === 'auto'
+        ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : pref;
+      document.documentElement.setAttribute('data-theme', resolved);
+      document.documentElement.setAttribute('data-theme-pref', pref);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.setAttribute('data-theme-pref', 'auto');
+    }
+  })();
+</script>
+<style>
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url('../fonts/jetbrains-mono-variable.woff2') format('woff2-variations');
+  }
+
+  :root,
+  :root[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --bg-tile: #111111;
+    --bg-deep: #050505;
+    --ink: #ededed;
+    --ink-strong: #ffffff;
+    --ink-muted: #6e6e6e;
+    --ink-faint: #3a3a3a;
+    --rule: #1f1f1f;
+    --rule-strong: #2a2a2a;
+    --accent: #a3e635;
+    --accent-soft: rgba(163, 230, 53, 0.12);
+    --noise: 0.04;
+    --sidebar-width: 260px;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-tile: #ffffff;
+    --bg-deep: #f3f2eb;
+    --ink: #1a1a1a;
+    --ink-strong: #0a0a0a;
+    --ink-muted: #6b6b66;
+    --ink-faint: #c8c6bb;
+    --rule: #1a1a1a;
+    --rule-strong: #0a0a0a;
+    --accent: #3f6212;
+    --accent-soft: rgba(63, 98, 18, 0.08);
+    --noise: 0.02;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'PingFang SC', 'Microsoft YaHei', monospace;
+    font-feature-settings: 'ss01', 'ss02', 'calt' 1, 'liga' 1;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+      radial-gradient(rgba(0, 0, 0, var(--noise)) 1px, transparent 1px),
+      radial-gradient(rgba(255, 255, 255, calc(var(--noise) * 0.5)) 1px, transparent 1px);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 1px 1px;
+  }
+  a { color: var(--ink-strong); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  code {
+    font-family: inherit;
+    font-size: 0.92em;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+    color: var(--ink-strong);
+  }
+  pre {
+    background: var(--bg-deep);
+    border: 1px solid var(--rule-strong);
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  strong { color: var(--ink-strong); font-weight: 700; }
+
+  /* ── Topbar (matches index.html) ── */
+  .topbar {
+    border-bottom: 1px solid var(--rule);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .topbar-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--ink-strong);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+  }
+  .brand:hover { color: var(--ink-strong); text-decoration: none; }
+  .brand .mark {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+  }
+  .brand .ver {
+    color: var(--ink-muted);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .nav-links a { color: var(--ink-muted); text-decoration: none; }
+  .nav-links a:hover { color: var(--ink-strong); }
+  .nav-links a.active { color: var(--ink-strong); border-bottom: 2px solid var(--accent); padding-bottom: 4px; }
+  .theme-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 0.5px;
+    text-transform: lowercase;
+  }
+  .theme-switch .label { color: var(--ink-faint); }
+  .theme-switch button {
+    background: none;
+    border: none;
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .theme-switch button:hover { color: var(--ink-strong); }
+  .theme-switch button.active {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .theme-switch .sep { color: var(--ink-faint); padding: 0 1px; }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+  .sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    padding: 40px 16px 32px 32px;
+    position: sticky;
+    top: 60px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    border-right: 1px solid var(--rule);
+  }
+  .sidebar h3 {
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-left: 10px;
+  }
+  .sidebar ul { list-style: none; }
+  .sidebar li { margin: 0; }
+  .sidebar a {
+    display: block;
+    padding: 6px 10px;
+    color: var(--ink-muted);
+    font-size: 12px;
+    border-left: 2px solid transparent;
+    transition: all 0.1s;
+    text-decoration: none;
+  }
+  .sidebar a:hover {
+    color: var(--ink-strong);
+    background: var(--bg-tile);
+    text-decoration: none;
+  }
+  .sidebar a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .content {
+    flex: 1;
+    min-width: 0;
+    padding: 48px 56px 100px;
+    max-width: 880px;
+  }
+  .content .header {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .content .header .meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--ink-muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .content .header .meta .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .content .header h1 {
+    font-size: 36px;
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.8px;
+  }
+  .content .header p {
+    color: var(--ink-muted);
+    font-size: 13px;
+    max-width: 640px;
+  }
+
+  /* ── Markdown ── */
+  .markdown h1 {
+    font-size: 26px;
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin: 48px 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule-strong);
+    letter-spacing: -0.4px;
+  }
+  .markdown h1:first-child { margin-top: 0; }
+  .markdown h2 {
+    font-size: 20px;
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin: 44px 0 16px;
+    padding: 14px 0 10px;
+    border-bottom: 1px solid var(--rule-strong);
+    scroll-margin-top: 80px;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .markdown h2::before {
+    content: '##';
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.7em;
+    letter-spacing: 1px;
+  }
+  .markdown h3 {
+    font-size: 16px;
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin: 28px 0 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .markdown h3::before {
+    content: '###';
+    color: var(--ink-muted);
+    font-weight: 700;
+    font-size: 0.7em;
+    letter-spacing: 1px;
+  }
+  .markdown h4 {
+    font-size: 14px;
+    color: var(--ink-strong);
+    font-weight: 700;
+    margin: 20px 0 8px;
+  }
+  .markdown p { margin: 12px 0; }
+  .markdown ul, .markdown ol { margin: 12px 0; padding-left: 28px; }
+  .markdown li { margin: 6px 0; }
+  .markdown li > p { margin: 4px 0; }
+  .markdown li::marker { color: var(--accent); }
+  .markdown blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 8px 18px;
+    margin: 14px 0;
+    color: var(--ink);
+    background: var(--bg-tile);
+  }
+  .markdown hr {
+    border: none;
+    border-top: 1px solid var(--rule-strong);
+    margin: 32px 0;
+  }
+  .markdown table {
+    border-collapse: collapse;
+    margin: 16px 0;
+    width: 100%;
+    border: 1px solid var(--rule-strong);
+  }
+  .markdown th, .markdown td {
+    padding: 10px 14px;
+    border: 1px solid var(--rule-strong);
+    text-align: left;
+    font-size: 13px;
+  }
+  .markdown th {
+    background: var(--bg-tile);
+    color: var(--ink-strong);
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+  .markdown a:hover { color: var(--ink-strong); }
+
+  /* ── Status / loading ── */
+  .status {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--ink-muted);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .status.error { color: var(--accent); }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .content { padding: 32px 22px 60px; }
+    .content .header h1 { font-size: 28px; }
+    .topbar-inner { padding: 16px 22px; }
+    .nav-links { gap: 14px; }
+    .theme-switch { display: none; }
+  }
+
+  .lang-select {
+    position: relative;
+    display: inline-flex;
+  }
+  .lang-current {
+    background: none;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-muted);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+  .lang-current:hover { color: var(--ink-strong); border-color: var(--ink-strong); }
+  .lang-current .chev { font-size: 9px; margin-left: 2px; }
+  .lang-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-tile);
+    border: 1px solid var(--rule-strong);
+    min-width: 120px;
+    z-index: 100;
+  }
+  .lang-select.open .lang-menu { display: block; }
+  .lang-menu a {
+    display: block;
+    padding: 8px 14px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+  .lang-menu a:hover { color: var(--ink-strong); background: var(--bg-deep); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="index.html" class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span>mcs</span>
+      <!-- v0.16 replaced by .github/workflows/pages.yml at deploy time; do not hand-edit -->
+      <span class="ver">v0.16</span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">home</a>
+      <a href="docs.html">docs</a>
+      <a href="release-notes.html" class="active">release notes</a>
+      <div class="theme-switch" role="group" aria-label="切换主题">
+        <span class="label">theme:</span>
+        <button type="button" data-theme-pref-btn="dark" onclick="setTheme('dark')">dark</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="light" onclick="setTheme('light')">light</button>
+        <span class="sep">·</span>
+        <button type="button" data-theme-pref-btn="auto" onclick="setTheme('auto')">auto</button>
+      </div>
+      <div class="lang-select">
+        <button type="button" class="lang-current" onclick="this.parentElement.classList.toggle('open')">中文 <span class="chev">▾</span></button>
+        <div class="lang-menu">
+          <a href="../release-notes.html" data-lang="en">English</a>
+        </div>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h3>// 版本</h3>
+    <ul id="toc">
+      <li class="status">加载中…</li>
+    </ul>
+  </aside>
+
+  <main class="content">
+    <div class="header">
+      <div class="meta">
+        <span class="dot" aria-hidden="true"></span>
+        <span>// changelog</span>
+      </div>
+      <h1>release notes</h1>
+      <p>所有版本的能力增量、行为变更与修复清单。由 <code>CHANGELOG.md</code> 直接渲染。</p>
+    </div>
+    <div id="changelog" class="markdown">
+      <div class="status">加载 CHANGELOG.md…</div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/marked.min.js"></script>
+<script src="../js/purify.min.js"></script>
+<script>
+function setTheme(pref) {
+  localStorage.setItem('theme', pref);
+  applyTheme(pref);
+}
+function applyTheme(pref) {
+  var resolved = pref === 'auto'
+    ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+    : pref;
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute('data-theme-pref', pref);
+  var btns = document.querySelectorAll('[data-theme-pref-btn]');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('data-theme-pref-btn') === pref) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+}
+(function() {
+  var pref = localStorage.getItem('theme') || 'auto';
+  applyTheme(pref);
+})();
+if (window.matchMedia) {
+  var mql = window.matchMedia('(prefers-color-scheme: light)');
+  if (mql.addEventListener) {
+    mql.addEventListener('change', function() {
+      if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme('auto');
+    });
+  }
+}
+
+(function() {
+  var changelog = document.getElementById('changelog');
+  var toc = document.getElementById('toc');
+
+  function setStatus(target, text, isError) {
+    target.replaceChildren();
+    var div = document.createElement('div');
+    div.className = 'status' + (isError ? ' error' : '');
+    div.textContent = text;
+    target.appendChild(div);
+  }
+
+  fetch('../CHANGELOG.md', { cache: 'no-cache' })
+    .then(function(resp) {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.text();
+    })
+    .then(function(md) {
+      marked.use({ gfm: true, breaks: false });
+      // marked.parse returns HTML; DOMPurify strips any <script>/onclick/etc. before injection.
+      var clean = DOMPurify.sanitize(marked.parse(md));
+      changelog.innerHTML = clean;
+      buildToc();
+    })
+    .catch(function(err) {
+      setStatus(changelog, '加载 CHANGELOG.md 失败：' + (err && err.message ? err.message : err), true);
+      toc.replaceChildren();
+    });
+
+  function buildToc() {
+    var headings = Array.prototype.filter.call(
+      changelog.querySelectorAll('h2'),
+      function(h) { return !h.closest('details'); }
+    );
+    toc.replaceChildren();
+    if (!headings.length) {
+      var empty = document.createElement('li');
+      empty.className = 'status';
+      empty.textContent = '无版本节';
+      toc.appendChild(empty);
+      return;
+    }
+    var idx = 0;
+    headings.forEach(function(h) {
+      var id = h.id || ('v-' + (idx++));
+      h.id = id;
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + id;
+      a.textContent = h.textContent.trim();
+      li.appendChild(a);
+      toc.appendChild(li);
+    });
+    observeActive(headings);
+  }
+
+  function observeActive(headings) {
+    var links = toc.querySelectorAll('a');
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          var id = entry.target.id;
+          links.forEach(function(a) {
+            if (a.getAttribute('href') === '#' + id) {
+              a.classList.add('active');
+            } else {
+              a.classList.remove('active');
+            }
+          });
+        }
+      });
+    }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+    headings.forEach(function(h) { observer.observe(h); });
+  }
+})();
+</script>
+
+<script>document.addEventListener("click",function(e){var t=e.target.closest("[data-lang]");if(t){localStorage.setItem("mcs-lang",t.dataset.lang);return}if(!e.target.closest(".lang-select")){document.querySelectorAll(".lang-select.open").forEach(function(el){el.classList.remove("open")})}})</script>
+</body>
+</html>
