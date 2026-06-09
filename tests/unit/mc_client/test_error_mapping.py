@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for mc_client/errors.py — map_pyodps_exception.
 
 After the 0.5.0a45 substring-stripping refactor the classifier routes

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Multi-level file-browser-style profile editor.
 
 Single entry point ``edit_profile(profile, client)`` — opens a
@@ -457,8 +454,8 @@ def _edit_process_auth(draft: Profile) -> Profile:
 
     The command must emit a JSON payload on stdout in the Alibaba Cloud
     STS AssumeRole format (AccessKeyId, AccessKeySecret, SecurityToken,
-    optional Expiration).  The canonical form is a process auth credential helper:
-    ``my-credential-helper get --format json``.
+    optional Expiration).  The canonical form is the ncs CLI:
+    ``ncs create credential odpsuser --employee-id <id> -o template -t odpscmd``.
     """
     cur_cmd = draft.auth.command if isinstance(draft.auth, ProcessAuth) else ""
     cur_timeout = draft.auth.timeout if isinstance(draft.auth, ProcessAuth) else 60

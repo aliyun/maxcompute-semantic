@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Hint registry — inferential suggestions, severity info.
 
 Hints are the inferential sibling of issues: they don't gate execution

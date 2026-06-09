@@ -3,7 +3,7 @@ __pycache__/
 *$py.class
 *.so
 dist/
-build/
+/build/
 *.egg-info/
 *.egg
 .venv/

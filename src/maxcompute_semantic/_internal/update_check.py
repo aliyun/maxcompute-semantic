@@ -1,13 +1,10 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Update-check probe, cache, and banner formatting.
 
 The module's job is the *passive* version-awareness layer of mcs:
 
 - ``fetch_latest_metadata`` synchronously pulls
-  ``MCS_UPDATE_BASE_URL`` (default
-  ``https://pypi.org/pypi/maxcompute-semantic/json``) with a
+  ``MCS_UPDATE_BASE_URL/latest.json`` (default
+  ``https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com``) with a
   short timeout. Returns ``None`` on any failure so callers don't need
   exception handling.
 - ``read_cache`` / ``write_cache`` / ``should_check`` manage a
@@ -49,15 +46,21 @@ from typing import Any
 
 from maxcompute_semantic._internal.paths import cache_dir
 
-DEFAULT_BASE_URL = "https://pypi.org/pypi/maxcompute-semantic/json"
-"""PyPI JSON API endpoint for version checks.
+DEFAULT_BASE_URL = "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com"
+"""Hardcoded fallback. Override via ``MCS_UPDATE_BASE_URL`` env var.
 
-Override via ``MCS_UPDATE_BASE_URL`` env var.
+The forward-compat seam: when mcs moves to PyPI, the env var points
+``https://pypi.org`` and ``fetch_latest_metadata`` switches the
+envelope adapter to the PyPI JSON shape (``{"info": {"version": ...},
+"urls": [{"url": ...}]}``). The cache, banner, and install-mode
+detection don't change — they all consume the normalized
+``LatestMetadata``."""
 
-# TODO: Adapt fetch_latest_metadata to parse PyPI JSON format:
-# PyPI returns {"info": {"version": "X.Y.Z"}, "urls": [{"url": "...", "digests": {"sha256": "..."}}]}
-# Map to existing LatestMetadata fields accordingly.
-"""
+_ALLOWED_HOSTS: frozenset[str] = frozenset(
+    {
+        "maxcompute-semantic.oss-cn-beijing.aliyuncs.com",
+    }
+)
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
@@ -217,6 +220,14 @@ def _base_url() -> str:
         raise ValueError(
             f"MCS_UPDATE_BASE_URL must use https (got {parsed.scheme}://); "
             f"refusing to fetch metadata over insecure transport"
+        )
+    if parsed.hostname not in _ALLOWED_HOSTS and not _truthy_env(
+        "MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL"
+    ):
+        raise ValueError(
+            f"MCS_UPDATE_BASE_URL host {parsed.hostname!r} is not in the "
+            f"trusted allowlist {sorted(_ALLOWED_HOSTS)}; unset it to use the default "
+            f"or set MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL=1 for a deliberate HTTPS mirror"
         )
     return url
 

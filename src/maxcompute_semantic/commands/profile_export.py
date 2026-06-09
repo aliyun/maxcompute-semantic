@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs profile export`` / ``mcs profile import`` — package portability.
 
 A package built locally can be bundled into a tar.gz and handed to a
@@ -22,7 +19,7 @@ What's in the archive:
 
 What's NOT in the archive:
 
-    - auth credentials (access keys, process auth commands) — never exported.
+    - auth credentials (access keys, ncs commands) — never exported.
       The recipient configures their own auth via ``mcs profile update``
       after import.
     - cwd link bindings — those are local to each machine.

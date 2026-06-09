@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Guard tests for the SKILL.md bundle's metric teaching.
 
 These tests pin the v10 vocabulary split into the agent-facing

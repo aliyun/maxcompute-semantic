@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 from maxcompute_semantic.commands.sql_review.next_step import next_step_for_sql
 
 

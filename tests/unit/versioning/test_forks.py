@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Unit tests for ``versioning.forks`` — the yaml-side helpers
 that pair with the git-side worktree machinery.
 
@@ -42,7 +39,7 @@ def _make_main_profile_with_history(name: str = "p_main") -> tuple[Profile, str]
     profile = Profile(
         name=name,
         compute_project="acme_proj",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
         auth=AkAuth(access_key_id="${env:K}", access_key_secret="${env:S}"),
         sources=(DataSource(project="acme_proj", schema="default", tables="*"),),
     )
@@ -122,7 +119,7 @@ def test_register_fork_name_collision_with_main_profile_errors(
     other_main = Profile(
         name="other_main",
         compute_project="acme_proj",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
         auth=AkAuth(access_key_id="${env:K}", access_key_secret="${env:S}"),
         sources=(DataSource(project="acme_proj", schema="default", tables="*"),),
     )

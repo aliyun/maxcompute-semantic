@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.16.1] — 2026-06-09
+
+### Changed
+
+- Open-source release on GitHub and PyPI.
+- Replaced OSS-based distribution with PyPI Trusted Publisher (OIDC).
+- Added Apache-2.0 license and SPDX headers.
+- Added GitHub Actions CI/CD workflows.
+
 ## [0.14.35] — 2026-06-08
 
 ### Fixed
@@ -1007,7 +1016,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **ncs install guidance.** The profile-create wizard preflight,
   `mcs doctor`, and the runtime `AuthBinaryMissingError`
   remediation now link to the Akless CLI install docs
-  (<https://aliyuque.antfin.com/cloudcenter/resource/mrla0gkiy4u655xz>)
+  (<[internal])
   when `ncs` is missing for an internal-endpoint profile. The
   hint wording lives in a single helper (`auth/ncs.install_hint`)
   so the three surfaces stay in sync.

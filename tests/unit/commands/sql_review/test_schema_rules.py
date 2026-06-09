@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 from maxcompute_semantic.commands.sql_review.rules.schema import (
     check_column_not_found,
     check_table_not_found,

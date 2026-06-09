@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """The "which profile is active right now?" decision tree.
 
 Three slots in descending priority. The first that yields the

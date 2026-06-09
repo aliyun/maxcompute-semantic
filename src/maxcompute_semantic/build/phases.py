@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Build pipeline phases 2-7.
 
 PhaseResult is the unified return type for all phase functions. Each phase

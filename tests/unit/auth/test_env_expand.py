@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for auth/env_expand.py."""
 
 from __future__ import annotations
@@ -11,12 +8,12 @@ from maxcompute_semantic.auth.errors import ConfigEnvNotSetError
 
 
 def test_literal_value_returned_as_is() -> None:
-    assert expand_env("LTAI12345abc") == "LTAI12345abc"
+    assert expand_env("FooAKID12345") == "FooAKID12345"
 
 
 def test_env_var_expansion(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MY_AK", "LTAI12345abc")
-    assert expand_env("${env:MY_AK}") == "LTAI12345abc"
+    monkeypatch.setenv("MY_AK", "FooAKID12345")
+    assert expand_env("${env:MY_AK}") == "FooAKID12345"
 
 
 def test_unset_env_var_raises(monkeypatch: pytest.MonkeyPatch) -> None:

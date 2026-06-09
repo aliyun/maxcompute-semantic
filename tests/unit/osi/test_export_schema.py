@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """to_osi_dict output must validate against the vendored OSI schema."""
 
 from maxcompute_semantic.osi import OSI_SCHEMA_VERSION, to_osi_dict

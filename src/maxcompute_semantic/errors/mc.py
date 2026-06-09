@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """MaxCompute-side error classes plus :func:`map_pyodps_exception`.
 
 Holds the bulk of the historical ``mc_client/errors.py`` content. Auth
@@ -221,7 +218,7 @@ def map_pyodps_exception(
         "InvalidSecurityToken",
     }:
         return AuthFailedError(
-            msg, remediation="re-run your credential helper login or verify AK env vars", sql=sql
+            msg, remediation="re-run `ncs auth login` or verify AK env vars", sql=sql
         )
     if code in {"IdentityNotAuthorized"}:
         return IdentityNotAuthorizedError(

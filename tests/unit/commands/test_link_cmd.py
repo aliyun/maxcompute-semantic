@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for commands/link.py — link / status / unlink / bind."""
 
 from __future__ import annotations
@@ -18,9 +15,9 @@ def _process_profile(name: str = "meta-dev") -> Profile:
     return Profile(
         name=name,
         compute_project="meta_dev",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
         auth=ProcessAuth(
-            command="my-credential-helper get --format json"
+            command="ncs create credential odpsuser --employee-id 1 -o template -t odpscmd"
         ),
         sources=(DataSource(project="meta_dev", schema="default", tables="*"),),
     )

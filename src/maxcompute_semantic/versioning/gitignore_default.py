@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """The standard contents of a profile's ``.gitignore``.
 
 The constant is the source of truth for what gets committed to a

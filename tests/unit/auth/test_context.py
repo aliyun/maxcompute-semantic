@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``auth/context.py`` — :class:`ProfileContext`.
 
 Covers the four-slot resolve chain, the ``--project`` rewrite of
@@ -29,7 +26,7 @@ def _make_profile(name: str = "acme", project: str = "acme_warehouse") -> Profil
     return Profile(
         name=name,
         compute_project=project,
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
         auth=AkAuth(access_key_id="FAKE", access_key_secret="SECRET"),
         sources=(DataSource(project=project, schema="default", tables="*"),),
     )

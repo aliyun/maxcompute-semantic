@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 from maxcompute_semantic.commands.sql_review.rules.tier import check_bare_table_in_3level
 
 from .conftest import _mock_multi_source_profile

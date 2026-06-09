@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs profile diff <a> <b>`` — two-commit unified diff (T12).
 
 Pins the verb's user-visible contract: SHA / keyword acceptance on
@@ -194,7 +191,7 @@ def test_diff_unversioned_profile_exits_zero(isolated_config: Path, monkeypatch)
         {
             "name": "unversioned_diff",
             "compute_project": "acme_proj",
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:K}",

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for the inference-logic version stamp + offline re-derive path.
 
 The ``inference_logic_version`` stored in ``package_settings`` decides

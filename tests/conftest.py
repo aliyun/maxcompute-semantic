@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Shared pytest fixtures."""
 
 from __future__ import annotations
@@ -243,6 +240,8 @@ def latest_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Relax _base_url() validation for the test-local HTTP server:
     # allow http scheme and the 127.0.0.1 host.
     import maxcompute_semantic._internal.update_check as _uc
+
+    monkeypatch.setattr(_uc, "_ALLOWED_HOSTS", frozenset({*_uc._ALLOWED_HOSTS, str(host)}))
 
     def _test_base_url() -> str:
         import os as _os

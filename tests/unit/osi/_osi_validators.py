@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Re-implementation of the OSI upstream validate.py four checks.
 
 Source: https://github.com/open-semantic-interchange/OSI/blob/main/validation/validate.py

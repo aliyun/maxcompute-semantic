@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for build/storage.py — PackageDB (SQLite CRUD).
 
 Schema version 3 (0.4.0a4) is per-source-keyed: every ``tables``

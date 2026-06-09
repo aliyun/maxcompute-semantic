@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Fork verbs: ``fork`` (create), ``fork-list`` (inspect),
 ``fork-remove`` (destroy). T14 lands ``cmd_profile_fork`` here;
 T15 and T16 add the other two verbs to the same module.

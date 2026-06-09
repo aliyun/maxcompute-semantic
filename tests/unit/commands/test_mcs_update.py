@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for the ``mcs update`` self-upgrade command.
 
 The Python entry point lives at
@@ -119,7 +116,7 @@ class TestInstallMode:
 
 
 class TestBuildUpgradeArgv:
-    _URL = "https://files.pythonhosted.org/packages/wheels/maxcompute_semantic-0.4.0a99-py3-none-any.whl"
+    _URL = "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/wheels/maxcompute_semantic-0.4.0a99-py3-none-any.whl"
 
     def test_uv_tool(self) -> None:
         from maxcompute_semantic.commands.update import (

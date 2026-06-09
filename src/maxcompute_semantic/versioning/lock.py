@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Per-profile write serialization via ``filelock`` + a PID-body hint.
 
 Two files, one purpose. The user-supplied ``lock_path`` (e.g.

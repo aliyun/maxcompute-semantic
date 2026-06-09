@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Integration tests for the active-profile resolution chain.
 
 The user-facing chain is exposed by

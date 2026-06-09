@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs update`` — pull the latest wheel from OSS and reinstall in place.
 
 The command picks the right installer based on how mcs is currently
@@ -423,10 +420,11 @@ def cmd_update(check: bool, target_version: str | None) -> None:
     The installer is picked from how the running mcs was originally
     installed — ``uv tool install``, ``pipx install``, or
     ``pip install --user`` / plain ``pip install``. The wheel URL
-    comes from ``MCS_UPDATE_BASE_URL`` (default
-    ``https://pypi.org/pypi/maxcompute-semantic/json``), so
-    the same command works with any PyPI-compatible mirror by
-    overriding the base URL via env var.
+    comes from ``MCS_UPDATE_BASE_URL/wheels/maxcompute_semantic-
+    <version>-py3-none-any.whl`` (default base
+    ``https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com``), so
+    the same command works for a PyPI move later by flipping the
+    base URL via env var.
 
     After the install, the skill bundle is re-linked in every agent
     slot (``mcs skill update --all``) so Claude Code / Codex /

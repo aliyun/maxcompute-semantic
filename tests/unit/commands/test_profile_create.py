@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for commands/profile.py — create_cmd (non-interactive + wizard)."""
 
 from __future__ import annotations
@@ -21,12 +18,14 @@ from maxcompute_semantic.commands.profile import profile_group
 # readable and lets one rename in ``profile.py`` ripple cleanly.
 
 PICK_ENV_PUBLIC = "public"
+PICK_ENV_INTERNAL = "internal"
 PICK_ENV_CUSTOM = "custom"
 PICK_AUTH_AK = "ak"
 PICK_AUTH_NCS = "ncs"
 PICK_AUTH_PROCESS = "process"
 PICK_AK_ENV_VAR = "Env var reference — store env var names, not secrets"
 PICK_AK_LITERAL = "Literal values — store AK directly in profiles.yaml"
+PICK_INTERNAL_CN_HANGZHOU = "CN Hangzhou (corp) (http://service-corp.odps.aliyun-inc.com/api)"
 
 
 def _queue_public_ak_env_var(mock_picker: list[object]) -> None:
@@ -191,6 +190,14 @@ def test_classify_endpoint_public() -> None:
     assert region == "cn-shanghai"
 
 
+def test_classify_endpoint_internal() -> None:
+    from maxcompute_semantic.commands.profile import _classify_endpoint
+
+    kind, key = _classify_endpoint("http://service-corp.odps.aliyun-inc.com/api")
+    assert kind == "internal"
+    assert key == "2"
+
+
 def test_classify_endpoint_custom() -> None:
     from maxcompute_semantic.commands.profile import _classify_endpoint
 
@@ -199,8 +206,57 @@ def test_classify_endpoint_custom() -> None:
     assert url == "http://custom.example.com/api"
 
 
-def test_classify_endpoint_non_public_is_custom() -> None:
-    """Any non-public-template URL classifies as custom."""
+def test_classify_endpoint_internal_lazada() -> None:
+    from maxcompute_semantic.commands.profile import _classify_endpoint
+
+    kind, key = _classify_endpoint("http://service-all.ali-sg-lazada.odps.aliyun-inc.com/api")
+    assert kind == "internal"
+    assert key == "1"
+
+
+def test_classify_endpoint_corp_variant_is_internal() -> None:
+    """User-typed intranet endpoint variants classify as internal.
+
+    Domain ends in `.aliyun-inc.com` but URL isn't in the preset list.
+    Spec requires this so the wizard's Step 3 picks auth_default=ncs
+    and the new doctor/preflight ncs gates fire.
+    """
+    from maxcompute_semantic.commands.profile import _classify_endpoint
+
+    url = "http://service.cn-shanghai-corp.odps.aliyun-inc.com/api"
+    kind, key = _classify_endpoint(url)
+    assert kind == "internal"
+    # User-typed variants return the URL itself as the second tuple
+    # element (downstream callers only consume the first element).
+    assert key == url
+
+
+def test_classify_endpoint_preset_match_wins_over_host_fallback() -> None:
+    """A URL that matches a preset still returns the preset key,
+    not the URL — preset check runs before the host fallback."""
+    from maxcompute_semantic.commands.profile import _classify_endpoint
+
+    kind, key = _classify_endpoint("http://service-corp.odps.aliyun-inc.com/api")
+    assert kind == "internal"
+    assert key == "2"  # CN Hangzhou (corp) preset key
+
+
+def test_classify_endpoint_public_template_wins_over_host_fallback() -> None:
+    """A public-cloud URL stays `public`; the new fallback only
+    triggers after both preset and public-template matches fail."""
+    from maxcompute_semantic.commands.profile import _classify_endpoint
+
+    kind, region = _classify_endpoint("https://service.cn-shanghai.maxcompute.aliyun.com/api")
+    assert kind == "public"
+    assert region == "cn-shanghai"
+
+
+def test_classify_endpoint_external_host_still_custom() -> None:
+    """External hosts (no `.aliyun-inc.com` suffix) stay `custom`.
+
+    Regression guard against an over-broad rewrite that would have
+    flipped this case too.
+    """
     from maxcompute_semantic.commands.profile import _classify_endpoint
 
     kind, url = _classify_endpoint("https://example.com/api")
@@ -252,22 +308,24 @@ def test_create_wizard_public_cloud_region(
     assert profiles["pub_proj"].auth.access_key_id == "${env:ALIBABA_CLOUD_ACCESS_KEY_ID}"
 
 
-def test_create_wizard_custom_endpoint_ak(isolated_config: Path, mock_picker: list[object]) -> None:
-    """Wizard: custom endpoint with AK auth path."""
-    mock_picker.append(PICK_ENV_CUSTOM)
+def test_create_wizard_internal_endpoint(isolated_config: Path, mock_picker: list[object]) -> None:
+    """Wizard: internal → CN Hangzhou preset."""
+    mock_picker.append(PICK_ENV_INTERNAL)
+    mock_picker.append(PICK_INTERNAL_CN_HANGZHOU)
+    # internal endpoint defaults auth to ncs; user keeps the AK choice.
     mock_picker.append(PICK_AUTH_AK)
     mock_picker.append(PICK_AK_ENV_VAR)
     with patch("maxcompute_semantic.auth.ncs.is_available", return_value=False):
-        # stdin: alias, custom URL, ak-id-env(default), ak-secret-env(default), Configure? = n
+        # stdin: alias, ak-id-env(default), ak-secret-env(default), Configure? = n
         result = _invoke(
             isolated_config,
-            ["create", "--no-test", "--project", "custom_proj"],
-            input="custom_proj\nhttps://service.cn-shanghai.maxcompute.aliyun.com/api\n\n\nn\n",
+            ["create", "--no-test", "--project", "corp_proj"],
+            input="corp_proj\n\n\nn\n",
         )
     assert result.exit_code == 0
     profiles = load_all()
-    assert "custom_proj" in profiles
-    assert profiles["custom_proj"].endpoint == "https://service.cn-shanghai.maxcompute.aliyun.com/api"
+    assert "corp_proj" in profiles
+    assert profiles["corp_proj"].endpoint == "http://service-corp.odps.aliyun-inc.com/api"
 
 
 def test_create_wizard_ak_literal_mode(isolated_config: Path, mock_picker: list[object]) -> None:
@@ -278,11 +336,11 @@ def test_create_wizard_ak_literal_mode(isolated_config: Path, mock_picker: list[
     result = _invoke(
         isolated_config,
         ["create", "--no-test", "--project", "lit_proj"],
-        input="lit_proj\ncn-shanghai\nLTAI5tFakeAK\nFakeSecret\nn\n",
+        input="lit_proj\ncn-shanghai\nFakeAKID0001\nFakeSecret\nn\n",
     )
     assert result.exit_code == 0
     profiles = load_all()
-    assert profiles["lit_proj"].auth.access_key_id == "LTAI5tFakeAK"
+    assert profiles["lit_proj"].auth.access_key_id == "FakeAKID0001"
     assert profiles["lit_proj"].auth.access_key_secret == "FakeSecret"
 
 
@@ -305,7 +363,7 @@ def test_create_ak_literal_secret_from_stdin(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret-stdin",
         ],
         input="SecretFromStdin\nn\n",
@@ -313,7 +371,7 @@ def test_create_ak_literal_secret_from_stdin(
 
     assert result.exit_code == 0, result.output
     profiles = load_all()
-    assert profiles["stdin_proj"].auth.access_key_id == "LTAI5tFakeAK"
+    assert profiles["stdin_proj"].auth.access_key_id == "FakeAKID0001"
     assert profiles["stdin_proj"].auth.access_key_secret == "SecretFromStdin"
 
 
@@ -336,7 +394,7 @@ def test_create_ak_secret_stdin_conflicts_with_ak_secret(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret",
             "SecretOnArgv",
             "--ak-secret-stdin",
@@ -367,7 +425,7 @@ def test_create_ak_secret_flag_warns_to_stderr(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret",
             "SecretOnArgv",
         ],
@@ -412,7 +470,7 @@ def test_create_ak_secret_conflicts_with_ak_env_flags(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret",
             "SecretOnArgv",
             flag,
@@ -495,7 +553,7 @@ def test_create_ak_secret_stdin_requires_ak_literal(
             "--auth-type",
             "ak",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret-stdin",
         ],
         input="SecretFromStdin\n",
@@ -551,7 +609,7 @@ def test_create_ak_secret_stdin_conflicts_with_ak_secret_env(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret-env",
             "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
             "--ak-secret-stdin",
@@ -582,7 +640,7 @@ def test_create_ak_secret_stdin_conflicts_with_ak_id_env(
             "ak",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-id-env",
             "ALIBABA_CLOUD_ACCESS_KEY_ID",
             "--ak-secret-stdin",
@@ -619,7 +677,7 @@ def test_create_ak_secret_stdin_rejected_with_from_spec(isolated_config: Path) -
             "--no-test",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret-stdin",
         ],
         input="SecretFromStdin\n",
@@ -654,7 +712,7 @@ def test_create_ak_secret_rejected_with_from_spec(isolated_config: Path) -> None
             "--no-test",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret",
             "SecretOnArgv",
         ],
@@ -685,7 +743,7 @@ def test_create_ak_secret_rejected_for_process_auth(
             "ncs whoami",
             "--ak-literal",
             "--ak-id",
-            "LTAI5tFakeAK",
+            "FakeAKID0001",
             "--ak-secret",
             "SecretOnArgv",
         ],
@@ -714,14 +772,15 @@ def test_create_wizard_ak_env_var_with_defaults(
 
 def test_create_wizard_process_auth(isolated_config: Path, mock_picker: list[object]) -> None:
     """Wizard: ncs auth works (ncs unavailable, falls to manual eid)."""
-    mock_picker.append(PICK_ENV_CUSTOM)
+    mock_picker.append(PICK_ENV_INTERNAL)
+    mock_picker.append(PICK_INTERNAL_CN_HANGZHOU)
     mock_picker.append(PICK_AUTH_NCS)
     with patch("maxcompute_semantic.auth.ncs.is_available", return_value=False):
-        # stdin: alias, custom URL, employee_id, Configure? = n
+        # stdin: alias, employee_id, Configure? = n
         result = _invoke(
             isolated_config,
             ["create", "--no-test", "--project", "proc_proj"],
-            input="proc_proj\nhttps://service.cn-shanghai.maxcompute.aliyun.com/api\n12345\nn\n",
+            input="proc_proj\n12345\nn\n",
         )
     assert result.exit_code == 0
     profiles = load_all()
@@ -734,18 +793,19 @@ def test_create_wizard_warns_when_ncs_missing_for_internal(
 ) -> None:
     """Wizard preflight: when ncs is selected as auth but the binary
     is missing, print install_hint() before falling back to the
-    manual credential prompt. The profile is still saved
+    manual employee-id prompt. The profile is still saved
     (soft warning, not a hard gate)."""
     from maxcompute_semantic.auth.ncs import NCS_INSTALL_DOC_URL
 
-    mock_picker.append(PICK_ENV_CUSTOM)
+    mock_picker.append(PICK_ENV_INTERNAL)
+    mock_picker.append(PICK_INTERNAL_CN_HANGZHOU)
     mock_picker.append(PICK_AUTH_NCS)
     with patch("maxcompute_semantic.auth.ncs.is_available", return_value=False):
-        # stdin: alias, custom URL, employee_id, Configure? = n
+        # stdin: alias, employee_id, Configure? = n
         result = _invoke(
             isolated_config,
             ["create", "--no-test", "--project", "warn_proc_proj"],
-            input="warn_proc_proj\nhttps://service.cn-shanghai.maxcompute.aliyun.com/api\n12345\nn\n",
+            input="warn_proc_proj\n12345\nn\n",
         )
 
     assert result.exit_code == 0
@@ -754,7 +814,7 @@ def test_create_wizard_warns_when_ncs_missing_for_internal(
     assert "not found on PATH" in result.output
 
     # The profile is still saved — preflight is a soft warning,
-    # not a hard gate. The fallback to manual credential is
+    # not a hard gate. The fallback to manual employee-id is
     # unchanged from the pre-existing behavior.
     profiles = load_all()
     assert "warn_proc_proj" in profiles
@@ -1170,7 +1230,7 @@ def test_auth_summary_ak_literal() -> None:
     from maxcompute_semantic.auth.schema import AkAuth
     from maxcompute_semantic.commands.profile import _auth_summary
 
-    auth = AkAuth(access_key_id="LTAI5tFakeAKabcde", access_key_secret="dontshow")
+    auth = AkAuth(access_key_id="FakeAKID0001abcde", access_key_secret="dontshow")
     assert _auth_summary(auth) == "AK xxxxxxxxabcde"
 
 
@@ -1208,7 +1268,7 @@ def test_auth_summary_process_long_command_truncated() -> None:
     from maxcompute_semantic.auth.schema import ProcessAuth
     from maxcompute_semantic.commands.profile import _auth_summary
 
-    long_cmd = "my-credential-helper get --format json"
+    long_cmd = "ncs create credential odpsuser --employee-id 12345 -o template -t odpscmd"
     auth = ProcessAuth(command=long_cmd, timeout=60)
     assert _auth_summary(auth) == "process: ncs create credential odpsuser --employe…"
 
@@ -1414,7 +1474,7 @@ def test_step15_picker_lists_mcs_candidates_first(
         source_label="maxc",
         source_path=Path("/fake/maxc.yaml"),
         auth=__import__("maxcompute_semantic.auth.schema", fromlist=["AkAuth"]).AkAuth(
-            "LTAI5tFakeMaxc", "x"
+            "FakeAKID0002", "x"
         ),
         compute_project="maxc_proj",
         endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
@@ -1617,7 +1677,7 @@ def test_step15_pick_external_creds_still_short_circuits(
     fake_maxc = ImportedCreds(
         source_label="maxc",
         source_path=_Path("/fake/maxc.yaml"),
-        auth=AkAuth("LTAI5tFakeMaxc", "fakesec"),
+        auth=AkAuth("FakeAKID0002", "fakesec"),
         compute_project="maxc_proj",
         endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
     )
@@ -1642,4 +1702,4 @@ def test_step15_pick_external_creds_still_short_circuits(
     prof = get("from_maxc")
     assert prof.compute_project == "maxc_proj"
     assert prof.endpoint == "https://service.cn-hangzhou.maxcompute.aliyun.com/api"
-    assert prof.auth.access_key_id == "LTAI5tFakeMaxc"
+    assert prof.auth.access_key_id == "FakeAKID0002"

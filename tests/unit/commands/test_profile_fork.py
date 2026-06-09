@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs profile fork --from <ref>`` — the fork-creation verb (T14).
 
 Pins the CLI surface of the verb: name validation, ref resolution
@@ -353,7 +350,7 @@ def test_fork_unversioned_parent_errors(
         {
             "name": "unversioned_parent",
             "compute_project": "acme_proj",
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:K}",

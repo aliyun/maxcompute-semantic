@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for auth/credential.py — resolve_credentials (process + ak)."""
 
 from __future__ import annotations
@@ -28,13 +25,13 @@ from maxcompute_semantic.mc_client.errors import IdentityNotAuthorizedError
 
 def _example_process_auth() -> ProcessAuth:
     return ProcessAuth(
-        command="my-credential-helper get --format json",
+        command="ncs create credential odpsuser --employee-id 100001 -o template -t odpscmd",
         timeout=60,
     )
 
 
 def _example_ak_auth_literal() -> AkAuth:
-    return AkAuth(access_key_id="LTAI5tFoo", access_key_secret="BarSecret123")
+    return AkAuth(access_key_id="FakeAKID0005", access_key_secret="BarSecret123")
 
 
 def _example_ak_auth_env() -> AkAuth:
@@ -48,7 +45,7 @@ class TestResolveAkAuth:
     def test_ak_literal_returns_credentials(self) -> None:
         creds = resolve_credentials(_example_ak_auth_literal())
         assert creds is not None
-        assert creds.access_key_id == "LTAI5tFoo"
+        assert creds.access_key_id == "FakeAKID0005"
         assert creds.access_key_secret == "BarSecret123"
         assert creds.security_token == ""
 
@@ -75,9 +72,9 @@ class TestResolveProcessAuth:
         self, monkeypatch: pytest.MonkeyPatch, fixtures_dir: Path
     ) -> None:
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
-        payload = json.loads((fixtures_dir / "process_outputs" / "credential_success.json").read_text())
+        payload = json.loads((fixtures_dir / "ncs_outputs" / "credential_success.json").read_text())
         monkeypatch.setattr(
             "subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(
@@ -99,7 +96,7 @@ class TestResolveProcessAuth:
     def test_process_auth_empty_command(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # empty command should fail even with ncs available
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         empty_auth = ProcessAuth(command="", timeout=60)
         # resolve_credentials should handle empty command gracefully
@@ -109,7 +106,7 @@ class TestResolveProcessAuth:
 
     def test_process_auth_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         monkeypatch.setattr(
             "subprocess.run",
@@ -122,9 +119,9 @@ class TestResolveProcessAuth:
         self, monkeypatch: pytest.MonkeyPatch, fixtures_dir: Path
     ) -> None:
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
-        output = (fixtures_dir / "process_outputs" / "not_json.txt").read_text()
+        output = (fixtures_dir / "ncs_outputs" / "not_json.txt").read_text()
         monkeypatch.setattr(
             "subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(
@@ -138,9 +135,9 @@ class TestResolveProcessAuth:
         self, monkeypatch: pytest.MonkeyPatch, fixtures_dir: Path
     ) -> None:
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
-        payload = json.loads((fixtures_dir / "process_outputs" / "credential_success.json").read_text())
+        payload = json.loads((fixtures_dir / "ncs_outputs" / "credential_success.json").read_text())
         monkeypatch.setattr(
             "subprocess.run",
             lambda *a, **k: subprocess.CompletedProcess(
@@ -162,7 +159,7 @@ class TestResolveProcessAuth:
 
     def test_process_auth_identity_not_authorized(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         stderr = "identity not authorized: ODPS user not found"
         monkeypatch.setattr(
@@ -177,7 +174,7 @@ class TestResolveProcessAuth:
 
 class TestParsePayload:
     def test_parse_success(self, fixtures_dir: Path) -> None:
-        payload = json.loads((fixtures_dir / "process_outputs" / "credential_success.json").read_text())
+        payload = json.loads((fixtures_dir / "ncs_outputs" / "credential_success.json").read_text())
         creds = _parse_payload(payload)
         assert creds is not None
         assert creds.access_key_id.startswith("STS.")
@@ -185,13 +182,13 @@ class TestParsePayload:
     def test_parse_missing_fields_raises(self, fixtures_dir: Path) -> None:
         """Payload with only AccessKeyId (missing secret + token) -> AuthFailedError."""
         payload = json.loads(
-            (fixtures_dir / "process_outputs" / "credential_missing_fields.json").read_text()
+            (fixtures_dir / "ncs_outputs" / "credential_missing_fields.json").read_text()
         )
         with pytest.raises(AuthFailedError, match="missing required fields"):
             _parse_payload(payload)
 
     def test_parse_non_json_output(self, fixtures_dir: Path) -> None:
-        text = (fixtures_dir / "process_outputs" / "not_json.txt").read_text()
+        text = (fixtures_dir / "ncs_outputs" / "not_json.txt").read_text()
         creds = _parse_payload(text)
         assert creds is None
 
@@ -234,7 +231,7 @@ class TestParsePayload:
 
 class TestHeuristicHelpers:
     def test_looks_like_login_required(self) -> None:
-        assert _looks_like_login_required("authentication required: run the credential helper login command") is True
+        assert _looks_like_login_required("authentication required: run 'ncs auth login'") is True
         assert _looks_like_login_required("please login first") is True
         assert _looks_like_login_required("normal error") is False
 
@@ -256,7 +253,7 @@ class TestProcessAuthEdgeCases:
     def test_process_auth_oserror(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """OSError from subprocess.run → AuthFailedError."""
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         monkeypatch.setattr("subprocess.run", lambda *a, **k: _raise_oserror())
         with pytest.raises(AuthFailedError, match="failed to execute"):
@@ -265,7 +262,7 @@ class TestProcessAuthEdgeCases:
     def test_process_auth_generic_exit_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Non-zero exit without login/identity patterns → AuthFailedError."""
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         monkeypatch.setattr(
             "subprocess.run",
@@ -279,7 +276,7 @@ class TestProcessAuthEdgeCases:
     def test_process_auth_unparseable_output(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Process returns rc=0 but output cannot be parsed → AuthFailedError."""
         monkeypatch.setattr(
-            "shutil.which", lambda cmd: "/usr/local/bin/my-credential-helper" if cmd == "my-credential-helper" else None
+            "shutil.which", lambda cmd: "/usr/local/bin/ncs" if cmd == "ncs" else None
         )
         monkeypatch.setattr(
             "subprocess.run",
@@ -341,7 +338,7 @@ class TestAuthBinaryMissingRemediation:
 
         monkeypatch.setattr("shutil.which", lambda cmd: None)
         auth = ProcessAuth(
-            command="my-credential-helper get --format json"
+            command="ncs create credential odpsuser --employee-id 12345 -o template -t odpscmd"
         )
 
         with pytest.raises(AuthBinaryMissingError) as excinfo:

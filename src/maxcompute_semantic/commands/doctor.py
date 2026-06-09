@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs doctor — run a series of health checks and report status.
 
 Each check is a lightweight, read-only probe.  No mutations, no writes.
@@ -164,6 +161,7 @@ def _check_env_fallback_endpoint(profile_name: str | None = None) -> CheckResult
     known_suffixes = (
         ".maxcompute.aliyun.com",
         ".odps.aliyun.com",
+        ".odps.aliyun-inc.com",
     )
     if host.endswith(known_suffixes):
         return ("env_fallback_endpoint", "pass", endpoint)
@@ -771,6 +769,32 @@ def _check_package_sql_parses(p: object) -> CheckResult:
     )
 
 
+def _check_ncs_available(p: object) -> CheckResult:
+    """Check whether `ncs` is on PATH when the profile uses ProcessAuth+ncs.
+
+    Skipped (status="skip") for AK auth, for ProcessAuth whose command
+    is not `ncs`, and when the resolved profile is None (a prerequisite
+    check upstream failed). Pass when `ncs` is on PATH; fail with
+    `install_hint()` in the detail when it is missing.
+    """
+    import shutil
+
+    from maxcompute_semantic.auth import ncs as ncs_mod
+    from maxcompute_semantic.auth.schema import ProcessAuth
+
+    if p is None:
+        return ("ncs_available", "skip", "skipped: prerequisite failed")
+    auth = getattr(p, "auth", None)
+    if not isinstance(auth, ProcessAuth):
+        return ("ncs_available", "skip", "profile does not use ncs")
+    parts = auth.command.split()
+    if not parts or parts[0] != "ncs":
+        return ("ncs_available", "skip", "profile does not use ncs")
+    if shutil.which("ncs") is None:
+        return ("ncs_available", "fail", ncs_mod.install_hint())
+    return ("ncs_available", "pass", "ncs is on PATH")
+
+
 def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
     """Run the shared fetch for both update-checks.
 
@@ -1021,7 +1045,8 @@ def doctor_cmd(ctx: click.Context, profile: str | None, offline: bool) -> None:
         "working_tree_clean": "clean",
         "forks_healthy": "forks",
         "inference_logic_current": "inference",
-                "auth": "auth",
+        "ncs_available": "ncs CLI",
+        "auth": "auth",
         "connectivity": "connect",
         "tier": "tier",
         "build_data": "build",
@@ -1097,6 +1122,7 @@ def doctor_cmd(ctx: click.Context, profile: str | None, offline: bool) -> None:
     emit(_check_forks_healthy())
     emit(_check_inference_logic_current())
 
+    # 5e. ncs availability — needs the resolved profile but is a local
     # shutil.which probe (no network), so it runs under --offline too.
     emit(_check_ncs_available(resolved_profile))
 

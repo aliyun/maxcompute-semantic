@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``commands/_table_resolve.py`` — the shared (source_key,
 table) disambiguation helper used by ``mcs memory verify`` /
 ``mcs package apply`` to resolve user-supplied table references.

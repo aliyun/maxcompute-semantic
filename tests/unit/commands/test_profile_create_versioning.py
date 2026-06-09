@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs profile create's versioning side effect (T6).
 
 The end of every successful ``mcs profile create`` runs the auto-
@@ -77,7 +74,7 @@ def _canonical_spec(name: str, compute_project: str = "acme_proj") -> str:
         {
             "name": name,
             "compute_project": compute_project,
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:MY_AK_ID}",
@@ -311,7 +308,7 @@ def test_existing_named_profile_create_aborts_before_hook(
     existing = Profile(
         name="dup",
         compute_project="existing_proj",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
         auth=AkAuth(
             access_key_id="${env:OLD_AK}",
             access_key_secret="${env:OLD_SEC}",

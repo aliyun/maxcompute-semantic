@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs profile subcommand group — manage named profiles and profile data (build, init, refresh)."""
 
 from __future__ import annotations
@@ -65,7 +62,7 @@ def _confirm_imported_process_auth(
     command = creds.auth.command
     if is_canonical_ncs_process_auth(creds.auth):
         return click.confirm(
-            f"⚠️  Credential uses process auth command:\n"
+            f"⚠️  Credential uses ncs process auth command:\n"
             f"    {command}\n"
             f"Adopt this command?",
             default=True,
@@ -73,7 +70,7 @@ def _confirm_imported_process_auth(
 
     if trust_process_command:
         click.echo(
-            "⚠️  Trusting non-process auth command because "
+            "⚠️  Trusting non-ncs process auth command because "
             "--trust-process-command was passed:",
             err=True,
         )
@@ -82,13 +79,13 @@ def _confirm_imported_process_auth(
 
     if require_flag_without_tty and not sys.stdin.isatty():
         raise click.ClickException(
-            "external credentials use a non-process auth command:\n"
+            "external credentials use a non-ncs process auth command:\n"
             f"  {command}\n"
             "rerun with --trust-process-command to adopt it"
         )
 
     click.echo(
-        "  ⚠️  This external credential uses a non-process auth command:\n"
+        "  ⚠️  This external credential uses a non-ncs process auth command:\n"
         f"      {command}\n"
         "  Only adopt it if you trust this config file and helper.",
     )
@@ -536,7 +533,7 @@ def whoami_cmd(ctx: click.Context, name: str | None) -> None:
     principal-display string (the same shape ``maxc auth whoami``
     emits as ``principal_display``, e.g.
     ``RAM$role-name:user-name``), and for ProcessAuth profiles the
-    configured helper returning
+    configured ncs helper's whoami returning
     ``"<identity_name> (employee.<id>)"``. Nothing is cached on
     disk — every invocation hits the live source, so the answer
     always reflects the current state of the credential.
@@ -1263,10 +1260,10 @@ auth:
 # Process type — subprocess that returns a JSON payload on stdout in
 # the Alibaba Cloud STS AssumeRole response format (AccessKeyId,
 # AccessKeySecret, SecurityToken, optional Expiration).  The canonical
-# Process auth credential helper:
+# command is the ncs CLI (Akless Credential CLI):
 # auth:
 #   type: process
-#   command: my-credential-helper get --format json
+#   command: ncs create credential odpsuser --employee-id <YOUR_EMP_ID> -o template -t odpscmd
 #   timeout: 60                                    # optional, 1-600 seconds
 
 # Optional: cost thresholds (CNY). Defaults shown.
@@ -1344,7 +1341,7 @@ def spec_template_cmd() -> None:
     "--trust-process-command",
     is_flag=True,
     help=(
-        "adopt a ProcessAuth command from external config without "
+        "adopt a non-ncs ProcessAuth command from external config without "
         "an interactive trust prompt"
     ),
 )
@@ -1524,7 +1521,7 @@ def suggest_creds_cmd(ctx: click.Context, exclude_name: str | None) -> None:
     Empty result is not an error — returns ``{"existing_mcs": [],
     "external": []}`` and exits 0.
 
-    Secrets are never serialized. Only ``auth_kind (ak /
+    Secrets are never serialized. Only ``auth_kind`` (ak / ncs /
     process), endpoint, compute_project, and a display label.
     """
     from maxcompute_semantic.commands._import_creds import (
@@ -1572,6 +1569,10 @@ def endpoint_presets_cmd(ctx: click.Context) -> None:
     - ``common_regions`` — a few canonical public regions to seed the
       agent's prompt to the user (not exhaustive — any string the user
       provides is acceptable in the template).
+    - ``internal`` — the named intranet endpoints from
+      ``_INTERNAL_ENDPOINTS``. Adding / removing presets in that
+      constant flows through automatically.
+
     Pure local read; no network, no disk write.
     """
     r = _renderer(ctx)
@@ -1585,9 +1586,82 @@ def endpoint_presets_cmd(ctx: click.Context) -> None:
                 "cn-shenzhen",
                 "cn-zhangjiakou",
             ],
+            "internal": [
+                {"label": label, "url": url} for label, url in _INTERNAL_ENDPOINTS.values()
+            ],
         }
     )
 
+
+@profile_group.command("list-ncs-identities")
+@click.pass_context
+def list_ncs_identities_cmd(ctx: click.Context) -> None:
+    """Enumerate ncs ODPS authorizations for agent identity selection.
+
+    Mirrors the wizard's Step 4 ncs identity picker. Returns three
+    fields:
+
+    - ``available`` — true iff the agent should present the picker
+      (binary on PATH AND list non-empty). False otherwise; agent
+      should fall back to collecting ``employee_id``.
+    - ``identities`` — list of ``{buc_user_id, buc_user_type,
+      buc_account_name}`` dicts. Empty when ``available=false``.
+    - ``reason`` — human-readable disambiguator when
+      ``available=false`` (binary missing / list empty / probe
+      failed). Absent when ``available=true``.
+
+    All failure modes return shape-stable JSON; ncs subprocess
+    exceptions are caught and converted, never raised.
+    """
+    from maxcompute_semantic.auth import ncs as ncs_mod
+
+    r = _renderer(ctx)
+
+    if not ncs_mod.is_available():
+        r.success(
+            {
+                "available": False,
+                "reason": "ncs binary not found on PATH",
+                "identities": [],
+            }
+        )
+        return
+
+    try:
+        auths = ncs_mod.list_odps_authorizations()
+    except Exception:
+        r.success(
+            {
+                "available": False,
+                "reason": "ncs probe failed",
+                "identities": [],
+            }
+        )
+        return
+
+    if not auths:
+        r.success(
+            {
+                "available": False,
+                "reason": "ncs returned no ODPS authorizations",
+                "identities": [],
+            }
+        )
+        return
+
+    r.success(
+        {
+            "available": True,
+            "identities": [
+                {
+                    "buc_user_id": a.buc_user_id,
+                    "buc_user_type": a.buc_user_type,
+                    "buc_account_name": a.buc_account_name,
+                }
+                for a in auths
+            ],
+        }
+    )
 
 
 def _make_client_for_project(
@@ -1652,15 +1726,23 @@ def _resolve_profile_for_project(
 
 _PUBLIC_ENDPOINT_TEMPLATE = "https://service.{region}.maxcompute.aliyun.com/api"
 
-_INTERNAL_ENDPOINTS: dict[str, tuple[str, str]] = {}
+_INTERNAL_ENDPOINTS = {
+    "1": ("Lazada (SG)", "http://service-all.ali-sg-lazada.odps.aliyun-inc.com/api"),
+    "2": ("CN Hangzhou (corp)", "http://service-corp.odps.aliyun-inc.com/api"),
+    "3": ("Singapore", "http://service-sg.odps.aliyun-inc.com/api"),
+    "4": ("Germany", "http://service-corp.de-internal.odps.aliyun-inc.com/api"),
+    "5": ("US Ant", "http://service-corp-us.odps.aliyun-inc.com/api"),
+    "6": ("Vietnam Ant", "http://service-all.vn-ant.odps.aliyun-inc.com/api"),
+}
 
 _ENV_TYPE_CHOICES = {
     "1": "public",
-    "2": "custom",
+    "2": "internal",
+    "3": "custom",
 }
 
 _NCS_COMMAND_TEMPLATE = (
-    "my-credential-helper get --format json"
+    "ncs create credential odpsuser --employee-id {employee_id} -o template -t odpscmd"
 )
 
 
@@ -1784,17 +1866,32 @@ def _build_endpoint_from_region(region: str) -> str:
 
 
 def _classify_endpoint(endpoint: str) -> tuple[str, str]:
-    """Reverse-map an endpoint URL to (env_type, region_or_url).
+    """Reverse-map an endpoint URL to (env_type, region_or_key_or_url).
 
     Returns:
         ("public", region)   — matches the public template
+        ("internal", key)    — matches an internal preset
+        ("internal", url)    — host ends in .aliyun-inc.com (user-typed variant)
         ("custom", url)      — anything else
     """
+    for key, (_, url) in _INTERNAL_ENDPOINTS.items():
+        if endpoint == url:
+            return "internal", key
+
     prefix = _PUBLIC_ENDPOINT_TEMPLATE.split("{region}")[0]
     suffix = _PUBLIC_ENDPOINT_TEMPLATE.split("{region}")[1]
     if endpoint.startswith(prefix) and endpoint.endswith(suffix):
         region = endpoint[len(prefix) : -len(suffix)]
         return "public", region
+
+    # Any URL hosted on the corp intranet domain → internal. Covers
+    # user-typed variants such as
+    # `http://service.cn-shanghai-corp.odps.aliyun-inc.com/api` that
+    # are not in the preset list. The second tuple element is the
+    # URL itself; downstream callers only consume the first element.
+    parsed = urllib.parse.urlparse(endpoint)
+    if parsed.hostname and parsed.hostname.endswith(".aliyun-inc.com"):
+        return "internal", endpoint
 
     return "custom", endpoint
 
@@ -1863,7 +1960,7 @@ def _validate_ak_secret_flags(
         )
     if ak_secret is not None and (from_file is not None or from_spec is not None):
         raise click.ClickException("--ak-secret cannot be used with --from-file or --from-spec")
-    if auth_type in {"process"}:
+    if auth_type in {"ncs", "process"}:
         if ak_secret is not None:
             raise click.ClickException(f"--ak-secret cannot be used with --auth-type {auth_type}")
         if ak_secret_stdin:
@@ -1876,10 +1973,10 @@ def _validate_ak_secret_flags(
 @click.option("--project", help="MaxCompute project name")
 @click.option("--endpoint", help="override endpoint URL (overrides --region)")
 @click.option("--region", help="public-cloud region (e.g. cn-shanghai); auto-builds endpoint")
-@click.option("--auth-type", type=click.Choice(["ak", "process"]), help="auth method")
-@click.option("--helper-arg", help="argument for process auth credential helper")
+@click.option("--auth-type", type=click.Choice(["ak", "ncs", "process"]), help="auth method")
+@click.option("--employee-id", help="employee ID for ncs process auth")
 @click.option("--alias", help="profile name (skip the alias prompt)")
-@click.option("--process-command", help="override process auth command")
+@click.option("--ncs-command", help="override ncs command for process auth")
 @click.option("--ak-id-env", help="env var name for AK access key ID")
 @click.option("--ak-secret-env", help="env var name for AK secret")
 @click.option("--ak-literal", is_flag=True, help="store AK values directly (not env var refs)")
@@ -2382,7 +2479,7 @@ def _create_wizard(
     else:
         from maxcompute_semantic.commands._source_picker import _pick_one
 
-        env_items = list(_ENV_TYPE_CHOICES.values())  # ["public", "custom"]
+        env_items = list(_ENV_TYPE_CHOICES.values())  # ["public", "internal", "custom"]
         env_choice = _pick_one(
             "Environment:", choices=env_items, echo_label="Environment", echo_emoji="🌍"
         )
@@ -2393,6 +2490,29 @@ def _create_wizard(
         if env_type == "public":
             region_input = _prompt_required("Region (e.g. cn-shanghai)")
             chosen_endpoint = _build_endpoint_from_region(region_input)
+        elif env_type == "internal":
+            ep_items = [f"{label} ({url})" for label, url in _INTERNAL_ENDPOINTS.values()]
+            choice = _pick_one(
+                "Internal endpoint:",
+                choices=ep_items,
+                echo_label="Endpoint",
+                echo_emoji="🌐",
+            )
+            if choice is None:
+                return None
+            # Find the matching endpoint by display string.
+            url = next(
+                (
+                    url
+                    for label, url in _INTERNAL_ENDPOINTS.values()
+                    if f"{label} ({url})" == choice
+                ),
+                None,
+            )
+            if url is None:
+                click.echo("invalid choice")
+                return None
+            chosen_endpoint = url
         else:  # custom
             chosen_endpoint = _prompt_required("Custom endpoint URL")
 
@@ -2402,18 +2522,20 @@ def _create_wizard(
         chosen_auth = reuse_decisions.auth
     else:
         # Step 3: auth method — default depends on environment:
-        #   custom → process
+        #   internal / custom → ncs (ncs is standard on intranet)
         #   public → ak (AK is more common on public endpoints)
         # When Step 2 was skipped via flags, infer env_type from endpoint.
         if env_type is None:
             env_type = _classify_endpoint(chosen_endpoint)[0]
-        if env_type == "custom":
+        if env_type == "internal":
+            auth_default = "ncs"
+        elif env_type == "custom":
             auth_default = "process"
         else:
             auth_default = "ak"
         chosen_auth_type = auth_type or _pick_one(
             "Auth method:",
-            choices=["ak", "process"],
+            choices=["ak", "ncs", "process"],
             default=auth_default,
         )
 
@@ -2461,6 +2583,56 @@ def _create_wizard(
                     ak_id_val = _prompt_required("Access Key ID")
                     ak_secret_val = _prompt_required("Access Key Secret", hide_input=True)
                     chosen_auth = AkAuth(access_key_id=ak_id_val, access_key_secret=ak_secret_val)
+        elif chosen_auth_type == "ncs":
+            # ncs auth — auto-discover ODPS identities via ncs CLI
+            from maxcompute_semantic.auth import ncs as ncs_mod
+
+            # Preflight: surface the install-docs hint once if the
+            # binary is missing. The flow continues either way
+            # (manual employee-id fallback path is unchanged).
+            if not ncs_mod.is_available():
+                click.secho(ncs_mod.install_hint(), fg="yellow")
+
+            if ncs_command:
+                chosen_auth = ProcessAuth(command=ncs_command)
+            elif ncs_mod.is_available() and employee_id is None:
+                auths = ncs_mod.list_odps_authorizations()
+                if auths:
+                    id_items = [f"{a.buc_account_name} ({a.buc_user_type})" for a in auths]
+                    choice = _pick_one("Select ODPS identity:", choices=id_items)
+                    if choice is not None:
+                        selected = next(
+                            (
+                                a
+                                for a in auths
+                                if f"{a.buc_account_name} ({a.buc_user_type})" == choice
+                            ),
+                            None,
+                        )
+                        if selected is not None:
+                            cmd = (
+                                f"ncs create credential odpsuser "
+                                f"--buc-user-id {selected.buc_user_id} "
+                                "-o template -t odpscmd"
+                            )
+                            chosen_auth = ProcessAuth(command=cmd)
+                        else:
+                            eid = _prompt_required("Employee ID")
+                            chosen_auth = ProcessAuth(
+                                command=_NCS_COMMAND_TEMPLATE.format(employee_id=eid)
+                            )
+                    else:
+                        # User cancelled fzf or no auths discovered
+                        eid = employee_id or _prompt_required("Employee ID")
+                        chosen_auth = ProcessAuth(
+                            command=_NCS_COMMAND_TEMPLATE.format(employee_id=eid)
+                        )
+                else:
+                    eid = employee_id or _prompt_required("Employee ID")
+                    chosen_auth = ProcessAuth(command=_NCS_COMMAND_TEMPLATE.format(employee_id=eid))
+            else:
+                eid = employee_id or _prompt_required("Employee ID")
+                chosen_auth = ProcessAuth(command=_NCS_COMMAND_TEMPLATE.format(employee_id=eid))
         else:
             # process auth — user provides a custom command that returns
             # STS AssumeRole JSON (AccessKeyId, AccessKeySecret, SecurityToken)

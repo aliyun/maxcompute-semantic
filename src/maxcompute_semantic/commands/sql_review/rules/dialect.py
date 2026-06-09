@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Dialect rules — flag SQLite/Hive syntax MaxCompute rejects.
 
 All 4 dialect rules walk the AST once per call (cheap); we trade a

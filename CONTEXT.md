@@ -55,7 +55,7 @@ actions and artifact integrity checks.
 A local command that mcs runs to obtain temporary MaxCompute credentials for a
 profile. A helper discovered in an external config is adopted only after the
 command is visible to the user or explicitly trusted by the importing workflow;
-process auth commands use a configurable credential helper binary.
+the canonical ncs credential command is the standard known helper.
 
 ## managed write path
 

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """SQL pattern normalization for mined and verified query memory.
 
 The analyzer intentionally normalizes literal values but keeps table names,

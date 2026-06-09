@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for auth/schema.py — Profile + DataSource + TableSpec
 dataclasses and their validators.
 
@@ -29,7 +26,7 @@ def _ak() -> AkAuth:
     """The canonical test-AK pair (literal values, not env-refs).
     The LTAI- prefix is the Aliyun-AccessKey convention; the
     test_secret is non-functional placeholder text."""
-    return AkAuth(access_key_id="LTAI_test_id", access_key_secret="test_secret_redacted")
+    return AkAuth(access_key_id="FooAKID", access_key_secret="test_secret_redacted")
 
 
 def _bare_source(project: str = "data_proj", schema: str = "default") -> DataSource:
@@ -69,7 +66,7 @@ def _bare_profile(
 
 
 def test_process_auth_default_timeout() -> None:
-    a = ProcessAuth(command="my-credential-helper get --format json")
+    a = ProcessAuth(command="ncs create credential odpsuser --employee-id 1 -o template -t odpscmd")
     assert a.timeout == 60
 
 

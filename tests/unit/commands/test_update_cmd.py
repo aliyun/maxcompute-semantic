@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for `mcs profile update` (v0.4.0a3 new verb shape).
 
 The update_cmd has two paths:

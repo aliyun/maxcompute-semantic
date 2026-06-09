@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for the multi-level file-browser-style profile editor.
 
 The editor is a state-machine of nested ``while True:`` loops; each
@@ -189,7 +186,7 @@ class TestEditAuth:
         Implemented via ``_pick_choice``'s ``default=`` kwarg; the
         invariant still holds — verify by inspecting the call-args.
         """
-        p = _profile(auth=AkAuth("LTAI_ID", "secret"))
+        p = _profile(auth=AkAuth("FooAKID", "secret"))
         client = MagicMock()
         # Patch _pick_choice with a MagicMock so we can inspect call_args.
         pick_mock = MagicMock(side_effect=["auth", "BACK", "DONE"])
@@ -543,7 +540,7 @@ class TestEditProfileEscDoesNotDiscard:
             name="test",
             compute_project="proj_a",
             endpoint="http://example/api",
-            auth=AkAuth(access_key_id="LTAI***", access_key_secret="abc"),
+            auth=AkAuth(access_key_id="FooAKID", access_key_secret="abc"),
             sources=(),
             cost_thresholds=CostThresholds(confirm_cny=10.0, blocked_cny=100.0),
             tags=(),
@@ -618,7 +615,7 @@ class TestSectionEditorAbortPropagates:
             name="test",
             compute_project="proj_a",
             endpoint="http://example/api",
-            auth=AkAuth(access_key_id="LTAI***", access_key_secret="abc"),
+            auth=AkAuth(access_key_id="FooAKID", access_key_secret="abc"),
             sources=(),
             cost_thresholds=CostThresholds(confirm_cny=10.0, blocked_cny=100.0),
             tags=(),
@@ -692,7 +689,7 @@ class TestEditSourceIncludeAllListed:
             name="test",
             compute_project="proj_a",
             endpoint="http://example/api",
-            auth=AkAuth(access_key_id="LTAI***", access_key_secret="abc"),
+            auth=AkAuth(access_key_id="FooAKID", access_key_secret="abc"),
             sources=(DataSource(project="proj_a", schema="default", tables=()),),
             cost_thresholds=CostThresholds(confirm_cny=10.0, blocked_cny=100.0),
             tags=(),
@@ -711,7 +708,7 @@ class TestEditSourceIncludeAllListed:
             name="test",
             compute_project="proj_a",
             endpoint="http://example/api",
-            auth=AkAuth(access_key_id="LTAI***", access_key_secret="abc"),
+            auth=AkAuth(access_key_id="FooAKID", access_key_secret="abc"),
             sources=(
                 DataSource(
                     project="proj_a",
@@ -813,7 +810,7 @@ class TestEditProfileCtrlCIsEsc:
             name="test",
             compute_project="proj_a",
             endpoint="http://example/api",
-            auth=AkAuth(access_key_id="LTAI***", access_key_secret="abc"),
+            auth=AkAuth(access_key_id="FooAKID", access_key_secret="abc"),
             sources=(),
             cost_thresholds=CostThresholds(confirm_cny=10.0, blocked_cny=100.0),
             tags=(),

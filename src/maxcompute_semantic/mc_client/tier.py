@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tier detection (2-level vs 3-level) with per-project on-disk cache.
 
 The tier cache is keyed per-(profile, MaxCompute project) so a

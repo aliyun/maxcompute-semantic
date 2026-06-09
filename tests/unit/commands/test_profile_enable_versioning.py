@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs profile enable-versioning — the explicit upgrade entry point (T7).
 
 The auto-commit hook (T5) auto-initializes a per-profile ``.git/``

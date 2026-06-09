@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Fixtures shared by the T8 ``versioning``-wiring test files.
 
 The per-verb test files (``test_build_versioning.py``,
@@ -91,7 +88,7 @@ def _canonical_spec(name: str, compute_project: str = "acme_proj") -> str:
         {
             "name": name,
             "compute_project": compute_project,
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:MY_AK_ID}",

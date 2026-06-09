@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``compute_model_coverage`` (`coverage.py`).
 
 The calculator quantifies how much of the SQL's surface — referenced

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Parse external MaxCompute credential files into ``ImportedCreds``.
 
 Two well-known credential storage formats are supported:
@@ -23,7 +20,7 @@ Two well-known credential storage formats are supported:
       project: <name>
       endpoint: https://service.<region>.maxcompute.aliyun.com/api
       external:
-        process_command: my-credential-helper get --format json
+        process_command: ncs create credential odpsuser --employee-id <id> -o template -t odpscmd
         process_timeout: 60
 
 - **odpscmd** (the official Aliyun MaxCompute CLI): config path is
@@ -41,9 +38,9 @@ Two well-known credential storage formats are supported:
     access_key=...
     end_point=https://service.<region>.maxcompute.aliyun.com/api
 
-    # Process auth:
+    # Process auth (ncs/Akless CLI):
     account_provider=external
-    processCommand=my-credential-helper get --format json
+    processCommand=ncs create credential odpsuser --employee-id <id> -o template -t odpscmd
     processCommandTimeout=20
     project_name=<name>
     end_point=https://service.<region>.maxcompute.aliyun.com/api
@@ -298,14 +295,14 @@ def parse_creds_at(label: str, path: Path) -> ImportedCreds | None:
 
 
 def is_canonical_ncs_process_auth(auth: AkAuth | ProcessAuth) -> bool:
-    """True for a known credential helper command shape."""
+    """True for the known ncs ODPS credential helper command shape."""
     if not isinstance(auth, ProcessAuth):
         return False
     try:
         parts = shlex.split(auth.command)
     except ValueError:
         return False
-    return len(parts) >= 2 and parts[0] != ""
+    return parts[:4] == ["ncs", "create", "credential", "odpsuser"]
 
 
 def _classify_auth_kind(auth: AkAuth | ProcessAuth) -> str:
@@ -313,12 +310,12 @@ def _classify_auth_kind(auth: AkAuth | ProcessAuth) -> str:
     ``mcs profile suggest-creds``.
 
     - ``"ak"`` — :class:`AkAuth` (literal or ``${env:VAR}`` references).
-    - ``"process" — any ProcessAuth command
-      that produces STS JSON on stdout (matches the wizard's
-      process command template form at
+    - ``"ncs"`` — :class:`ProcessAuth` whose tokenized command begins with
+      ``ncs create credential odpsuser`` (matches both the wizard's
+      ``--employee-id`` template form at
       :data:`commands.profile._NCS_COMMAND_TEMPLATE` and the
       ``--buc-user-id`` form generated when the wizard's identity
-      standard process auth helpers).
+      picker resolves a live ncs authorization).
     - ``"process"`` — any other :class:`ProcessAuth` (custom STS
       commands, etc.).
 
@@ -332,7 +329,7 @@ def _classify_auth_kind(auth: AkAuth | ProcessAuth) -> str:
     if isinstance(auth, AkAuth):
         return "ak"
     if is_canonical_ncs_process_auth(auth):
-        return "process"
+        return "ncs"
     return "process"
 
 

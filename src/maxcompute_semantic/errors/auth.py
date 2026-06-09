@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Auth / profile / config error subclasses of :class:`McsError`."""
 
 from __future__ import annotations
@@ -9,7 +6,7 @@ from maxcompute_semantic.errors.base import ErrorCode, McsError
 
 
 class AuthBinaryMissingError(McsError):
-    """process auth binary not found on PATH."""
+    """`ncs` (or other process auth binary) not found on PATH."""
 
     code = ErrorCode.AUTH_BINARY_MISSING
     exit_code = 4

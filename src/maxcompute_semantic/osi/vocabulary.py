@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Bidirectional vocabulary map between mcs internal terms and OSI YAML.
 
 Used by ``export.py`` (mcs -> OSI) and (in v2) ``import_.py`` (OSI -> mcs).

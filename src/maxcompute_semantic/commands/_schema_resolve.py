@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Shared ``--schema`` / project-tier resolution for the CLI verbs.
 
 Single entry point :func:`resolve_schema_for_tier` is the unified policy

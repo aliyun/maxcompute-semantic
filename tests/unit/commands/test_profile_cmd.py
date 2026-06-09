@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``commands/profile.py`` profile-lifecycle verbs.
 
 This file covers ``list``, ``show``, ``whoami``, ``remove``,
@@ -39,9 +36,9 @@ def _process_profile(name: str = "meta-dev") -> Profile:
     return Profile(
         name=name,
         compute_project="meta_dev",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
         auth=ProcessAuth(
-            command="my-credential-helper get --format json"
+            command="ncs create credential odpsuser --employee-id 1 -o template -t odpscmd"
         ),
         sources=(DataSource(project="meta_dev", schema="default", tables="*"),),
     )
@@ -872,9 +869,9 @@ class TestSuggestCreds:
         ncs_candidate = McsProfileCandidate(
             name="dev-ncs",
             auth=ProcessAuth(
-                command="my-credential-helper get --format json",
+                command="ncs create credential odpsuser --employee-id 99 -o template -t odpscmd",
             ),
-            endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            endpoint="http://service-corp.odps.aliyun-inc.com/api",
             compute_project="dev_proj",
             sources=(),
         )
@@ -901,7 +898,7 @@ class TestSuggestCreds:
         for forbidden in (
             "AKID_LITERAL_THAT_MUST_NOT_LEAK",
             "SECRET_THAT_MUST_NOT_LEAK",
-            "--id 99",
+            "--employee-id 99",
         ):
             assert forbidden not in result.output, f"secret leaked: {forbidden!r} found in output"
 
@@ -923,7 +920,7 @@ class TestSuggestCreds:
                 command="ncs create credential odpsuser --buc-user-id 4242 -o template -t odpscmd",
             ),
             compute_project="dev_proj",
-            endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            endpoint="http://service-corp.odps.aliyun-inc.com/api",
         )
         with (
             patch(

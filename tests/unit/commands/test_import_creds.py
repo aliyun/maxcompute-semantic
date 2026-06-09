@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for commands/_import_creds.py + the import-creds CLI verb."""
 
 from __future__ import annotations
@@ -31,14 +28,14 @@ from maxcompute_semantic.commands._import_creds import (
 from maxcompute_semantic.commands.profile import profile_group
 
 # Canonical ncs command used in fixtures
-_PROCESS_CMD = "my-credential-helper get --format json"
-_PROCESS_CMD_ALT = "my-credential-helper get --format json"
+_NCS_CMD = "ncs create credential odpsuser --employee-id 123456 -o template -t odpscmd"
+_NCS_CMD_EID1 = "ncs create credential odpsuser --employee-id 1 -o template -t odpscmd"
 _CUSTOM_PROCESS_CMD = "python -m company_sts_helper --profile odps"
 
 _VALID_MAXC_YAML = """\
 auth:
   provider: access_key
-  access_id: LTAI5tFakeMaxc
+  access_id: FakeAKID0002
   secret_access_key: SecretMaxcVal
   project: maxc_proj
   endpoint: https://service.cn-shanghai.maxcompute.aliyun.com/api
@@ -57,7 +54,7 @@ _VALID_MAXC_PROCESS_YAML = (
 
 _VALID_ODPSCMD_INI = """\
 project_name=odpscmd_proj
-access_id=LTAI5tFakeOdpscmd
+access_id=FakeAKID0003
 access_key=SecretOdpscmdVal
 end_point=https://service.cn-hangzhou.maxcompute.aliyun.com/api
 log_view_host=http://logview.odps.aliyun.com
@@ -93,7 +90,7 @@ _ODPSCMD_PROCESS_PLUS_AK_INI = (
     f"processCommand={_NCS_CMD}\n"
     "processCommandTimeout=20\n"
     "project_name=mixed_proj\n"
-    "access_id=LTAI5tMixed\n"
+    "access_id=FakeAKID0004\n"
     "access_key=SecretMixed\n"
     "end_point=https://service.cn-hangzhou.maxcompute.aliyun.com/api\n"
 )
@@ -109,7 +106,7 @@ class TestParseMaxc:
         creds = parse_maxc_config(p)
         assert creds is not None
         assert isinstance(creds.auth, AkAuth)
-        assert creds.auth.access_key_id == "LTAI5tFakeMaxc"
+        assert creds.auth.access_key_id == "FakeAKID0002"
         assert creds.auth.access_key_secret == "SecretMaxcVal"
         assert creds.compute_project == "maxc_proj"
         assert creds.endpoint == "https://service.cn-shanghai.maxcompute.aliyun.com/api"
@@ -172,7 +169,7 @@ class TestParseOdpscmd:
         creds = parse_odpscmd_config(p)
         assert creds is not None
         assert isinstance(creds.auth, AkAuth)
-        assert creds.auth.access_key_id == "LTAI5tFakeOdpscmd"
+        assert creds.auth.access_key_id == "FakeAKID0003"
         assert creds.auth.access_key_secret == "SecretOdpscmdVal"
         assert creds.compute_project == "odpscmd_proj"
         assert creds.endpoint == "https://service.cn-hangzhou.maxcompute.aliyun.com/api"
@@ -224,7 +221,7 @@ end_point=https://x/api
         """Process auth but no project_name → reject."""
         ini = """\
 account_provider=external
-processCommand=my-credential-helper get --format json
+processCommand=ncs create credential odpsuser --employee-id 1 -o template -t odpscmd
 end_point=https://x/api
 """
         p = tmp_path / "odps_config.ini"
@@ -235,7 +232,7 @@ end_point=https://x/api
         """Process auth but no end_point → reject."""
         ini = """\
 account_provider=external
-processCommand=my-credential-helper get --format json
+processCommand=ncs create credential odpsuser --employee-id 1 -o template -t odpscmd
 project_name=p
 """
         p = tmp_path / "odps_config.ini"
@@ -295,7 +292,7 @@ class TestImportedCredsDisplay:
         creds = ImportedCreds(
             source_label="odpscmd",
             source_path=tmp_path / "odps_config.ini",
-            auth=ProcessAuth(command=_PROCESS_CMD_ALT),
+            auth=ProcessAuth(command=_NCS_CMD_EID1),
             compute_project="proj",
             endpoint="https://x/api",
         )
@@ -324,7 +321,7 @@ def test_import_creds_from_maxc_explicit_path(isolated_config: Path, tmp_path: P
     p = get("maxc_proj")
     assert p.compute_project == "maxc_proj"
     assert isinstance(p.auth, AkAuth)
-    assert p.auth.access_key_id == "LTAI5tFakeMaxc"
+    assert p.auth.access_key_id == "FakeAKID0002"
     assert p.auth.access_key_secret == "SecretMaxcVal"
     assert "imported maxc credentials" in result.output
 
@@ -433,7 +430,7 @@ def test_import_creds_auto_picks_process_candidate(isolated_config: Path, tmp_pa
     fake_creds = ImportedCreds(
         source_label="odpscmd",
         source_path=tmp_path / "odps_config.ini",
-        auth=ProcessAuth(command=_PROCESS_CMD_ALT),
+        auth=ProcessAuth(command=_NCS_CMD_EID1),
         compute_project="auto_process_proj",
         endpoint="https://x/api",
     )
@@ -827,10 +824,10 @@ class TestClassifyAuthKind:
     @pytest.mark.parametrize(
         "command",
         [
-            "my-credential-helper get --format json",
+            "ncs create credential odpsuser --employee-id 12345 -o template -t odpscmd",
             "ncs create credential odpsuser --buc-user-id 67890 -o template -t odpscmd",
             # leading whitespace
-            "  my-credential-helper get --format json",
+            "  ncs create credential odpsuser --employee-id 1 -o template -t odpscmd",
         ],
     )
     def test_ncs_command_shapes_classify_as_ncs(self, command: str) -> None:
@@ -843,7 +840,7 @@ class TestClassifyAuthKind:
             "/path/to/sts.sh",
             "aliyun sts AssumeRole --role-arn ...",
             "ncs whoami",  # ncs binary but not the credential subcommand
-            "my-credential-helper-extra get --format json",
+            "ncs create credential odpsuser-extra --employee-id 1 -o template -t odpscmd",
             "python -m my_sts_helper",
         ],
     )

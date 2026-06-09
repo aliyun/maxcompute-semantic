@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for cli.py -- global flags + group registration."""
 
 from __future__ import annotations
@@ -314,7 +311,7 @@ def test_banner_renders_on_stderr_when_cache_says_upgrade(
             current_at_check="0.4.0a38",
             latest_version="9.9.9",
             wheel_url=(
-                "https://files.pythonhosted.org/packages/"
+                "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/"
                 "wheels/maxcompute_semantic-9.9.9-py3-none-any.whl"
             ),
             min_supported="0.4.0",
@@ -405,7 +402,7 @@ def test_hard_block_overrides_command_exit_code_to_2(
             current_at_check=__version__,
             latest_version="9.9.9",
             wheel_url=(
-                "https://files.pythonhosted.org/packages/"
+                "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/"
                 "wheels/maxcompute_semantic-9.9.9-py3-none-any.whl"
             ),
             min_supported="9.0.0",
@@ -463,7 +460,7 @@ def test_banner_uses_sparkle_prefix_with_leading_newline(
             current_at_check="0.4.0a38",
             latest_version="9.9.9",
             wheel_url=(
-                "https://files.pythonhosted.org/packages/"
+                "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/"
                 "wheels/maxcompute_semantic-9.9.9-py3-none-any.whl"
             ),
             min_supported="0.4.0",

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """XDG-compliant path helpers for mcs config + data + cache directories.
 
 Config root is ``~/.config/maxcompute-semantic/`` (override via

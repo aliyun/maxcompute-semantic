@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs memory subcommand group -- structured memory CRUD + hybrid retrieval.
 
 Write commands (verify, fail, note) create memory entries.

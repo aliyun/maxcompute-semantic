@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for aggregation hint generator (`hints/aggregation.py`).
 
 The hint generator skips aggregates over unqualified columns (the

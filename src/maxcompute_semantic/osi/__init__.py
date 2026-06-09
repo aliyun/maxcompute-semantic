@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """OSI (Open Semantic Interchange) interop adapter.
 
 This package translates between mcs's internal vocabulary

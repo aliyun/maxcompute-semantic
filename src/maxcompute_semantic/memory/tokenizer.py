@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """MemoryTokenizer — jieba + Latin regex pre-tokenizer for FTS5 unicode61.
 
 Returns space-separated token strings consumable by FTS5's default

@@ -1,0 +1,14 @@
+====== Identity ======
+Key              Value
+---              -----
+identity_name    Test User
+identity_key     employee.100001
+entity_id        ei.f8952d8f-5437-4519-8251-9dd1789a648a
+
+======== Status ========
+Key                Value
+---                -----
+login_method       alilang
+lease_duration     12h
+completion_time    2026-05-11 10:00:00
+expiration_time    2026-05-11 22:00:00

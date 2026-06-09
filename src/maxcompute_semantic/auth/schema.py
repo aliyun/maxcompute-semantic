@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Profile dataclasses with manual validation (no pydantic).
 
 The model:
@@ -49,8 +46,8 @@ class ProcessAuth:
     """Subprocess-style auth: ``command`` returns a JSON credential
     payload on stdout in the Alibaba Cloud STS AssumeRole format
     (``AccessKeyId``, ``AccessKeySecret``, ``SecurityToken``, and
-    optional ``Expiration``).  The canonical command is a process auth helper (e.g. ``my-credential-helper get
-    --format json``)
+    optional ``Expiration``).  The canonical command is ``ncs create
+    credential odpsuser --employee-id <id> -o template -t odpscmd``
     which produces exactly this shape.  Any program emitting the same
     four-field JSON works — snake_case variants (``access_key_id``
     etc.) are also accepted.  ``timeout`` is the max wall-clock for
@@ -551,8 +548,8 @@ class Profile:
                     f"profile {self.name!r}: auth.command is empty",
                     remediation="ProcessAuth's command is the shell command "
                     "the credential resolver runs to get a JSON token; "
-                    "the canonical form is 'my-credential-helper get "
-                    "--format json'",
+                    "the canonical Alibaba form is 'ncs create credential "
+                    "odpsuser --employee-id <id> -o template -t odpscmd'",
                 )
             if not (1 <= self.auth.timeout <= 600):
                 raise InvalidProfileError(

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Shared identity-display helpers.
 
 Four small functions, each pure-data:
@@ -172,7 +169,7 @@ def live_identity(profile: Profile) -> str | None:
       present the specific code and remediation instead of a generic
       "no identity" message. Only unexpected exceptions are folded
       into the ``None`` failure path.
-    - ``ProcessAuth uses the credential helper (whoami not available()``
+    - ``ProcessAuth`` calls the ncs credential helper's ``whoami()``
       function and formats the resulting record as
       ``"<identity_name> (employee.<id>)"``, the same string the
       retired ``mcs auth whoami`` verb used to emit. Classified
@@ -202,7 +199,7 @@ def live_identity(profile: Profile) -> str | None:
         return resolve_principal(client)
     if isinstance(profile.auth, ProcessAuth):
         try:
-            pass
+            from maxcompute_semantic.auth import ncs as ncs_mod
 
             info = ncs_mod.whoami()
         except McsError:

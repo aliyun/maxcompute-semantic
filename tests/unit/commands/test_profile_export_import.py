@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``mcs profile export`` / ``mcs profile import`` round-trip."""
 
 from __future__ import annotations
@@ -22,7 +19,7 @@ def _profile(name: str = "alpha") -> Profile:
         name=name,
         compute_project="proj_alpha",
         endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
-        auth=AkAuth("LTAI5tFakeID", "FakeSecret-do-not-export"),
+        auth=AkAuth("FakeAKID", "FakeSecret-do-not-export"),
         tags=("benchmark", "shared"),
         sources=(DataSource(project="proj_alpha", schema="default", tables="*"),),
     )
@@ -98,7 +95,7 @@ def test_export_manifest_excludes_auth(isolated_config: Path, tmp_path: Path) ->
     # The whole point: secrets must NOT travel.
     assert "auth" not in manifest["profile"]
     assert "FakeSecret" not in json.dumps(manifest)
-    assert "LTAI5tFakeID" not in json.dumps(manifest)
+    assert "FakeAKID" not in json.dumps(manifest)
 
 
 def test_export_does_not_follow_package_symlinks(

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for ``auth/resolver.py`` — the three-slot inner chain.
 
 The resolver priority is explicit ``name`` arg → ``MCS_PROFILE``
@@ -37,7 +34,7 @@ def _make_profile(name: str = "acme-corp") -> Profile:
     return Profile(
         name=name,
         compute_project="acme_warehouse",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
         auth=AkAuth(access_key_id="FAKE_AK_ID", access_key_secret="FAKE_AK_SECRET"),
         sources=(DataSource(project="acme_warehouse", schema="default", tables="*"),),
     )

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """OSI -> mcs import (deferred to v2)."""
 
 from __future__ import annotations

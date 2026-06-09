@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs profile log`` — per-profile history listing (T10).
 
 Pins the verb's user-visible contract: default ``memory:`` noise
@@ -217,7 +214,7 @@ def test_log_unversioned_profile_exits_zero_with_hint(isolated_config: Path, mon
         {
             "name": "unversioned",
             "compute_project": "acme_proj",
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:K}",

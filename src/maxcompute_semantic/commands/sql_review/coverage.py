@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Compute model_coverage envelope field — annotation completeness for the SQL.
 
 The coverage payload tells the agent how much of the SQL's surface is

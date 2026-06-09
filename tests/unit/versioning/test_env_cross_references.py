@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Cross-reference invariants for the ``MCS_NO_VERSIONING`` env knob (T18).
 
 The helper itself (``versioning/env.py:is_versioning_disabled``) is
@@ -28,9 +25,7 @@ from pathlib import Path
 from maxcompute_semantic.versioning import is_versioning_disabled as reexport
 from maxcompute_semantic.versioning.env import is_versioning_disabled as impl
 
-# Walk up from this file to the repo root (tests/unit/versioning/<this> →
-# repo root four levels up from packages/maxcompute-semantic/).
-_REPO_ROOT = Path(__file__).resolve().parents[5]
+_PACKAGE_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_env_helper_is_exported_from_package_init() -> None:
@@ -60,21 +55,8 @@ def test_env_helper_matches_mcs_no_history_truthy_set() -> None:
     assert set(build_cmd._TRUTHY) == canonical
 
 
-def test_env_helper_is_referenced_in_claude_md() -> None:
-    """The project's ``CLAUDE.md`` mentions ``MCS_NO_VERSIONING``
-    near the existing ``MCS_NO_HISTORY`` paragraph (T18's
-    documentation cross-reference)."""
-    text = (_REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "MCS_NO_VERSIONING" in text
-    assert "MCS_NO_HISTORY" in text
-
-
 def test_env_helper_is_referenced_in_changelog() -> None:
     """The package CHANGELOG mentions ``MCS_NO_VERSIONING`` at least
-    once. T22's release-section bullet pins the user-facing
-    contract; this test refuses regression in case the section is
-    moved or rewritten."""
-    text = (_REPO_ROOT / "packages" / "maxcompute-semantic" / "CHANGELOG.md").read_text(
-        encoding="utf-8"
-    )
+    once."""
+    text = (_PACKAGE_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "MCS_NO_VERSIONING" in text

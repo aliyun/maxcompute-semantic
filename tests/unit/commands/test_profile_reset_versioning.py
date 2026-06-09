@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """``mcs profile reset --to <ref>`` — the rollback verb (T13).
 
 Pins the verb's user-visible contract: ref / keyword resolution,
@@ -370,7 +367,7 @@ def test_reset_unversioned_profile_errors(
         {
             "name": "unversioned_reset",
             "compute_project": "acme_proj",
-            "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
+            "endpoint": "http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
             "auth": {
                 "type": "ak",
                 "access_key_id": "${env:K}",

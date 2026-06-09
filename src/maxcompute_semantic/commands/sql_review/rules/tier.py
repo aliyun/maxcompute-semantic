@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tier rule — flag bare table refs in multi-source 3-level projects."""
 
 from __future__ import annotations

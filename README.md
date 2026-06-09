@@ -5,7 +5,9 @@ bare `maxcompute-semantic` agent skill. Agents do not import Python
 internals from this package at runtime; they load `SKILL.md` and call
 `mcs` commands.
 
-This README is the short reference for the installed distribution.
+Use the repository-root [README](../../README.md) for the longer
+end-user walkthrough. This package README is the short reference for
+the installed distribution.
 
 ## What Is Included
 
@@ -19,24 +21,13 @@ This README is the short reference for the installed distribution.
   package path. Builds materialize a local SQLite + markdown semantic
   package for the profile.
 
-The eval harness under [`eval/`](eval/) is not part of the installed
-skill.
+The eval harness under repository-root [`eval/`](../../eval/) is not
+part of the installed skill.
 
 ## Install
 
 ```bash
 pip install maxcompute-semantic
-```
-
-or
-
-```bash
-uv tool install maxcompute-semantic
-```
-
-Then verify with:
-
-```bash
 mcs --help
 ```
 
@@ -102,6 +93,7 @@ mcs profile show [NAME]
 mcs profile update <NAME>
 mcs profile whoami [NAME]
 mcs link status
+mcs link unlink
 
 # semantic package
 mcs build
@@ -170,12 +162,5 @@ uv run ruff check packages/maxcompute-semantic/src packages/maxcompute-semantic/
 uv run mypy packages/maxcompute-semantic/src
 ```
 
-See [CLAUDE.md](CLAUDE.md) for contributor workflow, CI, release, and
-benchmark details.
-
-## License
-
-maxcompute-semantic is developed by Alibaba Cloud and licensed under the
-Apache License (Version 2.0). This product contains various third-party
-components under other open source licenses. See the NOTICE file for more
-information.
+See repository-root [CLAUDE.md](../../CLAUDE.md) for contributor
+workflow, CI, release, and benchmark details.

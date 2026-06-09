@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """CLI tests for the new `mcs metric` verb group (top-level metrics).
 
 Pins the behaviour introduced in Task 5 of the top-level-metrics

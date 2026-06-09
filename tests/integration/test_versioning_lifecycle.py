@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """End-to-end integration test of the per-profile git-versioning
 worked example (T21).
 
@@ -452,7 +449,7 @@ def test_legacy_profile_first_write_auto_upgrades(
     profile = Profile(
         name="legacy",
         compute_project="acme_proj",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service.cn-shanghai.maxcompute.aliyun-inc.com/api",
         auth=AkAuth("${env:MY_AK_ID}", "${env:MY_AK_SEC}"),
         sources=(DataSource(project="acme_proj", schema="default", tables="*"),),
     )

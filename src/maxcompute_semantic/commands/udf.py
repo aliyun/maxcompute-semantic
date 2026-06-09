@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """mcs udf subcommand group — manage MaxCompute UDFs (list, show, search,
 create, test, remove) and resources (list, show, remove).
 

@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Thin ``subprocess.run(["git", "-C", repo_root, ...])`` wrapper.
 
 The single source of truth for shelling out to git in mcs. Every

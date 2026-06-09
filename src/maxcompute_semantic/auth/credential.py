@@ -1,7 +1,4 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
-"""Credential resolver: process auth + ak auth (literal or env)."""
+"""Credential resolver: process auth (via ncs) + ak auth (literal or env)."""
 
 from __future__ import annotations
 
@@ -38,7 +35,7 @@ def resolve_credentials(auth: ProcessAuth | AkAuth) -> Credentials:
     For ProcessAuth: run the command, parse JSON payload.
     Raises AuthBinaryMissingError if process binary not on PATH.
     Raises AuthFailedError if command ran but failed (timeout, error, login required).
-    Raises IdentityNotAuthorizedError if identity is not authorized.
+    Raises IdentityNotAuthorizedError if ncs reports identity not authorized.
     Raises ConfigEnvNotSetError (via expand_env) if env var unset.
     """
     if isinstance(auth, AkAuth):
@@ -58,11 +55,16 @@ def _resolve_process(auth: ProcessAuth) -> Credentials:
     if not cmd_parts:
         raise AuthBinaryMissingError(
             "auth.command is empty; cannot resolve credentials",
-            remediation="set auth.command to a valid credential helper command",
+            remediation="set auth.command to e.g. 'ncs create credential odpsuser ...'",
         )
     binary = cmd_parts[0]
     if shutil.which(binary) is None:
-        remediation = f"install {binary} or switch to auth.type=ak"
+        if binary == "ncs":
+            from maxcompute_semantic.auth.ncs import install_hint
+
+            remediation = install_hint()
+        else:
+            remediation = f"install {binary} or switch to auth.type=ak"
         raise AuthBinaryMissingError(
             f"auth.command binary '{binary}' not found on PATH",
             remediation=remediation,
@@ -87,21 +89,20 @@ def _resolve_process(auth: ProcessAuth) -> Credentials:
         ) from e
 
     if proc.returncode != 0:
-        stderr = proc.stderr.strip()
-        stdout = proc.stdout.strip()
-        combined = stderr or stdout
-        if _looks_like_login_required(combined):
+        stderr = _redact_if_credential(proc.stderr.strip())
+        detail = stderr or f"(exit code {proc.returncode}, no stderr)"
+        if _looks_like_login_required(detail):
             raise AuthFailedError(
-                f"authentication required: {combined}",
-                remediation="run the appropriate login command for your credential helper",
+                f"authentication required: {detail}",
+                remediation="run the appropriate login command (e.g. ncs auth login)",
             )
-        if _looks_like_identity_not_authorized(combined):
+        if _looks_like_identity_not_authorized(detail):
             raise IdentityNotAuthorizedError(
-                f"identity not authorized for ODPS: {combined}",
+                f"identity not authorized for ODPS: {detail}",
                 remediation="check ODPS authorization or use a different account",
             )
         raise AuthFailedError(
-            f"auth.command exited {proc.returncode}: {combined}",
+            f"auth.command exited {proc.returncode}: {detail}",
             remediation="check command output for details",
         )
 
@@ -119,7 +120,8 @@ def _parse_payload(raw: str | dict[str, Any]) -> Credentials | None:
 
     Expected shape is the Alibaba Cloud STS AssumeRole response format
     (``AccessKeyId``, ``AccessKeySecret``, ``SecurityToken``, optional
-    ``Expiration``).  snake_case variants
+    ``Expiration``) — the same shape that ``ncs create credential
+    odpsuser -o template -t odpscmd`` emits.  snake_case variants
     (``access_key_id``, ``access_key_secret``, ``security_token``)
     are also accepted.
     Returns None if input cannot be parsed (non-JSON, non-dict).
@@ -157,7 +159,7 @@ def _parse_payload(raw: str | dict[str, Any]) -> Credentials | None:
         raise AuthFailedError(
             f"process auth payload missing required fields: {', '.join(required_missing)}; "
             f"found keys: {found_keys}",
-            remediation="check process auth command output format",
+            remediation="check ncs command output format",
         )
 
     expiration: datetime | None = None
@@ -192,3 +194,17 @@ _NOT_AUTHORIZED_PATTERNS = re.compile(
 
 def _looks_like_identity_not_authorized(text: str) -> bool:
     return bool(_NOT_AUTHORIZED_PATTERNS.search(text))
+
+
+_CREDENTIAL_FIELD_NAMES = re.compile(
+    r"access_key|security_token|sts_token|secret_access_key|SecurityToken|AccessKeySecret",
+    re.IGNORECASE,
+)
+
+
+def _redact_if_credential(text: str) -> str:
+    if not text:
+        return text
+    if _CREDENTIAL_FIELD_NAMES.search(text):
+        return "[credentials redacted]"
+    return text

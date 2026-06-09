@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for build/errors.py — build-specific error classes."""
 
 from maxcompute_semantic.build.errors import (

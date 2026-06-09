@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """Tests for auth/profile_store.py — yaml round-trip for the
 multi-source Profile shape, missing-key validation, and the
 ruamel-ScalarString-wrapper coercion regression test.
@@ -67,9 +64,9 @@ def _example_profile(name: str = "acme-corp") -> Profile:
     return Profile(
         name=name,
         compute_project="acme_warehouse",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
         auth=ProcessAuth(
-            command="my-credential-helper get --format json"
+            command="ncs create credential odpsuser --employee-id 1 -o template -t odpscmd"
         ),
         sources=(DataSource(project="acme_warehouse", schema="default", tables="*"),),
     )
@@ -152,8 +149,8 @@ def test_upsert_overwrites_existing(isolated_config: Path) -> None:
     p2 = Profile(
         name="acme-corp",
         compute_project="acme_prod",
-        endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
-        auth=AkAuth(access_key_id="LTAI_id", access_key_secret="secret_redacted"),
+        endpoint="http://service-corp.odps.aliyun-inc.com/api",
+        auth=AkAuth(access_key_id="FooAKID", access_key_secret="secret_redacted"),
         sources=(DataSource(project="acme_prod", schema="warehouse", tables="*"),),
     )
     upsert(p2)
@@ -530,7 +527,7 @@ def test_description_round_trips():
         name="p1",
         compute_project="proj",
         endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
-        auth=AkAuth("LTAI_x", "secret"),
+        auth=AkAuth("FooAKID", "secret"),
         description="orders + payments analysis",
     )
     body = _profile_to_dict(p)
@@ -550,7 +547,7 @@ def test_description_omitted_when_empty():
         name="p1",
         compute_project="proj",
         endpoint="https://service.cn-shanghai.maxcompute.aliyun.com/api",
-        auth=AkAuth("LTAI_x", "secret"),
+        auth=AkAuth("FooAKID", "secret"),
         description="",
     )
     body = _profile_to_dict(p)
@@ -570,7 +567,7 @@ def test_legacy_zero_cost_thresholds_remain_disabled():
             "endpoint": "https://service.cn-shanghai.maxcompute.aliyun.com/api",
             "auth": {
                 "type": "ak",
-                "access_key_id": "LTAI_x",
+                "access_key_id": "FooAKID",
                 "access_key_secret": "secret",
             },
             "sources": [

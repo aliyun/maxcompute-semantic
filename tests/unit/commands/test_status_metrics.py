@@ -1,6 +1,3 @@
-# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
-# SPDX-License-Identifier: Apache-2.0
-
 """CLI tests for ``mcs status`` surfacing the top-level metric count.
 
 Pins Task 8 of the top-level-metrics plan: ``mcs status`` reports
