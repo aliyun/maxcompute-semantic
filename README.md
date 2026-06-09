@@ -53,12 +53,17 @@ Verify:
 mcs --help
 ```
 
-### For AI agents
+### For LLM Agents
 
-Point your agent at [`scripts/install.md`](scripts/install.md). It
-contains a complete step-by-step guide that any LLM agent can follow to
-bootstrap `uv`, install `mcs` from PyPI, configure PATH, and register
-the skill — no human intervention needed.
+Fetch the full guide and follow it step by step:
+
+```
+curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
+```
+
+The guide covers: checking for an existing install, bootstrapping `uv`,
+installing from PyPI, persisting `~/.local/bin` on PATH, and registering
+the skill into agent directories. Don't summarize it; read it end to end.
 
 ### Skill registration
 
