@@ -121,7 +121,7 @@ def clear_all_vectors(conn: sqlite3.Connection) -> int:
         for row in rowids:
             conn.execute(f"DELETE FROM {_VEC_TABLE_NAME} WHERE rowid=?", (row[0],))
         conn.commit()
-        return count
+        return int(count)
     except sqlite3.OperationalError:
         return -1
 

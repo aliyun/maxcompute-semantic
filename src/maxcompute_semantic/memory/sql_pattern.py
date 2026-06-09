@@ -170,7 +170,7 @@ def _normalize_expr_sql(expression: exp.Expression) -> str:
     return re.sub(r"\s+", " ", normalized.sql()).strip().lower()
 
 
-def _redact_projection_inplace(parsed: exp.Expression) -> None:
+def _redact_projection_inplace(parsed: exp.Expr) -> None:
     placeholder = exp.Column(this=exp.Identifier(this="<col>", quoted=False))
     for select in parsed.find_all(exp.Select):
         new_expressions: list[exp.Expression] = []
@@ -183,7 +183,7 @@ def _redact_projection_inplace(parsed: exp.Expression) -> None:
         select.set("expressions", new_expressions)
 
 
-def _redact_join_keys_inplace(parsed: exp.Expression) -> None:
+def _redact_join_keys_inplace(parsed: exp.Expr) -> None:
     placeholder_col = exp.Column(this=exp.Identifier(this="<col>", quoted=False))
     for join in parsed.find_all(exp.Join):
         on_expr = join.args.get("on")

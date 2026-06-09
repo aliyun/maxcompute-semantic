@@ -195,7 +195,7 @@ def rank_join_candidates(
 
         cg = f"{lsk}.{edge.get('left_table', '')}->{rsk}.{edge.get('right_table', '')}"
 
-        evidence: list[dict[str, Any]] = [{"source": "name_heuristic", "kind": kind}]
+        evidence = [{"source": "name_heuristic", "kind": kind}]
         if left_uniqueness is not None or right_uniqueness is not None:
             evidence.append(
                 {
@@ -303,12 +303,10 @@ def _apply_join_shape_adjustment(
     - ``unknown`` — one or both stats missing; partial boost on whichever
       side is present.
     """
-    left_known = left_uniqueness is not None
-    right_known = right_uniqueness is not None
-    left_unique = left_known and left_uniqueness >= _UNIQUE_THRESHOLD
-    right_unique = right_known and right_uniqueness >= _UNIQUE_THRESHOLD
-    left_non_unique = left_known and left_uniqueness < _NON_UNIQUE_THRESHOLD
-    right_non_unique = right_known and right_uniqueness < _NON_UNIQUE_THRESHOLD
+    left_unique = left_uniqueness is not None and left_uniqueness >= _UNIQUE_THRESHOLD
+    right_unique = right_uniqueness is not None and right_uniqueness >= _UNIQUE_THRESHOLD
+    left_non_unique = left_uniqueness is not None and left_uniqueness < _NON_UNIQUE_THRESHOLD
+    right_non_unique = right_uniqueness is not None and right_uniqueness < _NON_UNIQUE_THRESHOLD
 
     if left_unique and right_unique:
         return "pk-pk", base_conf * _PK_PK_PENALTY

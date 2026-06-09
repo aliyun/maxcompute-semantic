@@ -115,7 +115,7 @@ def register_fork(
         sources=parent.sources,
         cost_thresholds=parent.cost_thresholds,
         tags=parent.tags,
-        package_path=str(worktree_path),
+        package_path=worktree_path,
         kind="fork",
         parent_profile=parent.name,
         git_sha=full_sha,

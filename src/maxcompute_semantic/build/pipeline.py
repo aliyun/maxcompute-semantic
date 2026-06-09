@@ -989,7 +989,7 @@ class BuildPipeline:
 
                 budget -= est_cny
 
-                rows = envelope.data.get("rows", [])
+                rows = envelope.data.get("rows", []) if envelope.data else []
                 coverage: float = 0.0
                 if rows and len(rows) > 0:
                     left_nn = int(rows[0].get("left_non_null", 0))

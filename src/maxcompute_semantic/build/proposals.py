@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.errors.annotate import AnnotateValidationError
+from maxcompute_semantic.errors.base import ErrorCode
 from maxcompute_semantic.mc_client.errors import McsError
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 class SemanticProposalError(McsError):
     """Raised when a semantic proposal cannot be read or applied."""
 
-    code = "SemanticProposalError"
+    code = ErrorCode.SEMANTIC_PROPOSAL
     exit_code = 2
 
 

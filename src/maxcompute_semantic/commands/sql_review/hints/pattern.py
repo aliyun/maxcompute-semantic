@@ -55,6 +55,8 @@ def hint_verified_match(ctx: ReviewContext) -> list[Hint]:
     pattern = analyze_sql_pattern(ctx.sql)
     if not pattern.shape_key:
         return []
+    if ctx.db is None:
+        return []
     hints: list[Hint] = []
     for row in ctx.db.list_memories(kind="verified_query", limit=200):
         verified_id = row.get("id")

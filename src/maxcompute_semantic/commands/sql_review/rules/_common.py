@@ -147,6 +147,8 @@ def resolve_source_for_table(
 
     Returns ``None`` when no source contains the table.
     """
+    if ctx.db is None:
+        return None
     if origin is not None and origin.catalog:
         sk: str | None = ctx.db.lookup_source_key(
             origin.catalog, origin.db or "default", table_name
@@ -164,6 +166,8 @@ def _keys_for_sources(
     table_name: str,
 ) -> list[str]:
     out: list[str] = []
+    if ctx.db is None:
+        return out
     for src in sources:
         sk: str | None = ctx.db.lookup_source_key(src.project, src.schema, table_name)
         if sk:

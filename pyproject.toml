@@ -97,3 +97,7 @@ strict_optional = true
 warn_unused_ignores = true
 warn_return_any = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["sqlite_vec", "sentence_transformers", "jieba"]
+ignore_missing_imports = true

@@ -190,6 +190,8 @@ def _declared_pair(ctx: ReviewContext, left: Endpoint, right: Endpoint) -> bool:
     collapsed both to ``{"orders", "users"}`` and silently suppressed
     the cross-source hint.
     """
+    if ctx.db is None:
+        return False
     target = {left, right}
     return any(
         {
@@ -263,6 +265,8 @@ def _build_join_graph(
     ``proj_b`` nodes are simply absent from the graph.
     """
     graph: dict[Endpoint, set[tuple[Endpoint, str, str]]] = defaultdict(set)
+    if ctx.db is None:
+        return graph
     for j in ctx.db.list_joins():
         left: Endpoint = (j["left_source_key"], j["left_table"])
         right: Endpoint = (j["right_source_key"], j["right_table"])

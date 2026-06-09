@@ -91,7 +91,7 @@ class HybridSearcher:
                 "tags_json": entries[mid]["tags_json"],
                 "created_at": entries[mid]["created_at"],
             }
-            for mid in sorted(rrf_scores, key=rrf_scores.get, reverse=True)
+            for mid in sorted(rrf_scores, key=lambda mid: rrf_scores[mid], reverse=True)
             if mid in entries
         ]
         return scored[:top_k]

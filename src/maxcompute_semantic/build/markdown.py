@@ -1117,7 +1117,7 @@ class MarkdownRenderer:
                 if len(user_cols) > _COLUMNS_INDEX_CAP:
                     display_cols = sorted(
                         user_cols,
-                        key=lambda c: _signal_priority(c, id_markers.get(c.get("name"))),
+                        key=lambda c: _signal_priority(c, id_markers.get(c.get("name", ""))),
                     )
                 else:
                     display_cols = user_cols

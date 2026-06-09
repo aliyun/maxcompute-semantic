@@ -47,7 +47,7 @@ def _parse_single_statement(sql: str) -> sqlglot.exp.Expression | None:
         statements = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.RAISE)
     except Exception:
         return None
-    if len(statements) != 1 or statements[0] is None:
+    if len(statements) != 1 or not isinstance(statements[0], sqlglot.exp.Expression):
         return None
     return statements[0]
 

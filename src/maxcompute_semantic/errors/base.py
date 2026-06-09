@@ -86,6 +86,15 @@ class ErrorCode(str, Enum):
     METRIC_NOT_FOUND = "MetricNotFound"
     METRIC_VALIDATION = "MetricValidation"
 
+    # SQL Review
+    REVIEW_UNSUPPORTED = "MCS_REVIEW_UNSUPPORTED"
+
+    # Proposals
+    SEMANTIC_PROPOSAL = "SemanticProposalError"
+
+    # Table resolution
+    TABLE_RESOLUTION = "TableResolution"
+
     # Build
     BUILD_PHASE = "BuildPhase"
     SAMPLING_FAILED = "SamplingFailed"

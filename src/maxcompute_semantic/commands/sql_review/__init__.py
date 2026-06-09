@@ -115,7 +115,7 @@ def build_review_envelope(
         # v1 is fail-loud: any rule/hint exception propagates and crashes the
         # review. Per-rule isolation (logging + skip) is deferred to Task 18 —
         # fail-loud surfaces rule bugs faster during this phase.
-        issues: list[dict[str, Any]] = []
+        issues = []
         for rule in ALL_RULES:
             for issue in rule(ctx):
                 issues.append(issue.to_dict())

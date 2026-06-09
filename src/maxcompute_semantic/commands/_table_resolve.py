@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from maxcompute_semantic.mc_client.errors import McsError
+from maxcompute_semantic.mc_client.errors import ErrorCode, McsError
 
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import Profile
@@ -46,7 +46,7 @@ class TableResolutionError(McsError):
     callers can surface it through their normal error envelope.
     """
 
-    code = "TableResolution"
+    code = ErrorCode.TABLE_RESOLUTION
     exit_code = 2
 
 

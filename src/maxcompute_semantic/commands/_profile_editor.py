@@ -210,7 +210,7 @@ def edit_profile(
             elif action == "tags":
                 draft = _edit_tags(draft)
             elif action == "sources":
-                draft = _edit_sources(draft, cached)
+                draft = _edit_sources(draft, cached)  # type: ignore[arg-type]
         except (KeyboardInterrupt, click.exceptions.Abort):
             # Ctrl+C anywhere inside a section editor or subscreen —
             # same as Esc at top level: re-render the menu.
@@ -814,15 +814,15 @@ def _edit_source(draft: Profile, idx: int, client: MaxComputeClient) -> Profile:
             draft = _replace_source_at(draft, idx, new_src)
             continue
         if action == "INCLUDE_ALL_LISTED":
-            existing_specs = (
+            existing_by_name: dict[str, TableSpec] = (
                 {ts.name: ts for ts in src.tables} if not isinstance(src.tables, str) else {}
             )
             added = 0
             preserved = 0
             new_specs: list[TableSpec] = []
             for name in available:
-                if name in existing_specs:
-                    new_specs.append(existing_specs[name])
+                if name in existing_by_name:
+                    new_specs.append(existing_by_name[name])
                     preserved += 1
                 else:
                     new_specs.append(TableSpec(name=name))
@@ -913,6 +913,7 @@ def _table_action_menu(
             return _replace_source_at(draft, src_idx, dataclasses.replace(src, tables=new_tables))
 
     # In source — different menu per scope mode.
+    assert ts is not None
     if ts.columns is not None:
         # 🔒 whitelist: TUI is read-only on whitelist scope.
         click.secho(

@@ -41,7 +41,7 @@ class SqlWorkloadEvidence:
     parse_error: str | None = None
 
 
-def _resolve_table_alias(tree: exp.Expression) -> dict[str, str]:
+def _resolve_table_alias(tree: exp.Expr) -> dict[str, str]:
     """Build alias→table_name map from FROM/JOIN clauses."""
     alias_map: dict[str, str] = {}
     for table in tree.find_all(exp.Table):
@@ -54,7 +54,7 @@ def _resolve_table_alias(tree: exp.Expression) -> dict[str, str]:
 
 
 def _extract_group_by_columns(
-    tree: exp.Expression,
+    tree: exp.Expr,
     alias_map: dict[str, str],
 ) -> tuple[tuple[str, str], ...]:
     """Extract (table, column) pairs from GROUP BY columns."""
@@ -71,7 +71,7 @@ def _extract_group_by_columns(
 
 
 def _extract_aggregates(
-    tree: exp.Expression,
+    tree: exp.Expr,
     alias_map: dict[str, str],
 ) -> tuple[tuple[str, str, str], ...]:
     """Extract (func_name, table, column) triples from aggregate expressions."""
@@ -87,7 +87,7 @@ def _extract_aggregates(
 
 
 def _extract_where_columns(
-    tree: exp.Expression,
+    tree: exp.Expr,
     alias_map: dict[str, str],
 ) -> tuple[tuple[str, str], ...]:
     """Extract (table, column) pairs from WHERE clause column refs."""

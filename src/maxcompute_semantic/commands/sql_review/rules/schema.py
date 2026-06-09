@@ -61,6 +61,8 @@ def check_table_not_found(ctx: ReviewContext) -> list[Issue]:
     yields a Table node for every CTE *reference* with bare name + empty
     catalog/db, which would otherwise fire this rule on every CTE-using SQL.
     """
+    if ctx.db is None:
+        return []
     issues: list[Issue] = []
     for stmt in parse_statements(ctx.sql):
         ctes = cte_names(stmt)
@@ -134,6 +136,8 @@ def check_column_not_found(ctx: ReviewContext) -> list[Issue]:
     wrong one and we'd flag a real column as missing or miss a real typo
     because some other source happens to have the column.
     """
+    if ctx.db is None:
+        return []
     issues: list[Issue] = []
 
     for stmt in parse_statements(ctx.sql):
