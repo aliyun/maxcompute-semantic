@@ -4,16 +4,25 @@
 [![Python](https://img.shields.io/pypi/pyversions/maxcompute-semantic)](https://pypi.org/project/maxcompute-semantic/)
 [![License](https://img.shields.io/github/license/aliyun/maxcompute-semantic)](LICENSE)
 [![CI](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml/badge.svg)](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml)
-
 [![English](https://img.shields.io/badge/lang-English-blue)](README.md)
 [![中文](https://img.shields.io/badge/lang-中文-red)](README.zh-cn.md)
 
-**让你的 AI Agent 真正理解你的 MaxCompute 数据。**
+**语义包 + 记忆库，AI Agent 越用越懂你的 MaxCompute。**
 
 `mcs` 在本地构建语义包——表描述、字段含义、JOIN 关系、已验证的 SQL 模式和业务指标——让
 AI Agent 第一次就能写出正确的 MaxCompute SQL，而不是反复试错。
 
 [文档](https://aliyun.github.io/maxcompute-semantic/zh-cn/) · [PyPI](https://pypi.org/project/maxcompute-semantic/) · [更新日志](CHANGELOG.md)
+
+## 三件事
+
+**你配 `profile` → `mcs build` 出语义包 → agent 直读它写 SQL**
+
+- **`[A] profile`** —— 你配的一份"我是谁 + 看哪些表"（AK / 免密 + 一组 source）。一份 profile = 一个业务场景。
+- **`[B] 语义包`** —— `mcs build` 出来的本地知识库（表 / 列 / JOIN / UDF），agent 写 SQL 前先读它，省去每次现翻 MaxCompute meta。
+- **`[C] agent`** —— 通过 SKILL.md 接入；过 `mcs sql cost` 估价闸门后跑 `mcs sql execute` 执行。
+
+业务场景 = `[A]` profile + `[B]` 语义包 + 累积的 *annotate* / *memory*（沉淀越久越准）。
 
 ## 为什么用 mcs？
 
@@ -22,63 +31,38 @@ AI Agent 能查询 MaxCompute，但它不了解**你的**数据。它会猜表�
 
 `mcs` 填补这个缺口：
 
-- **语义包** — `mcs build` 扫描项目 schema，生成结构化知识库（SQLite + markdown），
-  Agent 写 SQL 前先读它。
+- **语义包** — `mcs build` 扫描项目 schema，生成结构化知识库（SQLite + markdown），Agent 写 SQL 前先读它。
 - **记忆** — 验证过的查询、失败模式、领域知识随使用积累。Agent 用得越多越准。
-- **SQL 护栏** — 费用估算、写保护、方言审查、tier 感知的 schema 解析，SQL 到达
-  MaxCompute 之前全部检查完。
-- **Agent 无关** — 支持 Claude Code、Cursor、Codex、Gemini CLI、Qwen Code、
-  OpenCode 等 50+ 平台。一条 `mcs skill install --all` 让所有 Agent 自动加载。
+- **SQL 护栏** — 费用估算、写保护、方言审查、tier 感知的 schema 解析，SQL 到达 MaxCompute 之前全部检查完。
+- **Agent 无关** — 支持 Claude Code、Cursor、Codex、Gemini CLI、Qwen Code、OpenCode 等 50+ 平台。一条 `mcs skill install --all` 让所有 Agent 自动加载。
 
-## 快速开始
+## 快速上手
 
-```bash
-# 1. 安装
-uv tool install maxcompute-semantic
+### 1. 安装
 
-# 2. 创建 profile（交互式向导）
-mcs profile create
-mcs link bind <profile-name>
+在任何已联网的 AI Agent 里说一句：
 
-# 3. 构建语义包
-mcs build
+> 帮我安装 mcs，先读完这个指南再逐步执行：curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
 
-# 完成 — Agent 现在可以通过 skill 使用 mcs 了。
-```
+Agent 会把 CLI 和 skill 一次性装好。不想让 agent 装的话，走[手动安装](#手动安装)。
 
-## 安装
+### 2. 让 agent 帮你建语义层
 
-### 手动安装
+skill 装好之后，**先和 agent 聊清楚你的业务场景**，让它把 profile + 语义包建出来：
 
-```bash
-uv tool install maxcompute-semantic    # 推荐
-# 或者: pip install maxcompute-semantic
-```
+> *"我在做数仓 A 的月度分析，主要看 `your_project` 里 dwd / dws 这两层的订单和用户表，帮我建一下语义层"*
 
-如果 `~/.local/bin` 不在 PATH 里：
+agent 会按这个流程搭起来：
 
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
-```
+1. **profile create** — 引导你接入 MaxCompute 身份，向导自动探活。
+2. **link bind** — 把当前目录绑定到 profile，后续命令自动认它。
+3. **mcs build** — 扫一遍所有表，落到本地语义包。
 
-### 让 Agent 安装
+### 3. 用自然语言提问
 
-把下面这段话发给你的 Agent，它会自动完成所有步骤：
+> *"上个月订单 GMV 同比怎么样"*
 
-```
-帮我安装 mcs，先读完这个指南再逐步执行：
-curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
-```
-
-### 注册 Skill
-
-```bash
-mcs skill install --all -g     # 所有支持的 Agent，全局安装
-mcs skill install --detect -g  # 仅安装到检测到的 Agent
-```
-
-支持的 Agent：`claude-code`、`cursor`、`codex`、`gemini-cli`、`qwen-code`、
-`opencode` 等 [50+ 平台](https://aliyun.github.io/maxcompute-semantic/zh-cn/docs.html)。
+agent 走 `mcs show`（读语义包）→ `mcs sql cost`（估价闸门）→ `mcs sql execute`（执行）。跑通的 SQL 再让它 `mcs memory verify` 存一下，下次相似问题直接召回。
 
 ## 核心功能
 
@@ -96,6 +80,34 @@ mcs skill install --detect -g  # 仅安装到检测到的 Agent
 
 运行 `mcs <command> --help` 查看完整参数。
 
+## 手动安装
+
+```bash
+uv tool install maxcompute-semantic    # 推荐
+# 或者: pip install maxcompute-semantic
+```
+
+如果 `~/.local/bin` 不在 PATH 里：
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+```
+
+装完后把 skill 装进 Agent：
+
+```bash
+mcs skill install --all -g     # 所有支持的 Agent，全局安装
+mcs skill install --detect -g  # 仅安装到检测到的 Agent
+```
+
+### 升级 / 卸载
+
+```bash
+mcs update                                    # 检查最新版并升级
+uv tool uninstall maxcompute-semantic         # 卸载 CLI
+mcs skill uninstall --all                     # 移除所有 Agent 的 skill 软链
+```
+
 ## 配置
 
 Profile 存储认证信息、计算项目、数据源和费用阈值：
@@ -107,15 +119,6 @@ mcs link bind <name>                  # 绑定当前目录到 profile
 ```
 
 Profile 解析顺序：`--profile` 参数 → `MCS_PROFILE` 环境变量 → 目录绑定 → ODPS 环境变量。
-
-CI 或一次性使用时可跳过 profile，直接设环境变量：
-
-```bash
-export ALIBABA_CLOUD_ACCESS_KEY_ID=...
-export ALIBABA_CLOUD_ACCESS_KEY_SECRET=...
-export MAXCOMPUTE_ENDPOINT=https://service.<region>.maxcompute.aliyun.com/api
-export MAXCOMPUTE_PROJECT=<project>
-```
 
 ## 参与贡献
 

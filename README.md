@@ -15,6 +15,16 @@ writes correct MaxCompute SQL on the first try, not the fifth.
 
 [Documentation](https://aliyun.github.io/maxcompute-semantic/) · [PyPI](https://pypi.org/project/maxcompute-semantic/) · [Changelog](CHANGELOG.md)
 
+## Three Things
+
+**You configure a `profile` → `mcs build` produces a semantic package → agent reads it to write SQL**
+
+- **`[A] profile`** — your identity + which tables to cover (AK or keyless auth + a set of sources). One profile = one business scenario.
+- **`[B] semantic package`** — local knowledge base (tables / columns / JOINs / UDFs) produced by `mcs build`. The agent reads it before writing SQL instead of re-scanning MaxCompute metadata every time.
+- **`[C] agent`** — connects via SKILL.md; runs `mcs sql cost` (cost gate) then `mcs sql execute` to query.
+
+Business scenario = `[A]` profile + `[B]` semantic package + accumulated *annotations* / *memory* (gets better over time).
+
 ## Why mcs?
 
 AI agents can query MaxCompute, but they don't know *your* data. They guess
@@ -22,65 +32,38 @@ table names, miss JOIN keys, and write SQL that fails or returns wrong results.
 
 `mcs` closes the gap:
 
-- **Semantic package** — `mcs build` scans your project's schema and produces a
-  structured knowledge base (SQLite + markdown) the agent reads before writing SQL.
-- **Memory** — verified queries, failed patterns, and domain notes accumulate
-  over time. The agent gets better the more you use it.
-- **SQL guard rails** — cost estimation, write protection, dialect review, and
-  tier-aware schema resolution, all before the query hits MaxCompute.
-- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI,
-  Qwen Code, OpenCode, and 50+ more. One `mcs skill install --all` and every
-  agent on your machine picks up the skill.
+- **Semantic package** — `mcs build` scans your project's schema and produces a structured knowledge base (SQLite + markdown) the agent reads before writing SQL.
+- **Memory** — verified queries, failed patterns, and domain notes accumulate over time. The agent gets better the more you use it.
+- **SQL guard rails** — cost estimation, write protection, dialect review, and tier-aware schema resolution, all before the query hits MaxCompute.
+- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, OpenCode, and 50+ more. One `mcs skill install --all` and every agent on your machine picks up the skill.
 
 ## Quick Start
 
-```bash
-# 1. Install
-uv tool install maxcompute-semantic
+### 1. Install
 
-# 2. Create a profile (interactive wizard)
-mcs profile create
-mcs link bind <profile-name>
+Tell any connected AI agent:
 
-# 3. Build the semantic package
-mcs build
+> Install mcs for me, read this guide fully then follow step by step: curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
 
-# Done — your agent can now use mcs commands via the skill.
-```
+The agent will install the CLI and skill in one go. Prefer manual setup? See [Manual Install](#manual-install).
 
-## Install
+### 2. Let the agent build your semantic layer
 
-### For humans
+Once the skill is installed, **describe your business scenario** and let the agent set up the profile + semantic package:
 
-```bash
-uv tool install maxcompute-semantic    # recommended
-# or: pip install maxcompute-semantic
-```
+> *"I'm doing monthly analysis on warehouse A, mainly looking at the order and user tables in the dwd/dws layers of `your_project` — help me build the semantic layer"*
 
-If `~/.local/bin` is not on your PATH:
+The agent will:
 
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
-```
+1. **profile create** — guide you through MaxCompute identity setup, auto-probe auth.
+2. **link bind** — bind the current directory to the profile so future commands auto-resolve.
+3. **mcs build** — scan all tables in scope, produce the local semantic package.
 
-### For LLM agents
+### 3. Ask in natural language
 
-Paste this to your agent — it will handle everything:
+> *"How did last month's order GMV compare year-over-year?"*
 
-```
-Fetch the full guide and follow it step by step:
-curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
-```
-
-### Skill registration
-
-```bash
-mcs skill install --all -g   # all supported agents, global
-mcs skill install --detect -g  # only agents found on this machine
-```
-
-Supported agents: `claude-code`, `cursor`, `codex`, `gemini-cli`, `qwen-code`,
-`opencode`, and [50+ more](https://aliyun.github.io/maxcompute-semantic/docs.html).
+The agent runs `mcs show` (read semantic package) → `mcs sql cost` (cost gate) → `mcs sql execute` (run query). Have it `mcs memory verify` the working SQL so similar questions get BM25 recall next time.
 
 ## Key Features
 
@@ -98,6 +81,34 @@ Supported agents: `claude-code`, `cursor`, `codex`, `gemini-cli`, `qwen-code`,
 
 Run `mcs <command> --help` for the full option surface.
 
+## Manual Install
+
+```bash
+uv tool install maxcompute-semantic    # recommended
+# or: pip install maxcompute-semantic
+```
+
+If `~/.local/bin` is not on your PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+```
+
+Then register the skill with your agents:
+
+```bash
+mcs skill install --all -g     # all supported agents, global
+mcs skill install --detect -g  # only agents found on this machine
+```
+
+### Upgrade / Uninstall
+
+```bash
+mcs update                                    # check for latest and upgrade
+uv tool uninstall maxcompute-semantic         # remove CLI
+mcs skill uninstall --all                     # remove skill symlinks
+```
+
 ## Configuration
 
 Profiles store auth, compute project, data sources, and cost thresholds:
@@ -109,15 +120,6 @@ mcs link bind <name>                  # bind cwd to profile
 ```
 
 Profile resolution order: `--profile` flag → `MCS_PROFILE` env → cwd binding → ODPS env vars.
-
-For CI / one-off use without a saved profile:
-
-```bash
-export ALIBABA_CLOUD_ACCESS_KEY_ID=...
-export ALIBABA_CLOUD_ACCESS_KEY_SECRET=...
-export MAXCOMPUTE_ENDPOINT=https://service.<region>.maxcompute.aliyun.com/api
-export MAXCOMPUTE_PROJECT=<project>
-```
 
 ## Contributing
 
