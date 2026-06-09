@@ -11,7 +11,7 @@
 
 `mcs` builds a local semantic package — table descriptions, column hints, JOIN
 relationships, verified SQL patterns, and business metrics — so your AI agent
-writes correct MaxCompute SQL on the first try, not the fifth.
+can write correct MaxCompute SQL sooner, with fewer retry loops.
 
 [Documentation](https://aliyun.github.io/maxcompute-semantic/) · [PyPI](https://pypi.org/project/maxcompute-semantic/) · [Changelog](CHANGELOG.md)
 
@@ -35,9 +35,13 @@ table names, miss JOIN keys, and write SQL that fails or returns wrong results.
 - **Semantic package** — `mcs build` scans your project's schema and produces a structured knowledge base (SQLite + markdown) the agent reads before writing SQL.
 - **Memory** — verified queries, failed patterns, and domain notes accumulate over time. The agent gets better the more you use it.
 - **SQL guard rails** — cost estimation, write protection, dialect review, and tier-aware schema resolution, all before the query hits MaxCompute.
-- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, OpenCode, and 50+ more. One `mcs skill install --all` and every agent on your machine picks up the skill.
+- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, OpenCode, and 50+ more. Run `mcs skill install --detect -g` for agents found on your machine, or `--all -g` for every supported platform.
 
 ## Quick Start
+
+Before you start, have these ready: a MaxCompute project, region or endpoint,
+auth method (AK, keyless/NCS, or process), the tables or schemas you want to
+cover, and SELECT permission on those tables.
 
 ### 1. Install
 
@@ -45,7 +49,9 @@ Tell any connected AI agent:
 
 > Install mcs for me, read this guide fully then follow step by step: curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
 
-The agent will install the CLI and skill in one go. Prefer manual setup? See [Manual Install](#manual-install).
+The agent will install the CLI and skill in one go. The guide tells it to show
+you the exact command before running any remote bootstrap or final install step.
+Prefer manual setup? See [Manual Install](#manual-install).
 
 ### 2. Let the agent build your semantic layer
 
@@ -63,7 +69,11 @@ The agent will:
 
 > *"How did last month's order GMV compare year-over-year?"*
 
-The agent runs `mcs show` (read semantic package) → `mcs sql cost` (cost gate) → `mcs sql execute` (run query). Have it `mcs memory verify` the working SQL so similar questions get BM25 recall next time.
+The agent runs `mcs show` (read semantic package) → `mcs sql cost` (cost gate) → `mcs sql execute` (run query). Have it record the working SQL so similar questions get BM25 recall next time:
+
+```bash
+mcs memory verify --question "How did last month's order GMV compare year-over-year?" --sql "SELECT ..." --tables your_project.your_schema.orders
+```
 
 ## Key Features
 
@@ -76,7 +86,7 @@ The agent runs `mcs show` (read semantic package) → `mcs sql cost` (cost gate)
 | **Memory** | `mcs memory verify ...` | Record a verified query for future recall |
 | **Recall** | `mcs memory recall '<q>'` | BM25 search across verified SQL + notes |
 | **Metrics** | `mcs metric add ...` | Define reusable business metrics |
-| **Proposals** | `mcs package propose` | Suggest semantic annotations from build |
+| **Proposals** | `mcs package propose --from-suggestions` | Suggest semantic annotations from build |
 | **Doctor** | `mcs doctor` | Diagnose profile / auth / skill state |
 
 Run `mcs <command> --help` for the full option surface.
@@ -84,8 +94,8 @@ Run `mcs <command> --help` for the full option surface.
 ## Manual Install
 
 ```bash
-uv tool install maxcompute-semantic    # recommended
-# or: pip install maxcompute-semantic
+uv tool install maxcompute-semantic    # recommended, Python >= 3.10
+# in a virtualenv / managed Python: pip install maxcompute-semantic
 ```
 
 If `~/.local/bin` is not on your PATH:
@@ -94,19 +104,22 @@ If `~/.local/bin` is not on your PATH:
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
-Then register the skill with your agents:
+Then register the skill with your agents. Choose one:
 
 ```bash
-mcs skill install --all -g     # all supported agents, global
-mcs skill install --detect -g  # only agents found on this machine
+mcs skill install --detect -g  # recommended: only agents found on this machine
+mcs skill install --all -g     # every supported agent platform
 ```
 
 ### Upgrade / Uninstall
 
+The uninstall example uses `-g` because the install examples above are global;
+omit it for local skill installs.
+
 ```bash
 mcs update                                    # check for latest and upgrade
+mcs skill uninstall --all -g                  # remove global skill symlinks
 uv tool uninstall maxcompute-semantic         # remove CLI
-mcs skill uninstall --all                     # remove skill symlinks
 ```
 
 ## Configuration
@@ -119,7 +132,7 @@ mcs profile create --from-file @p.yaml  # scripted
 mcs link bind <name>                  # bind cwd to profile
 ```
 
-Profile resolution order: `--profile` flag → `MCS_PROFILE` env → cwd binding → ODPS env vars.
+Profile resolution order: `--profile` flag → `MCS_PROFILE` env → cwd binding → `ALIBABA_CLOUD_*` / `MAXCOMPUTE_*` env vars.
 
 ## Contributing
 
