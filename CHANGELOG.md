@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.16.2] — 2026-06-09
+
+### Fixed
+
+- Fixed `.gitignore` pattern so `_skill_data/build/` is included in the wheel.
+- Fixed GitHub Actions CI to install dev dependencies (`uv sync --extra dev`).
+- Added `tomli` fallback for Python 3.10 compatibility (`tomllib` is 3.11+).
+- Removed mono-repo-only test assertions that referenced files absent from the
+  standalone GitHub repo (CLAUDE.md, AGENTS.md, Makefile, site/).
+
+### Changed
+
+- Added SPDX license headers (`Apache-2.0`) to all Python source files.
+- Updated `scripts/install.md` from OSS wheel distribution to PyPI.
+- Updated README: split install into human / LLM-agent sections, added
+  `curl` raw guide pattern for agent-assisted installation, fixed development
+  commands to use repo-root paths.
+
 ## [0.16.1] — 2026-06-09
 
 ### Changed
