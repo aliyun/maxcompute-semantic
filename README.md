@@ -5,9 +5,7 @@ bare `maxcompute-semantic` agent skill. Agents do not import Python
 internals from this package at runtime; they load `SKILL.md` and call
 `mcs` commands.
 
-Use the repository-root [README](../../README.md) for the longer
-end-user walkthrough. This package README is the short reference for
-the installed distribution.
+This README is the short reference for the installed distribution.
 
 ## What Is Included
 
@@ -20,16 +18,49 @@ the installed distribution.
   compute project, data sources, cost thresholds, tags, and optional
   package path. Builds materialize a local SQLite + markdown semantic
   package for the profile.
-
-The eval harness under repository-root [`eval/`](../../eval/) is not
-part of the installed skill.
+- Agent install guide at [`scripts/install.md`](scripts/install.md) —
+  a step-by-step skill for LLM agents to install `mcs` on the user's
+  machine (uv bootstrap, PyPI install, PATH setup, skill registration).
 
 ## Install
 
+### For humans
+
 ```bash
 pip install maxcompute-semantic
+```
+
+Or with uv (recommended):
+
+```bash
+uv tool install maxcompute-semantic
+```
+
+If `~/.local/bin` is not on your PATH, add it:
+
+```bash
+# bash/zsh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# fish
+fish_add_path ~/.local/bin
+```
+
+Verify:
+
+```bash
 mcs --help
 ```
+
+### For AI agents
+
+Point your agent at [`scripts/install.md`](scripts/install.md). It
+contains a complete step-by-step guide that any LLM agent can follow to
+bootstrap `uv`, install `mcs` from PyPI, configure PATH, and register
+the skill — no human intervention needed.
+
+### Skill registration
 
 Install the skill as a symlink into an agent skill directory:
 
@@ -37,6 +68,7 @@ Install the skill as a symlink into an agent skill directory:
 mcs skill install        # local .agents/skills/ by default
 mcs skill install -g     # global ~/.agents/skills/ by default
 mcs skill install --all  # install to every supported platform path
+mcs skill install --detect -g  # install only for detected agents
 ```
 
 Supported platform names for `mcs skill install -p <platform>`:
@@ -157,10 +189,15 @@ Config and built semantic packages are separate:
 From the repository root:
 
 ```bash
-uv run pytest packages/maxcompute-semantic/tests/
-uv run ruff check packages/maxcompute-semantic/src packages/maxcompute-semantic/tests
-uv run mypy packages/maxcompute-semantic/src
+uv sync --extra dev
+uv run pytest tests/ -m 'not live'
+uv run ruff check src/ tests/
+uv run mypy src/
 ```
 
-See repository-root [CLAUDE.md](../../CLAUDE.md) for contributor
-workflow, CI, release, and benchmark details.
+## License
+
+maxcompute-semantic is developed by Alibaba Cloud and licensed under the
+Apache License (Version 2.0). This product contains various third-party
+components under other open source licenses. See the NOTICE file for more
+information.
