@@ -30,85 +30,91 @@ stop and tell them to install `uv` manually, then re-run the mcs install flow.
 
 The installer drops the `uv` binary in `~/.local/bin` (macOS / Linux) or
 `%USERPROFILE%\.local\bin` (Windows). Prepend that directory to PATH for the
-current shell session so the next step finds it. Then proceed.
+current shell session so the next step finds it:
+
+- bash/zsh: `export PATH="$HOME/.local/bin:$PATH"`
+- fish: `set -x PATH $HOME/.local/bin $PATH`
+- PowerShell: `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"`
+
+Then proceed.
 
 Do not fall back to `pip --user` — Debian 12 / Ubuntu 22.04+ enforce PEP 668
 and refuse the `--user` install with an externally-managed-environment error,
 and `--break-system-packages` would pollute the distro Python.
 
-## Step 3: Decide the version to install
+## Step 3: Install from PyPI
 
-The default is to fetch the latest version from the publisher. Read the JSON
-metadata from this URL:
+Run:
 
-  https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/latest.json
+```
+uv tool install maxcompute-semantic
+```
 
-The response has fields named `latest_version` and `sha256`. Use
-`latest_version` as the version string and keep `sha256` for the wheel digest
-check in step 5. The digest must be a 64-character hex SHA256.
+If the user asked for a specific version, use:
 
-However, if the user asked for a specific version, use that instead and skip the
-HTTP fetch entirely. Accept version strings like `0.5.0a1` — the format is
-PEP 440. Tell the user that this pinned path bypasses the publisher digest from
-`latest.json` and should only be used when they trust the requested version and
-base URL.
+```
+uv tool install maxcompute-semantic==<version>
+```
 
-If the metadata URL is unreachable (DNS failure, connection refused, timeout
-after 5 seconds, or HTTP 4xx/5xx) and the user did not specify a version, stop
-and tell the user to either check their network and retry, or set the version
-manually and re-ask.
+Accept version strings like `0.16.1` or `0.17.0a1` — the format is PEP 440.
 
-## Step 4: Build the wheel URL
+To upgrade an existing install to the latest version:
 
-The wheel filename follows PEP 427: the project name `maxcompute-semantic` is
-normalized to `maxcompute_semantic` (hyphen becomes underscore) in the wheel
-filename. With the version from step 3, construct the URL:
+```
+uv tool install --reinstall maxcompute-semantic
+```
 
-  https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/wheels/maxcompute_semantic-<version>-py3-none-any.whl
-
-For example, version `0.5.0a1` becomes:
-
-  https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/wheels/maxcompute_semantic-0.5.0a1-py3-none-any.whl
-
-## Step 5: Verify the wheel and run the installer
-
-If the version came from `latest.json`, download the wheel to a temporary file,
-compute its SHA256, and compare it to `latest.json.sha256`. If the digest does
-not match, stop immediately and do not run `uv`.
-
-If the user pinned a version manually, there is no publisher digest in this
-flow; continue with the remote wheel URL after warning the user as described in
-step 3.
-
-Run `uv tool install --reinstall <verified-wheel-path-or-wheel-url>` with the
-verified local wheel path when a digest was available, or the remote URL for a
-pinned version.
+PyPI handles version resolution, integrity verification (PEP 691 + TLS), and
+wheel hosting natively — no separate metadata fetch or digest check is needed.
 
 Do not use a shell wrapper — pass the command and its arguments directly as an
 exec or subprocess call. If the command exits non-zero, stop and show the user
 the error output. The previous install, if any, is not affected because uv
 replaces the tool environment atomically.
 
-## Step 6: Verify the install
+## Step 4: Verify the install
 
-Run `mcs --version`. If the command is not found, prepend `~/.local/bin` (macOS
-/ Linux) or `%USERPROFILE%\.local\bin` (Windows) to PATH — that is where `uv
-tool install` puts its console scripts. On Windows you can also locate
-`mcs.exe` with `Get-Command mcs` to confirm the path before adding it to PATH.
+Run `mcs --version`. If the command is not found, the console script installed
+by `uv tool install` is not on PATH. The default location is:
 
-If `mcs --version` still cannot be found, tell the user the install appears to
-have succeeded (the wheel was written to uv's tool dir) but the console script
-is not on PATH. Show the directory and tell the user to add it to their shell
-rc or system PATH.
+- macOS / Linux: `~/.local/bin/mcs`
+- Windows: `%USERPROFILE%\.local\bin\mcs.exe`
 
-## Step 7: Link the skill into the user's AI agent (optional)
+First, add it to the current session so the remaining steps work:
+
+- bash/zsh: `export PATH="$HOME/.local/bin:$PATH"`
+- fish: `set -x PATH $HOME/.local/bin $PATH`
+- PowerShell: `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"`
+
+Then persist the change so future shells also find `mcs`. Check whether the
+user's shell rc already contains `~/.local/bin` before appending — if it does,
+skip the write.
+
+- bash: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc`
+- zsh: `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc`
+- fish: `fish_add_path ~/.local/bin` (built-in, persists automatically)
+- PowerShell: guide the user to add `$env:USERPROFILE\.local\bin` to the
+  system PATH via System Properties → Environment Variables, or run:
+  `[Environment]::SetEnvironmentVariable("Path", "$env:USERPROFILE\.local\bin;$([Environment]::GetEnvironmentVariable('Path','User'))", "User")`
+
+On Windows you can also run `Get-Command mcs` to confirm the actual path.
+
+If `mcs --version` still cannot be found after the above, tell the user the
+install appears to have succeeded (the wheel was written to uv's tool dir)
+but the console script is not on PATH. Show the directory and suggest they
+verify and source their shell rc.
+
+## Step 5: Link the skill into the user's AI agent (optional)
 
 After a successful install, the `mcs` CLI can register its skill bundle
 (SKILL.md) into the user's AI agent slots so those agents learn how to call mcs
 for MaxCompute SQL. Run `mcs skill install -p claude-code -g` to install for
 Claude Code globally. For other agents, replace `claude-code` with the matching
-platform name. Run `mcs skill install --all -g` to install for every supported
-platform at once.
+platform name (`cursor`, `codex`, `gemini-cli`, `qwen-code`, `opencode`, etc.).
+
+Run `mcs skill install --all -g` to install for every supported platform at
+once, or `mcs skill install --detect -g` to install only for agents detected on
+the machine.
 
 Skip this step entirely if the user explicitly asked not to install the skill,
 or if the environment variable `MCS_NO_SKILL_INSTALL` is set to 1, true, yes, or
@@ -119,18 +125,11 @@ on.
 The user may have set environment variables that change the behavior of the
 steps above. Check for these before starting and adjust accordingly:
 
-- `MCS_VERSION` — if set, skip the HTTP fetch in step 3 and use this value
-  directly as the version string.
-- `MCS_INSTALL_BASE_URL` — if set, replace `https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com`
-  with this value in steps 3 and 4.
-- `MCS_ALLOW_UNTRUSTED_INSTALL_BASE_URL` — non-default HTTPS base URLs require
-  this to be truthy. `http://`, `file://`, and other non-HTTPS schemes are
-  always refused.
 - `MCS_SKILL_PLATFORMS` — if set, pass its value (a comma-separated list, or
-  `all`) to `mcs skill install -p <value> -g` in step 7 instead of the default
+  `all`) to `mcs skill install -p <value> -g` in step 5 instead of the default
   `claude-code`.
 - `MCS_NO_SKILL_INSTALL` — if set to a truthy value (1, true, yes, on), skip
-  step 7 entirely. This is useful for CI runners and headless machines that do
+  step 5 entirely. This is useful for CI runners and headless machines that do
   not run an AI agent.
 
 The truthy check for `MCS_NO_SKILL_INSTALL` is case-insensitive: 1, true, TRUE,
@@ -143,21 +142,12 @@ Use these mappings to diagnose problems without guessing:
 - If `mcs --version` says `0+unknown` or the command is missing entirely: the
   console script was not registered correctly. The most common cause is that
   `~/.local/bin` (or `%USERPROFILE%\.local\bin` on Windows) is not on PATH.
-  Re-check step 6.
-- If the metadata fetch in step 3 fails with a DNS or connection error: the
-  machine may be behind a corporate proxy. Check `HTTP_PROXY` / `HTTPS_PROXY` in
-  the environment.
-- If the metadata fetch succeeds but `latest_version` or `sha256` is empty,
-  missing, or malformed: the publisher's `latest.json` is malformed. Stop and
-  tell the user to retry later or pin a version with `MCS_VERSION` after they
-  accept the no-digest warning.
-- If the wheel SHA256 does not match `latest.json.sha256`: stop immediately.
-  Do not install the wheel. Tell the user the publisher artifact may be stale,
-  corrupted, or tampered with.
+  Re-check step 4.
+- If `uv tool install` fails with a network error: the machine may be behind a
+  corporate proxy. Check `HTTP_PROXY` / `HTTPS_PROXY` in the environment and
+  ensure outbound HTTPS to `pypi.org` is allowed.
 - If the installer complains `--reinstall is not a valid flag`: the uv version is
   too old (before 0.2.0). Upgrade uv and retry.
-- If `uv tool install` itself fails (network error, sandboxed shell that
-  blocks subprocess launching, etc.): show the user the error and tell them
-  to ensure they have outbound HTTPS to PyPI and the publisher OSS bucket.
-  The fall-back of `pip --user` is no longer offered because PEP 668 makes it
-  unusable on modern Debian / Ubuntu.
+- If `uv tool install` fails with a resolver error mentioning Python version:
+  `maxcompute-semantic` requires Python ≥ 3.10. Run `python3 --version` to
+  check, and if needed use `uv tool install --python 3.12 maxcompute-semantic`.
