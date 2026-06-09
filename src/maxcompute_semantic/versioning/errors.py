@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """DEPRECATED: import from :mod:`maxcompute_semantic.errors` instead.
 
 This module is a thin re-export shim kept for one release cycle so

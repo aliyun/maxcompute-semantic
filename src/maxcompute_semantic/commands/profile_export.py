@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs profile export`` / ``mcs profile import`` — package portability.
 
 A package built locally can be bundled into a tar.gz and handed to a

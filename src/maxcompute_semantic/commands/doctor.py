@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs doctor — run a series of health checks and report status.
 
 Each check is a lightweight, read-only probe.  No mutations, no writes.

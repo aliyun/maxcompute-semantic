@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Type rule — STRING column compared to date-shaped literal."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Hint — SQL shape matches a previously-verified query in memory.
 
 Fires when the input SQL has the same canonical shape (literal-insensitive

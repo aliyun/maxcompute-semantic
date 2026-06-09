@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the update-check probe and cache.
 
 See spec §"Component interfaces" / "_internal/update_check.py" for the

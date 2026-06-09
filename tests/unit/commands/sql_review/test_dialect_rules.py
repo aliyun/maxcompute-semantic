@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 from maxcompute_semantic.build.workload import extract_sql_evidence
 from maxcompute_semantic.commands.sql_review.rules.dialect import (
     check_sqlite_iif,

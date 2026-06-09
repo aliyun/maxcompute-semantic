@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Cross-project scenarios: same / valid-cross / unauthorized-cross.
 
 These tests focus on the error-classification surface -- the actual SQL

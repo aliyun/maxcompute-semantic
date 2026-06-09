@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for auth/profile_store.py — yaml round-trip for the
 multi-source Profile shape, missing-key validation, and the
 ruamel-ScalarString-wrapper coercion regression test.

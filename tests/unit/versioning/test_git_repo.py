@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """GitRepo — subprocess-driven git CLI wrapper."""
 
 from __future__ import annotations

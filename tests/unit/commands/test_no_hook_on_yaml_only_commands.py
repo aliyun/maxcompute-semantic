@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Anti-test for T8: verbs that don't mutate package data must NOT
 land a new commit in the per-profile git repo.
 

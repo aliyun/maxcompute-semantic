@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for commands/sql.py (the ``mcs sql`` verb group of
 ``execute`` / ``cost`` / ``explain``) and the freestanding
 ``commands.meta`` module's ``meta_group`` (the eight catalog-

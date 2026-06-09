@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """sql_dump — round-trip a package.db through a text dump file."""
 
 from __future__ import annotations

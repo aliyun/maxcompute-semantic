@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """WriteLock — fcntl-based per-profile write serialization.
 
 The lock file lives at ``<profile_data_dir>/.mcs-lock``. Its body is the

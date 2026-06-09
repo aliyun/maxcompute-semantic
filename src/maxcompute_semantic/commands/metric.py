@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs metric -- CRUD over top-level (profile-global) named metrics.
 
 A *metric* is a named MaxCompute SQL expression with optional

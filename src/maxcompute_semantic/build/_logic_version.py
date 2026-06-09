@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Inference-logic version stamp.
 
 Bump :data:`INFERENCE_LOGIC_VERSION` whenever a change to the *post-

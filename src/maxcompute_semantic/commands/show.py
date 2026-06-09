@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs show`` — display the semantic-package data for a profile.
 
 The single agent-facing entry point for "what's in this profile's

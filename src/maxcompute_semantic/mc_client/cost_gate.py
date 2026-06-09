@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Cost-threshold gate for ``MaxComputeClient.execute_sql``.
 
 Centralized so every code path that calls ``execute_sql`` gets the

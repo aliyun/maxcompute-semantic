@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs profile fork --from <ref>`` — the fork-creation verb (T14).
 
 Pins the CLI surface of the verb: name validation, ref resolution

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Cross-reference invariants for the ``MCS_NO_VERSIONING`` env knob (T18).
 
 The helper itself (``versioning/env.py:is_versioning_disabled``) is

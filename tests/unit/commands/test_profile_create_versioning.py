@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs profile create's versioning side effect (T6).
 
 The end of every successful ``mcs profile create`` runs the auto-

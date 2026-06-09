@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Catalog API search via pyodps RestClient — server-side full-text search.
 
 Uses ``ODPS.catalog_rest`` (RestClient with auth already wired) to call

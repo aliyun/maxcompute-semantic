@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the sql_review dispatcher (`build_review_envelope`).
 
 The dispatcher is the seam Task 14's CLI integration calls into. It

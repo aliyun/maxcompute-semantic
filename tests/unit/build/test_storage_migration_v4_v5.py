@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for v4 → v5 PackageDB migration: drop bm25_index, add memory_fts.
 
 vec_index, when present, is left untouched.

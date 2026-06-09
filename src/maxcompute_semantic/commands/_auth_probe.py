@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """The 3-step auth probe used internally by the create / update wizards.
 
 Lifecycle history: this code used to live in ``commands/auth.py`` and

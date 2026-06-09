@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Ranked JOIN candidates from workload evidence, profile stats, and name heuristics.
 
 Combines three evidence sources — historical SQL workload, profile

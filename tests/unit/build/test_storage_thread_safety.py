@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Concurrent access regression tests for PackageDB.
 
 Justifies the single-connection + threading.RLock design used to make

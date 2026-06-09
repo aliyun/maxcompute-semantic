@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Auto-commit hook for mcs write commands.
 
 The two public functions — ``commit_after_command`` and

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for ``auth/context.py`` — :class:`ProfileContext`.
 
 Covers the four-slot resolve chain, the ``--project`` rewrite of

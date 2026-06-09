@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs profile subcommand group — manage named profiles and profile data (build, init, refresh)."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """End-to-end: `mcs profile export <name> [--osi] --out FILE`.
 
 Exercises both branches of the new dual-format export verb: the default

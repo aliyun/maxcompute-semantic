@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs build's commit_after_command wiring (T8).
 
 The build verb is the canonical case: at the success-path tail, the

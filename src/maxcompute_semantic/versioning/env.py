@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Read the ``MCS_NO_VERSIONING`` opt-out env knob.
 
 The same truthy-string set as the existing ``MCS_NO_HISTORY`` knob

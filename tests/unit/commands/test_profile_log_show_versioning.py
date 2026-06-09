@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs profile log-show <ref>`` — single-commit dump (T11).
 
 Pins the verb's user-visible contract: short/full SHA acceptance,

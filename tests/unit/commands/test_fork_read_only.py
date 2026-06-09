@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """T9 — read-only fork guard at write-command entry.
 
 Every write verb wired in T8 calls ``reject_if_fork(profile)``

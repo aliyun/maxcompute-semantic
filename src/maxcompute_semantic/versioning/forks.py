@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Helpers for the fork-vs-main metadata layer.
 
 A fork is a ``Profile`` with ``kind="fork"`` whose

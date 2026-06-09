@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs profile reset --to <ref>`` — the rollback verb (T13).
 
 Pins the verb's user-visible contract: ref / keyword resolution,

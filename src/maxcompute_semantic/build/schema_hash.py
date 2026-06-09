@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """SHA-256 column hash for refresh diff — only name+type participate."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """PackageDB — SQLite truth source for package build data.
 
 Schema version 5 (0.4.0a13) replaces the hand-rolled ``bm25_index``

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Regression-lint for the maxcompute-semantic skill bundle.
 
 These tests bind the installed skill bundle's documentation to the

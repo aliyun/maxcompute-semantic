@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the ``mcs sql review`` click subcommand.
 
 The CLI is the user-facing seam between the dispatcher

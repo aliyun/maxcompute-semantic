@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for mc_client/client.py — execute_sql + list_schemas + list_tables
 + describe_table + cost_estimate."""
 

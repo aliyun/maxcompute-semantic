@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Unit tests for ``versioning.forks`` — the yaml-side helpers
 that pair with the git-side worktree machinery.
 

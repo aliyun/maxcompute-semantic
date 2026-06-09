@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Status JSON helper — every script ends with one of these on stdout.
 
 Lets the SKILL.md workflow parse without regex.

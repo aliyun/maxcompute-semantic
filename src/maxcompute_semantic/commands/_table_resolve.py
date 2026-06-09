@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Resolve a user-supplied table reference to a ``(source_key, table)``
 pair against a multi-source PackageDB.
 

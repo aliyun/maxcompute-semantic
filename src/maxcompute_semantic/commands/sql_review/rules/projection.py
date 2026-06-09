@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Projection rule — flag a ranking key projected in a top-N query.
 
 A purely structural over-projection signal: in a `... ORDER BY x DESC

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """mcs udf's commit_after_command wiring (T8).
 
 Three write verbs under ``udf`` share the ``udf:`` action prefix:

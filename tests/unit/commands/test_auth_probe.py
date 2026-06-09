@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Unit tests for commands/_auth_probe._run_auth_test.
 
 Focused on Step 3 (the SELECT 1 probe) — Steps 1 and 2 are covered via

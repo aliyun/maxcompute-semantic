@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Versioning-subsystem error classes.
 
 Subclasses of :class:`McsError` so the CLI boundary's ``except McsError``

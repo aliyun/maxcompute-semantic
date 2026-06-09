@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for MaxComputeClient search_tables, search_columns, list_partitions,
 freshness_info, and catalog_search_tables integration."""
 

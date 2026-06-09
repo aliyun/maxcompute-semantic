@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Annotation suggestion generation from workload evidence, profile stats,
 and column naming patterns.
 

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for commands/_source_picker.py — drill-down picker + parsers."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """``mcs profile diff <a> <b>`` — two-commit unified diff (T12).
 
 Pins the verb's user-visible contract: SHA / keyword acceptance on

@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Drill-down source picker — used by ``commands/_profile_editor`` to
 build a ``DataSource`` interactively (project → schema → tables →
 columns), with fzf fuzzy matching for all selection steps and

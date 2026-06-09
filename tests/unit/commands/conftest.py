@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Fixtures shared by the T8 ``versioning``-wiring test files.
 
 The per-verb test files (``test_build_versioning.py``,

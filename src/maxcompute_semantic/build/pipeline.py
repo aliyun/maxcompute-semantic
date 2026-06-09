@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """BuildPipeline orchestrator — runs all 8 build phases sequentially.
 
 Phase 1 (resolve + tier) is done by the caller before BuildPipeline.run().

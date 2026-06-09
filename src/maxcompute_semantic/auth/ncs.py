@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Thin ncs subprocess helpers used by `mcs profile create` wizard.
 
 These are best-effort: any failure returns None / [] rather than raising,

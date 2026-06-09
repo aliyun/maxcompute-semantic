@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Renderer: CLI output adapter for plain (human) and envelope (json/yaml) modes."""
 
 from __future__ import annotations

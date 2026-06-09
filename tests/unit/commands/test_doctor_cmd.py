@@ -1,3 +1,6 @@
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+
 """Unit tests for mcs doctor command — focus on McsError propagation.
 
 The doctor check functions that call MaxComputeClient now catch McsError
