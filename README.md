@@ -1,197 +1,123 @@
 # maxcompute-semantic (`mcs`)
 
-`maxcompute-semantic` is the package that ships the `mcs` CLI and the
-bare `maxcompute-semantic` agent skill. Agents do not import Python
-internals from this package at runtime; they load `SKILL.md` and call
-`mcs` commands.
+[![PyPI](https://img.shields.io/pypi/v/maxcompute-semantic)](https://pypi.org/project/maxcompute-semantic/)
+[![Python](https://img.shields.io/pypi/pyversions/maxcompute-semantic)](https://pypi.org/project/maxcompute-semantic/)
+[![License](https://img.shields.io/github/license/aliyun/maxcompute-semantic)](LICENSE)
+[![CI](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml/badge.svg)](https://github.com/aliyun/maxcompute-semantic/actions/workflows/ci.yml)
 
-This README is the short reference for the installed distribution.
+**Give your AI agent a semantic understanding of your MaxCompute data.**
 
-## What Is Included
+`mcs` builds a local semantic package — table descriptions, column hints, JOIN
+relationships, verified SQL patterns, and business metrics — so your AI agent
+writes correct MaxCompute SQL on the first try, not the fifth.
 
-- `mcs` CLI: profile management, metadata discovery, SQL execution,
-  build/status/show, memory, metrics, UDF, and skill installation.
-- Bare skill bundle:
-  [`src/maxcompute_semantic/_skill/`](src/maxcompute_semantic/_skill/)
-  with `SKILL.md` and lazily loaded `references/`.
-- Profile store and semantic package builder. Profiles describe auth,
-  compute project, data sources, cost thresholds, tags, and optional
-  package path. Builds materialize a local SQLite + markdown semantic
-  package for the profile.
-- Agent install guide at [`scripts/install.md`](scripts/install.md) —
-  a step-by-step skill for LLM agents to install `mcs` on the user's
-  machine (uv bootstrap, PyPI install, PATH setup, skill registration).
+[Documentation](https://aliyun.github.io/maxcompute-semantic/) · [PyPI](https://pypi.org/project/maxcompute-semantic/) · [Changelog](CHANGELOG.md)
+
+## Why mcs?
+
+AI agents can query MaxCompute, but they don't know *your* data. They guess
+table names, miss JOIN keys, and write SQL that fails or returns wrong results.
+
+`mcs` closes the gap:
+
+- **Semantic package** — `mcs build` scans your project's schema and produces a
+  structured knowledge base (SQLite + markdown) the agent reads before writing SQL.
+- **Memory** — verified queries, failed patterns, and domain notes accumulate
+  over time. The agent gets better the more you use it.
+- **SQL guard rails** — cost estimation, write protection, dialect review, and
+  tier-aware schema resolution, all before the query hits MaxCompute.
+- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI,
+  Qwen Code, OpenCode, and 50+ more. One `mcs skill install --all` and every
+  agent on your machine picks up the skill.
+
+## Quick Start
+
+```bash
+# 1. Install
+uv tool install maxcompute-semantic
+
+# 2. Create a profile (interactive wizard)
+mcs profile create
+mcs link bind <profile-name>
+
+# 3. Build the semantic package
+mcs build
+
+# Done — your agent can now use mcs commands via the skill.
+```
 
 ## Install
 
 ### For humans
 
 ```bash
-pip install maxcompute-semantic
+uv tool install maxcompute-semantic    # recommended
+# or: pip install maxcompute-semantic
 ```
 
-Or with uv (recommended):
+If `~/.local/bin` is not on your PATH:
 
 ```bash
-uv tool install maxcompute-semantic
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
-If `~/.local/bin` is not on your PATH, add it:
+### For LLM agents
 
-```bash
-# bash/zsh
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+Paste this to your agent — it will handle everything:
 
-# fish
-fish_add_path ~/.local/bin
 ```
-
-Verify:
-
-```bash
-mcs --help
-```
-
-### For LLM Agents
-
 Fetch the full guide and follow it step by step:
-
-```
 curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
 ```
 
-The guide covers: checking for an existing install, bootstrapping `uv`,
-installing from PyPI, persisting `~/.local/bin` on PATH, and registering
-the skill into agent directories. Don't summarize it; read it end to end.
-
 ### Skill registration
 
-Install the skill as a symlink into an agent skill directory:
-
 ```bash
-mcs skill install        # local .agents/skills/ by default
-mcs skill install -g     # global ~/.agents/skills/ by default
-mcs skill install --all  # install to every supported platform path
-mcs skill install --detect -g  # install only for detected agents
+mcs skill install --all -g   # all supported agents, global
+mcs skill install --detect -g  # only agents found on this machine
 ```
 
-Supported platform names for `mcs skill install -p <platform>`:
-`agents`, `claude-code`, `cursor`, `codex`, `gemini-cli`,
-`qwen-code`, and `opencode`. Deprecated aliases `gemini` and `qwen`
-still work but emit a warning.
+Supported agents: `claude-code`, `cursor`, `codex`, `gemini-cli`, `qwen-code`,
+`opencode`, and [50+ more](https://aliyun.github.io/maxcompute-semantic/docs.html).
 
-## Configure A Profile
+## Key Features
 
-Interactive setup:
+| Feature | Command | What it does |
+|---------|---------|--------------|
+| **Build** | `mcs build` | Scan schema → produce semantic package |
+| **Query** | `mcs sql execute '...'` | Run SQL with tier-aware resolution |
+| **Cost gate** | `mcs sql cost '...'` | Estimate cost before running |
+| **Review** | `mcs sql review '...'` | Lint SQL for dialect / schema issues |
+| **Memory** | `mcs memory verify ...` | Record a verified query for future recall |
+| **Recall** | `mcs memory recall '<q>'` | BM25 search across verified SQL + notes |
+| **Metrics** | `mcs metric add ...` | Define reusable business metrics |
+| **Proposals** | `mcs package propose` | Suggest semantic annotations from build |
+| **Doctor** | `mcs doctor` | Diagnose profile / auth / skill state |
+
+Run `mcs <command> --help` for the full option surface.
+
+## Configuration
+
+Profiles store auth, compute project, data sources, and cost thresholds:
 
 ```bash
-mcs profile create
-mcs link bind <profile-name>
+mcs profile create                    # interactive wizard
+mcs profile create --from-file @p.yaml  # scripted
+mcs link bind <name>                  # bind cwd to profile
 ```
 
-Scripted setup:
+Profile resolution order: `--profile` flag → `MCS_PROFILE` env → cwd binding → ODPS env vars.
 
-```bash
-mcs profile spec-template > profile.yaml
-mcs profile create --from-file @profile.yaml
-mcs link bind <profile-name>
-```
-
-Profiles live in `~/.config/maxcompute-semantic/profiles.yaml` unless
-`MCS_CONFIG_DIR` overrides the config root. `mcs link bind` stores a
-cwd-to-profile binding in `link.json`.
-
-For CI or one-off shells, you can skip a saved profile and use the
-standard ODPS environment variables:
+For CI / one-off use without a saved profile:
 
 ```bash
 export ALIBABA_CLOUD_ACCESS_KEY_ID=...
 export ALIBABA_CLOUD_ACCESS_KEY_SECRET=...
 export MAXCOMPUTE_ENDPOINT=https://service.<region>.maxcompute.aliyun.com/api
-export MAXCOMPUTE_PROJECT=<compute-project>
+export MAXCOMPUTE_PROJECT=<project>
 ```
 
-## Profile Resolution
-
-Commands that support profiles resolve context in this order:
-
-1. Explicit `--profile NAME`.
-2. `MCS_PROFILE=NAME`.
-3. The cwd binding written by `mcs link bind NAME`.
-4. The standard ODPS environment variables as an in-memory profile.
-
-## Common Commands
-
-```bash
-# profile and identity
-mcs profile list
-mcs profile show [NAME]
-mcs profile update <NAME>
-mcs profile whoami [NAME]
-mcs link status
-mcs link unlink
-
-# semantic package
-mcs build
-mcs build --refresh
-mcs status --tables
-mcs show
-mcs show --table <TABLE>
-
-# semantic maintenance
-mcs package propose --from-suggestions
-mcs package list-proposals
-mcs package apply <id>
-mcs metric list
-mcs metric add total_revenue --expression 'SUM(orders.amount)'
-mcs metric show total_revenue
-
-# metadata and SQL
-mcs meta list-tables
-mcs meta describe-table <TABLE>
-mcs sql review 'SELECT ...'
-mcs sql cost 'SELECT ...'
-mcs sql explain 'SELECT ...'
-mcs sql execute 'SELECT ...'
-
-# memory
-mcs memory recall --project <P> '<question>'
-mcs memory verify --project <P> --question '<question>' --sql '<SQL>' --tables <T1,T2>
-
-# skill and UDFs
-mcs skill list
-mcs skill diff --all
-mcs udf list --project <P>
-```
-
-Run `mcs <command> --help` for the current option surface.
-
-## Data Layout
-
-Config and built semantic packages are separate:
-
-```text
-~/.config/maxcompute-semantic/
-├── profiles.yaml
-└── link.json
-
-<XDG_DATA_HOME>/maxcompute-semantic/data/<profile-name>/
-├── package.db
-├── _overview.md
-├── _joins.md
-├── _state.json
-├── _udfs.md
-├── tier_cache/
-└── <source_key>/              # per-source subdirectory (e.g. acme__warehouse/)
-    └── <table>.md
-```
-
-`profile.package_path` can override the per-profile package directory.
-
-## Development
-
-From the repository root:
+## Contributing
 
 ```bash
 uv sync --extra dev
@@ -202,7 +128,4 @@ uv run mypy src/
 
 ## License
 
-maxcompute-semantic is developed by Alibaba Cloud and licensed under the
-Apache License (Version 2.0). This product contains various third-party
-components under other open source licenses. See the NOTICE file for more
-information.
+Apache License 2.0 — see [LICENSE](LICENSE). Third-party notices in [NOTICE](NOTICE).
