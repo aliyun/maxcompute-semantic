@@ -97,6 +97,15 @@ def _build_wm_concat(args: list) -> exp.GroupConcat:
 class MaxComputeParser(HiveParser):
     LOG_DEFAULTS_TO_LN = True
 
+    ALTER_PARSERS = {
+        **HiveParser.ALTER_PARSERS,
+        "ENABLE": lambda self: self._parse_odps_alter_lifecycle(enable=True),
+        "DISABLE": lambda self: self._parse_odps_alter_lifecycle(enable=False),
+        "MERGE": lambda self: self._parse_odps_merge_smallfiles(),
+        "CHANGEOWNER": lambda self: self._parse_odps_changeowner(),
+        "CLUSTERED": lambda self: self._parse_odps_alter_clustered_by(),
+    }
+
     FUNCTIONS = {
         **HiveParser.FUNCTIONS,
         # ------------------------------------------------------------------
@@ -263,3 +272,46 @@ class MaxComputeParser(HiveParser):
             alias = self._parse_id_var()
             return exp.Alias(this=this, alias=alias)
         return t.cast(t.Optional[exp.Expression], this)
+
+    # ── ALTER TABLE extensions (from MaxCompute grammar) ──────────────
+
+    def _parse_odps_alter_lifecycle(self, enable: bool) -> exp.Property:
+        """ENABLE LIFECYCLE / DISABLE LIFECYCLE."""
+        self._match_text_seq("LIFECYCLE")
+        return exp.Property(
+            this=exp.var("LIFECYCLE"),
+            value=exp.Literal.string("ENABLE" if enable else "DISABLE"),
+        )
+
+    def _parse_odps_merge_smallfiles(self) -> exp.Property:
+        """MERGE SMALLFILES."""
+        self._match_text_seq("SMALLFILES")
+        return exp.Property(
+            this=exp.var("MERGE_SMALLFILES"),
+            value=exp.true(),
+        )
+
+    def _parse_odps_changeowner(self) -> exp.Property:
+        """CHANGEOWNER TO 'new_owner'."""
+        self._match_text_seq("TO")
+        owner = self._parse_string()
+        return exp.Property(
+            this=exp.var("CHANGEOWNER"),
+            value=owner or exp.Literal.string(""),
+        )
+
+    def _parse_odps_alter_clustered_by(self) -> exp.ClusteredByProperty:
+        """ALTER TABLE ... CLUSTERED BY (cols) [SORTED BY (cols)] INTO n BUCKETS."""
+        self._match_text_seq("BY")
+        expressions = self._parse_wrapped_csv(self._parse_column)
+        sorted_by = None
+        if self._match_text_seq("SORTED", "BY"):
+            sorted_by = self._parse_wrapped_csv(self._parse_ordered)
+        self._match_text_seq("INTO")
+        buckets = self._parse_number()
+        self._match_text_seq("BUCKETS")
+        return exp.ClusteredByProperty(
+            expressions=expressions,
+            sorted_by=sorted_by or [],
+            buckets=buckets or 0,
+        )
