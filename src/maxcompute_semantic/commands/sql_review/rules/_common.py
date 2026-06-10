@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import sqlglot
 from sqlglot import exp
 
+from maxcompute_semantic.dialect import parse_mc
+
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import DataSource
     from maxcompute_semantic.commands.sql_review.types import ReviewContext
@@ -25,7 +27,7 @@ def parse_statements(sql: str) -> list[exp.Expression]:
     of the prior ``is not None`` comprehension.
     """
     try:
-        parsed = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.IGNORE)
+        parsed = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
     except sqlglot.errors.SqlglotError:
         return []
     return [s for s in parsed if isinstance(s, exp.Expression)]

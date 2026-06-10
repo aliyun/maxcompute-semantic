@@ -43,8 +43,10 @@ def _normalized_sql(sql: str) -> str:
 
 
 def _parse_single_statement(sql: str) -> sqlglot.exp.Expression | None:
+    from maxcompute_semantic.dialect import parse_mc
+
     try:
-        statements = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.RAISE)
+        statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
     except Exception:
         return None
     if len(statements) != 1 or not isinstance(statements[0], sqlglot.exp.Expression):

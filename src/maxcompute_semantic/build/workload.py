@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 import sqlglot
 from sqlglot import exp
 
+from maxcompute_semantic.dialect import parse_mc_one
 from maxcompute_semantic.memory.sql_pattern import analyze_sql_pattern
 
 # Matches table-qualified column refs (``<table>.<col>``) inside the
@@ -106,7 +107,7 @@ def extract_sql_evidence(sql: str) -> SqlWorkloadEvidence:
     """Parse one SQL string and extract structured workload evidence."""
     pattern = analyze_sql_pattern(sql)
     try:
-        parsed = sqlglot.parse_one(sql)
+        parsed = parse_mc_one(sql)
     except sqlglot.errors.SqlglotError:
         return SqlWorkloadEvidence(
             tables=pattern.tables,

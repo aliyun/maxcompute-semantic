@@ -18,6 +18,8 @@ from dataclasses import dataclass
 import sqlglot
 from sqlglot import errors, exp
 
+from maxcompute_semantic.dialect import parse_mc_one
+
 
 @dataclass(frozen=True)
 class SqlPattern:
@@ -57,7 +59,7 @@ def analyze_sql_pattern(sql: str) -> SqlPattern:
     granular key without changing every caller.
     """
     try:
-        parsed = sqlglot.parse_one(sql)
+        parsed = parse_mc_one(sql)
         normalized = parsed.copy()
         normalized = normalized.transform(
             lambda node: exp.Placeholder() if isinstance(node, exp.Literal) else node
@@ -216,7 +218,7 @@ def redact_projection_columns(canonical_sql: str) -> str:
     must commit to a specific projection.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_projection_inplace(parsed)
@@ -252,7 +254,7 @@ def redact_join_keys(canonical_sql: str) -> str:
     Cross joins / joins without an ON clause pass through unchanged.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_join_keys_inplace(parsed)
@@ -278,7 +280,7 @@ def redact_for_display(canonical_sql: str) -> str:
     the parser.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_projection_inplace(parsed)

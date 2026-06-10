@@ -95,7 +95,9 @@ if TYPE_CHECKING:
 def _parse_tables(sql: str) -> list[sqlglot.exp.Table]:
     """Flat list of ``Table`` references in *sql*; ``[]`` on parse failure."""
     try:
-        statements = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.IGNORE)
+        from maxcompute_semantic.dialect import parse_mc
+
+        statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
     except Exception:
         return []
     tables: list[sqlglot.exp.Table] = []
