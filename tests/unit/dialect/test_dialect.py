@@ -14,7 +14,7 @@ import pytest
 import sqlglot
 from sqlglot import exp
 
-from maxcompute_semantic.dialect import parse_mc, parse_mc_one
+from maxcompute_semantic.dialect import parse_mc_one
 
 
 # ── Registration ──────────────────────────────────────────────────────

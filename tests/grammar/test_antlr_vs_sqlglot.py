@@ -392,7 +392,7 @@ class TestAntlrRuleCoverage:
         pct = len(covered_targetable) / len(targetable) * 100 if targetable else 0
 
         with capsys.disabled():
-            print(f"\n\n=== ANTLR Rule Coverage ===\n")
+            print("\n\n=== ANTLR Rule Coverage ===\n")
             print(f"Total rules:          {len(ALL_RULE_NAMES)}")
             print(f"Infrastructure (skip):{len(_INFRASTRUCTURE_RULES):>4}")
             print(f"Targetable rules:     {len(targetable)}")

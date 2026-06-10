@@ -9,7 +9,7 @@ here to ensure parse → AST → generate round-trips correctly.
 
 from __future__ import annotations
 
-from sqlglot import exp, transforms
+from sqlglot import exp
 from sqlglot.dialects.dialect import rename_func, unit_to_str
 from sqlglot.generators.hive import HiveGenerator
 from sqlglot.transforms import (

@@ -15,7 +15,6 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-import sqlglot
 from sqlglot import errors, exp
 
 from maxcompute_semantic.dialect import parse_mc_one

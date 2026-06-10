@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import typing as t
 
-from sqlglot import exp, parser
+from sqlglot import exp
 from sqlglot.dialects.dialect import build_formatted_time, build_timetostr_or_tochar
 from sqlglot.helper import seq_get
 from sqlglot.parsers.hive import HiveParser
