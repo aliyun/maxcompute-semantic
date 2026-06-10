@@ -51,7 +51,7 @@ fetch_grammar() {
 }
 
 patch_grammar() {
-    info "Patching grammar for Python target..."
+    info "Patching grammar for Python target..." >&2
     local tmp_dir
     tmp_dir=$(mktemp -d)
     trap "rm -rf '$tmp_dir'" EXIT
@@ -80,10 +80,79 @@ patch_grammar() {
 
     rm -f "$tmp_dir"/*.bak
 
-    echo "$tmp_dir"
-    # Note: caller must use the returned path before EXIT trap fires
+    # Caller owns cleanup after the patched path leaves this function.
     trap - EXIT
     echo "$tmp_dir"
+}
+
+python_bin() {
+    if [[ -f ".venv/bin/python3" ]]; then
+        echo ".venv/bin/python3"
+    else
+        echo "python3"
+    fi
+}
+
+postprocess_generated() {
+    local py
+    py=$(python_bin)
+
+    "$py" - "$OUTPUT_DIR" << 'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+output_dir = Path(sys.argv[1])
+
+old_module_header = (
+    "# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.\n"
+    "# SPDX-License-Identifier: Apache-2.0\n\n"
+)
+module_header = (
+    "# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.\n"
+    "# SPDX-License-Identifier: Apache-2.0\n"
+    "#\n"
+    "# Generated from Apache-2.0 MaxCompute grammar sourced from\n"
+    "# aliyun/aliyun-odps-java-sdk; see grammar/README.md.\n\n"
+)
+init_text = (
+    "# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.\n"
+    "# SPDX-License-Identifier: Apache-2.0\n"
+    "#\n"
+    "# Package marker for the generated MaxCompute grammar modules.\n\n"
+    '"""Auto-generated ANTLR4 parser for MaxCompute (ODPS) SQL.\n\n'
+    "Do not edit — regenerate via ``grammar/generate.sh``.\n"
+    '"""\n'
+)
+generated_re = re.compile(
+    r"^# Generated from .*?(OdpsLexer\.g4|OdpsParser\.g4) by ANTLR ([0-9.]+)$",
+    re.MULTILINE,
+)
+
+
+def normalize_generated_line(match: re.Match[str]) -> str:
+    grammar_name = match.group(1)
+    antlr_version = match.group(2)
+    return f"# Generated from grammar/odps/{grammar_name} by ANTLR {antlr_version}"
+
+
+for pyfile in sorted(output_dir.glob("*.py")):
+    if pyfile.name == "__init__.py":
+        continue
+
+    text = pyfile.read_text(encoding="utf-8")
+    for header in (module_header, old_module_header):
+        if text.startswith(header):
+            text = text[len(header) :]
+            break
+
+    text = generated_re.sub(normalize_generated_line, text, count=1)
+    pyfile.write_text(module_header + text, encoding="utf-8")
+
+(output_dir / "__init__.py").write_text(init_text, encoding="utf-8")
+PY
 }
 
 generate_python() {
@@ -109,13 +178,7 @@ generate_python() {
         rm -rf "$OUTPUT_DIR/$(echo "$patched_dir" | cut -d/ -f2)"
     fi
 
-    # Create __init__.py
-    cat > "$OUTPUT_DIR/__init__.py" << 'PYEOF'
-"""Auto-generated ANTLR4 parser for MaxCompute (ODPS) SQL.
-
-Do not edit — regenerate via ``grammar/generate.sh``.
-"""
-PYEOF
+    postprocess_generated
 
     # Clean up intermediate files we don't need
     rm -f "$OUTPUT_DIR"/*.interp "$OUTPUT_DIR"/*.tokens
@@ -131,11 +194,7 @@ PYEOF
 verify() {
     info "Verifying generated parser loads..."
     local py
-    if [[ -f ".venv/bin/python3" ]]; then
-        py=".venv/bin/python3"
-    else
-        py="python3"
-    fi
+    py=$(python_bin)
     PYTHONPATH="$OUTPUT_DIR" "$py" -c "
 from OdpsLexer import OdpsLexer
 from OdpsParser import OdpsParser
@@ -160,11 +219,11 @@ main() {
     download_antlr_jar
 
     local patched_dir
-    # patch_grammar prints the path twice (before and after trap change)
-    # take the last line
-    patched_dir=$(patch_grammar | tail -1)
+    patched_dir=$(patch_grammar)
+    trap 'rm -rf "$patched_dir"' EXIT
 
     generate_python "$patched_dir"
+    trap - EXIT
     verify
 
     info "Done. Generated parser is in grammar/generated/"

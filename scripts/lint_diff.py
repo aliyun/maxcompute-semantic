@@ -81,18 +81,29 @@ def _key(d: dict) -> tuple[str, str, str]:
 def _diff(
     base: list[dict], head: list[dict]
 ) -> tuple[list[dict], list[dict], list[dict]]:
-    base_map = {_key(d): d for d in base}
-    head_map = {_key(d): d for d in head}
-    base_keys = set(base_map)
-    head_keys = set(head_map)
-    new_keys = head_keys - base_keys
-    fixed_keys = base_keys - head_keys
-    unchanged_keys = base_keys & head_keys
-    return (
-        [head_map[k] for k in new_keys],
-        [base_map[k] for k in fixed_keys],
-        [head_map[k] for k in unchanged_keys],
-    )
+    base_groups: dict[tuple[str, str, str], list[dict]] = {}
+    head_groups: dict[tuple[str, str, str], list[dict]] = {}
+    for d in base:
+        base_groups.setdefault(_key(d), []).append(d)
+    for d in head:
+        head_groups.setdefault(_key(d), []).append(d)
+
+    new: list[dict] = []
+    fixed: list[dict] = []
+    unchanged: list[dict] = []
+
+    for key, head_entries in head_groups.items():
+        base_count = len(base_groups.get(key, []))
+        unchanged.extend(head_entries[:base_count])
+        if len(head_entries) > base_count:
+            new.extend(head_entries[base_count:])
+
+    for key, base_entries in base_groups.items():
+        head_count = len(head_groups.get(key, []))
+        if len(base_entries) > head_count:
+            fixed.extend(base_entries[head_count:])
+
+    return (new, fixed, unchanged)
 
 
 def _rule_counts(entries: list[dict]) -> list[tuple[str, int]]:

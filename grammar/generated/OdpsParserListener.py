@@ -1,4 +1,10 @@
-# Generated from /var/folders/29/8kxv8jjj1vsc7tghdf32hnp80000gp/T/tmp.kTf3n8txnp/OdpsParser.g4 by ANTLR 4.13.2
+# Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Generated from Apache-2.0 MaxCompute grammar sourced from
+# aliyun/aliyun-odps-java-sdk; see grammar/README.md.
+
+# Generated from grammar/odps/OdpsParser.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .OdpsParser import OdpsParser
