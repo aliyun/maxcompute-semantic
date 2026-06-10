@@ -52,11 +52,42 @@ def test_emit_yaml_quotes_specials() -> None:
     assert "'value: with colon'" in out or '"value: with colon"' in out
 
 
+def test_emit_yaml_quotes_yaml_literals_and_escapes_single_quotes() -> None:
+    out = emit_yaml({"enabled": "true", "owner": "Alice's"})
+    assert "enabled: 'true'" in out
+    assert "owner: 'Alice''s'" in out
+
+
 def test_emit_yaml_null_and_bool() -> None:
     out = emit_yaml({"a": None, "b": True, "c": False})
     assert "a: null" in out
     assert "b: true" in out
     assert "c: false" in out
+
+
+def test_emit_yaml_block_list_of_dicts() -> None:
+    out = emit_yaml(
+        {
+            "sources": [
+                {"project": "p1", "schema": "default"},
+                {"project": "p2", "enabled": False},
+            ]
+        }
+    )
+    assert "- project: p1" in out
+    assert "schema: default" in out
+    assert "- project: p2" in out
+    assert "enabled: false" in out
+
+
+def test_emit_yaml_rejects_unsupported_scalar() -> None:
+    with pytest.raises(TypeError, match="unsupported scalar type"):
+        emit_yaml({"bad": object()})
+
+
+def test_emit_yaml_rejects_unsupported_list_item() -> None:
+    with pytest.raises(TypeError, match="list items must be scalar or dict"):
+        emit_yaml({"bad": [object()]})
 
 
 def test_split_frontmatter_basic() -> None:
@@ -83,6 +114,34 @@ def test_parse_frontmatter_handles_block_list() -> None:
     raw = "---\nkeywords:\n  - a\n  - b\n---\n"
     fm = parse_frontmatter(raw)
     assert fm == {"keywords": ["a", "b"]}
+
+
+def test_parse_frontmatter_handles_mapping_block_list_and_comments() -> None:
+    raw = (
+        "---\n"
+        "# ignored\n"
+        "sources:\n"
+        "  - project: p1\n"
+        "    schema: default\n"
+        "  - project: p2\n"
+        "broken-line-without-colon\n"
+        "---\n"
+    )
+    fm = parse_frontmatter(raw)
+    assert fm == {
+        "sources": [
+            {"project": "p1", "schema": "default"},
+            {"project": "p2"},
+        ]
+    }
+
+
+def test_parse_frontmatter_splits_quoted_commas_in_inline_list() -> None:
+    fm = parse_frontmatter("items: 'a,b', plain")
+    assert fm == {"items": "'a,b', plain"}
+
+    fm = parse_frontmatter("items: ['a,b', plain]")
+    assert fm == {"items": ["a,b", "plain"]}
 
 
 # ---------------------------------------------------------------------------

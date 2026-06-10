@@ -17,6 +17,7 @@ import pytest
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.commands.doctor import (
     _check_connectivity,
+    _check_skill_install,
     _check_tier,
 )
 from maxcompute_semantic.mc_client.errors import (
@@ -263,6 +264,69 @@ class TestCheckTier:
         """None profile (prerequisite failed) returns skip."""
         result = _check_tier(None)
         assert result == ("tier", "skip", "skipped: prerequisite failed")
+
+
+class TestCheckSkillInstall:
+    def test_skips_when_no_skill_symlinks_exist(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(isolated_config)
+
+        result = _check_skill_install()
+
+        assert result == (
+            "skill_install",
+            "skip",
+            "no skill symlink; run `mcs skill install`",
+        )
+
+    def test_passes_when_global_skill_points_to_current_package(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from maxcompute_semantic.commands.skill import _skill_root
+
+        monkeypatch.chdir(isolated_config)
+        target = Path.home() / ".agents/skills/maxcompute-semantic"
+        target.parent.mkdir(parents=True)
+        target.symlink_to(_skill_root(), target_is_directory=True)
+
+        result = _check_skill_install()
+
+        assert result[0] == "skill_install"
+        assert result[1] == "pass"
+        assert "agents (global)" in (result[2] or "")
+
+    def test_fails_when_global_skill_points_elsewhere(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(isolated_config)
+        wrong_root = isolated_config / "wrong-skill"
+        wrong_root.mkdir()
+        target = Path.home() / ".agents/skills/maxcompute-semantic"
+        target.parent.mkdir(parents=True)
+        target.symlink_to(wrong_root, target_is_directory=True)
+
+        result = _check_skill_install()
+
+        assert result[0] == "skill_install"
+        assert result[1] == "fail"
+        assert "agents (global)" in (result[2] or "")
+        assert "expected" in (result[2] or "")
+
+    def test_fails_when_skill_target_is_directory(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(isolated_config)
+        target = Path(".agents/skills/maxcompute-semantic")
+        target.mkdir(parents=True)
+
+        result = _check_skill_install()
+
+        assert result == (
+            "skill_install",
+            "fail",
+            "broken: agents (local): directory instead of symlink",
+        )
 
 
 class TestUpdateChannelChecks:

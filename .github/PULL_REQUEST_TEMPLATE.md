@@ -16,7 +16,7 @@
 
 ## Checklist
 
-- [ ] Lint, type check, and tests pass locally (`ruff check`, `mypy src/`, `pytest -m 'not live'`)
+- [ ] Lint, type check, tests, overall coverage, and diff coverage pass locally/CI (`uv run ruff check src/ tests/`, `uv run mypy src/`, `uv run pytest tests/ -m 'not live' --cov=maxcompute_semantic --cov-report=xml --cov-fail-under=85`, `uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=80`)
 - [ ] SPDX license headers added to new `.py` files
 - [ ] Related issue linked below (if applicable)
 
