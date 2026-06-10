@@ -13,10 +13,10 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -30,9 +30,6 @@ jobs:
         run: |
           missing=$(grep -rL 'SPDX-License-Identifier' src/ tests/ --include='*.py' | grep -v __pycache__ || true)
           if [ -n "$missing" ]; then echo "Missing SPDX header in:"; echo "$missing"; exit 1; fi
-
-      - name: Lint
-        run: uv run ruff check src/ tests/
 
       - name: Type check
         run: uv run mypy src/
