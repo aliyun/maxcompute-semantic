@@ -132,13 +132,36 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     ``odpscmd`` configured. Tests that exercise the import path mock
     this explicitly.
     """
+    home_dir = tmp_path / "home"
+    xdg_config_dir = tmp_path / "xdg-config"
+    xdg_data_dir = tmp_path / "xdg-data"
+    xdg_cache_dir = tmp_path / "xdg-cache"
+    for path in (home_dir, xdg_config_dir, xdg_data_dir, xdg_cache_dir):
+        path.mkdir()
+
     config_dir = tmp_path / "config"
     config_dir.mkdir()
+    monkeypatch.setenv("HOME", str(home_dir))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_dir))
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg_data_dir))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(xdg_cache_dir))
     monkeypatch.setenv("MCS_CONFIG_DIR", str(config_dir))
     monkeypatch.setenv("MCS_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("MCS_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.delenv("MCS_PROFILE", raising=False)
     monkeypatch.delenv("MCS_TIER_OVERRIDE", raising=False)
     monkeypatch.delenv("MCS_PROFILES_DIR", raising=False)
+    # ``commands.skill`` computes global install paths at import time.
+    # Rebase them so tests using ``isolated_config`` do not inspect or
+    # mutate a developer's real global skill installs.
+    import maxcompute_semantic.commands.skill as _skill
+
+    global_paths = {}
+    for platform in _skill._PLATFORM_REGISTRY:
+        base = xdg_config_dir if platform.xdg else home_dir
+        global_paths[platform.id] = base.joinpath(*platform.global_segments) / _skill._SKILL_NAME
+    monkeypatch.setattr(_skill, "_XDG_CONFIG_HOME", xdg_config_dir, raising=False)
+    monkeypatch.setattr(_skill, "_GLOBAL_PATHS", global_paths, raising=False)
     # Suppress the wizard's import-discovery hook — tests that need to
     # exercise it patch the module's discover_creds directly.
     monkeypatch.setattr(
