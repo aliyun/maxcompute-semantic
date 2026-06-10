@@ -186,8 +186,8 @@ def phase_discover_udfs(
     for udf in udfs:
         # udf is expected to be a dict with name, kind, signature, class_name, description
         db.upsert_udf(
-            name=udf["name"],
-            kind=udf.get("kind", ""),
+            name=udf["name"] or "",
+            kind=udf.get("kind") or "",
             signature=udf.get("signature"),
             class_name=udf.get("class_name"),
             description=udf.get("description"),
@@ -1626,7 +1626,7 @@ def phase_infer_joins_heuristic(
             shared = set(regular_cols[left_key]) & set(regular_cols[right_key])
             for col_name in shared:
                 left_col = regular_cols[left_key][col_name]
-                right_col = regular_cols[right_key][col_name]
+                right_col_data = regular_cols[right_key][col_name]
                 # Dedup against patterns 0/1/2: when ``link_to`` /
                 # ``xxx_id`` already emitted an edge for this exact
                 # (left_table, col_name) → (right_table, col_name) pair
@@ -1650,14 +1650,14 @@ def phase_infer_joins_heuristic(
                 # See ``_looks_like_temporal_column`` for the full
                 # rationale (event-table ``creationdate`` /
                 # ``created_at`` collisions are the motivating case).
-                if _looks_like_temporal_column(left_col) and _looks_like_temporal_column(right_col):
+                if _looks_like_temporal_column(left_col) and _looks_like_temporal_column(right_col_data):
                     continue
                 # Drop URL-only collisions: each table's URL bag is a per-
                 # entity content URI, not a foreign-key reference. See
                 # ``_looks_like_url_column`` — multi-entity schemas
                 # where each table carries its own ``url`` column
                 # motivated this.
-                if _looks_like_url_column(left_col) and _looks_like_url_column(right_col):
+                if _looks_like_url_column(left_col) and _looks_like_url_column(right_col_data):
                     continue
                 # Drop numeric-value collisions: a shared NUMERIC column
                 # without an identity-suggesting suffix (``amount``,
@@ -1668,7 +1668,7 @@ def phase_infer_joins_heuristic(
                 # ≈ 0.97 it trips the PK-like gate even though monetary
                 # amounts are values, not entity keys.
                 if _looks_like_numeric_value_column(left_col) and _looks_like_numeric_value_column(
-                    right_col
+                    right_col_data
                 ):
                     continue
                 # Drop label-column collisions: a shared STRING column
@@ -1678,9 +1678,9 @@ def phase_infer_joins_heuristic(
                 # distinct display name, so both sides have high
                 # uniqueness and trip the PK-like gate even though the
                 # value spaces don't overlap.
-                if _looks_like_label_column(left_col) and _looks_like_label_column(right_col):
+                if _looks_like_label_column(left_col) and _looks_like_label_column(right_col_data):
                     continue
-                if _looks_like_primary_key(left_col) and _looks_like_primary_key(right_col):
+                if _looks_like_primary_key(left_col) and _looks_like_primary_key(right_col_data):
                     # Two PK-like columns sharing a name. When the name
                     # is a generic identifier (``id``, ``uuid``, ``pk``,
                     # ``key``, ``code``, ≤3 chars), this is almost always
@@ -1740,7 +1740,7 @@ def phase_infer_joins_heuristic(
                 # absent-parent case), and FK→PK via uniqueness.
                 fk_shaped = _looks_like_fk_name(col_name, name_index)
                 left_ratio = left_col.get("uniqueness_ratio")
-                right_ratio = right_col.get("uniqueness_ratio")
+                right_ratio = right_col_data.get("uniqueness_ratio")
                 one_side_pk_like = (
                     left_ratio is not None and left_ratio >= PK_LIKE_UNIQUENESS_THRESHOLD
                 ) or (right_ratio is not None and right_ratio >= PK_LIKE_UNIQUENESS_THRESHOLD)
@@ -1769,7 +1769,7 @@ def phase_infer_joins_heuristic(
                     right_targets = fk_targets.get((right_key[0], right_key[1], col_name))
                     if left_targets and right_targets and left_targets & right_targets:
                         continue
-                cardinality = _infer_cardinality(left_col, right_col)
+                cardinality = _infer_cardinality(left_col, right_col_data)
                 # Boost FK→PK shapes above the 0.5 floor when uniqueness
                 # stats are available — a column that's unique on one side
                 # and non-unique on the other is a much stronger join
@@ -1784,7 +1784,7 @@ def phase_infer_joins_heuristic(
                 _shape, adjusted_conf = _apply_join_shape_adjustment(
                     base_conf=0.5,
                     left_uniqueness=left_col.get("uniqueness_ratio"),
-                    right_uniqueness=right_col.get("uniqueness_ratio"),
+                    right_uniqueness=right_col_data.get("uniqueness_ratio"),
                 )
                 _emit(
                     left_key,

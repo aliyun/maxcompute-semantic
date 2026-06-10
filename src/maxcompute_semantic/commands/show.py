@@ -322,9 +322,9 @@ def _show_single_table(r: Renderer, p: Profile, pdir: Path, table: str) -> None:
         sk: str = p.sources[0].source_key()
     else:
         if not db_path.exists():
-            err = _err_no_package(p)
-            r.error(err)
-            sys.exit(err.exit_code)
+            err_pkg: McsError = _err_no_package(p)
+            r.error(err_pkg)
+            sys.exit(err_pkg.exit_code)
         db = PackageDB(db_path)
         try:
             resolved, err = _resolve_source_key(p, table, db)
@@ -338,9 +338,9 @@ def _show_single_table(r: Renderer, p: Profile, pdir: Path, table: str) -> None:
 
     md_path = pdir / sk / f"{table}.md"
     if not md_path.exists():
-        err = _err_table_not_found(p, table)
-        r.error(err)
-        sys.exit(err.exit_code)
+        err_miss: McsError = _err_table_not_found(p, table)
+        r.error(err_miss)
+        sys.exit(err_miss.exit_code)
 
     content = md_path.read_text(encoding="utf-8")
 
@@ -394,9 +394,9 @@ def _show_multi_tables(r: Renderer, p: Profile, pdir: Path, names: list[str]) ->
     db: PackageDB | None = None
     if needs_db:
         if not db_path.exists():
-            err = _err_no_package(p)
-            r.error(err)
-            sys.exit(err.exit_code)
+            err_pkg: McsError = _err_no_package(p)
+            r.error(err_pkg)
+            sys.exit(err_pkg.exit_code)
         db = PackageDB(db_path)
 
     error_count = 0

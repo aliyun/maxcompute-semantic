@@ -15,8 +15,9 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-import sqlglot
 from sqlglot import errors, exp
+
+from maxcompute_semantic.dialect import parse_mc_one
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ def analyze_sql_pattern(sql: str) -> SqlPattern:
     granular key without changing every caller.
     """
     try:
-        parsed = sqlglot.parse_one(sql)
+        parsed = parse_mc_one(sql)
         normalized = parsed.copy()
         normalized = normalized.transform(
             lambda node: exp.Placeholder() if isinstance(node, exp.Literal) else node
@@ -170,7 +171,7 @@ def _normalize_expr_sql(expression: exp.Expression) -> str:
     return re.sub(r"\s+", " ", normalized.sql()).strip().lower()
 
 
-def _redact_projection_inplace(parsed: exp.Expression) -> None:
+def _redact_projection_inplace(parsed: exp.Expr) -> None:
     placeholder = exp.Column(this=exp.Identifier(this="<col>", quoted=False))
     for select in parsed.find_all(exp.Select):
         new_expressions: list[exp.Expression] = []
@@ -183,7 +184,7 @@ def _redact_projection_inplace(parsed: exp.Expression) -> None:
         select.set("expressions", new_expressions)
 
 
-def _redact_join_keys_inplace(parsed: exp.Expression) -> None:
+def _redact_join_keys_inplace(parsed: exp.Expr) -> None:
     placeholder_col = exp.Column(this=exp.Identifier(this="<col>", quoted=False))
     for join in parsed.find_all(exp.Join):
         on_expr = join.args.get("on")
@@ -216,7 +217,7 @@ def redact_projection_columns(canonical_sql: str) -> str:
     must commit to a specific projection.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_projection_inplace(parsed)
@@ -252,7 +253,7 @@ def redact_join_keys(canonical_sql: str) -> str:
     Cross joins / joins without an ON clause pass through unchanged.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_join_keys_inplace(parsed)
@@ -278,7 +279,7 @@ def redact_for_display(canonical_sql: str) -> str:
     the parser.
     """
     try:
-        parsed = sqlglot.parse_one(canonical_sql)
+        parsed = parse_mc_one(canonical_sql)
     except errors.SqlglotError:
         return canonical_sql
     _redact_projection_inplace(parsed)

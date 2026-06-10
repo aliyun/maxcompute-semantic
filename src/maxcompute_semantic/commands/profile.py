@@ -34,7 +34,7 @@ from maxcompute_semantic.versioning import (
 )
 
 if TYPE_CHECKING:
-    from maxcompute_semantic.commands._import_creds import McsProfileCandidate
+    from maxcompute_semantic.commands._import_creds import ImportedCreds, McsProfileCandidate
 
 
 @click.group(name="profile")
@@ -51,7 +51,7 @@ def _renderer(ctx: click.Context) -> Renderer:
 
 
 def _confirm_imported_process_auth(
-    creds,
+    creds: ImportedCreds,
     *,
     trust_process_command: bool = False,
     require_flag_without_tty: bool = False,
@@ -1381,7 +1381,6 @@ def import_creds_cmd(
     from maxcompute_semantic.auth.profile_store import upsert
     from maxcompute_semantic.auth.schema import DataSource, Profile
     from maxcompute_semantic.commands._import_creds import (
-        ImportedCreds,
         _maxc_default_config_path,
         _odpscmd_default_config_path,
         discover_creds,

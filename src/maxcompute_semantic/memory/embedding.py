@@ -40,7 +40,7 @@ def _probe_endpoint(url: str, timeout: int = _PROBE_TIMEOUT_SEC) -> bool:
     try:
         req = urllib.request.Request(url, method="HEAD")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status < 400
+            return bool(resp.status < 400)
     except Exception:
         return False
 
@@ -96,7 +96,7 @@ def embed(text: str) -> list[float] | None:
     if model is None:
         return None
     vec = model.encode(text, normalize_embeddings=True)
-    return vec.tolist()
+    return list(vec.tolist())
 
 
 def embed_batch(texts: list[str]) -> list[list[float]] | None:

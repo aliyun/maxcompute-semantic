@@ -30,12 +30,16 @@ dev = [
     "mypy>=1.7",
     "ruff>=0.1",
     "jsonschema>=4.18",
+    "antlr4-python3-runtime==4.13.2",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.scripts]
 mcs = "maxcompute_semantic.cli:_cli_main"
 maxcompute-semantic = "maxcompute_semantic.cli:_cli_main"
+
+[project.entry-points."sqlglot.dialects"]
+maxcompute = "maxcompute_semantic.dialect._dialect:MaxCompute"
 
 [build-system]
 requires = ["hatchling"]
@@ -97,3 +101,7 @@ strict_optional = true
 warn_unused_ignores = true
 warn_return_any = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["sqlite_vec", "sentence_transformers", "jieba"]
+ignore_missing_imports = true

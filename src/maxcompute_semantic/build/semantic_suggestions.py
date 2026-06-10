@@ -388,7 +388,7 @@ def _classify_column(
         if uniqueness is not None and (
             uniqueness >= 0.99 or (is_bare_pk_name and uniqueness >= 0.95)
         ):
-            subtype = "primary"
+            subtype: str | None = "primary"
         else:
             subtype = "foreign"
         best_role = "identifier"

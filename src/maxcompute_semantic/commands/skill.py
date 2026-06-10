@@ -21,8 +21,12 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
+
+if TYPE_CHECKING:
+    from click.shell_completion import CompletionItem
 
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic.commands.skill_catalog import (
@@ -159,7 +163,7 @@ class _PlatformParam(click.ParamType):
                 f"Run 'mcs skill list' to see available platforms.",
             )
 
-    def shell_complete(self, ctx: object, param: object, incomplete: str):
+    def shell_complete(self, ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
         """Tab-complete all known platform IDs including deprecated aliases."""
         from click.shell_completion import CompletionItem
 

@@ -155,6 +155,16 @@ def _referenced_tables(sql: str) -> list[exp.Table]:
 
 def compute_model_coverage(ctx: ReviewContext) -> dict[str, int]:
     """Build the ``model_coverage`` envelope dict for *ctx*."""
+    if ctx.db is None:
+        return {
+            "tables_referenced": 0,
+            "tables_with_ai_context": 0,
+            "columns_referenced": 0,
+            "columns_with_semantic_role": 0,
+            "joins_used_in_sql": 0,
+            "joins_declared": 0,
+            "coverage_pct": 0,
+        }
     referenced_tables = _referenced_tables(ctx.sql)
     # ``list_joins()`` rows key on bare table name (no catalog/db
     # disambiguator), so the joins-declared check below must compare

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
 from odps import ODPS  # type: ignore[import-untyped]
-from odps import errors as odps_errors  # type: ignore[import-untyped]
+from odps import errors as odps_errors
 from odps.accounts import StsAccount  # type: ignore[import-untyped]
 
 try:

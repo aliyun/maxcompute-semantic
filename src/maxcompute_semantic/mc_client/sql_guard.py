@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sqlglot
 
+from maxcompute_semantic.dialect import parse_mc
 from maxcompute_semantic.mc_client.errors import WriteOpRejectedError
 
 _READ_EXPR_TYPES: tuple[type[sqlglot.exp.Expression], ...] = (
@@ -61,7 +62,7 @@ def classify_sql(sql: str) -> str:
     """Return ``"read"``, ``"write"``, or ``"unparseable"`` for *sql*."""
     _last_parse_error.error = ""
     try:
-        statements = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.RAISE)
+        statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
     except Exception as exc:
         _last_parse_error.error = str(exc)
         return "unparseable"

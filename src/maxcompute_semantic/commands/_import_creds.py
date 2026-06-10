@@ -64,6 +64,7 @@ from __future__ import annotations
 import configparser
 import shlex
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -278,7 +279,7 @@ def parse_odpscmd_config(path: Path) -> ImportedCreds | None:
     )
 
 
-_PARSERS: dict[str, callable] = {  # type: ignore[type-arg]
+_PARSERS: dict[str, Callable[[Path], ImportedCreds | None]] = {
     "maxc": parse_maxc_config,
     "odpscmd": parse_odpscmd_config,
 }

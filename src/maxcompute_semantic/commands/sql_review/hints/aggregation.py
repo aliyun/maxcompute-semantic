@@ -58,6 +58,8 @@ def hint_dimension_aggregated(ctx: ReviewContext) -> list[Hint]:
     silently pick whichever source happens to be listed first — and
     fire a hint against the wrong source's annotation.
     """
+    if ctx.db is None:
+        return []
     hints: list[Hint] = []
     # Dedup key is FQN-aware: bare ``(func, table, col)`` would collapse
     # ``proj_a.default.orders.amount`` and ``proj_b.default.orders.amount``

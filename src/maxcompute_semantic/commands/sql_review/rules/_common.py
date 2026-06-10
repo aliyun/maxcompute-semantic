@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import sqlglot
 from sqlglot import exp
 
+from maxcompute_semantic.dialect import parse_mc
+
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import DataSource
     from maxcompute_semantic.commands.sql_review.types import ReviewContext
@@ -25,7 +27,7 @@ def parse_statements(sql: str) -> list[exp.Expression]:
     of the prior ``is not None`` comprehension.
     """
     try:
-        parsed = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.IGNORE)
+        parsed = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
     except sqlglot.errors.SqlglotError:
         return []
     return [s for s in parsed if isinstance(s, exp.Expression)]
@@ -147,6 +149,8 @@ def resolve_source_for_table(
 
     Returns ``None`` when no source contains the table.
     """
+    if ctx.db is None:
+        return None
     if origin is not None and origin.catalog:
         sk: str | None = ctx.db.lookup_source_key(
             origin.catalog, origin.db or "default", table_name
@@ -164,6 +168,8 @@ def _keys_for_sources(
     table_name: str,
 ) -> list[str]:
     out: list[str] = []
+    if ctx.db is None:
+        return out
     for src in sources:
         sk: str | None = ctx.db.lookup_source_key(src.project, src.schema, table_name)
         if sk:

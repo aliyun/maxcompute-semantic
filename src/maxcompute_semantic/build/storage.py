@@ -26,7 +26,7 @@ import json
 import os
 import sqlite3
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
 from difflib import get_close_matches
 from pathlib import Path
@@ -905,7 +905,7 @@ def _migrate_v12_to_v13(conn: sqlite3.Connection) -> None:
 # from the on-disk ``user_version`` to ``_SCHEMA_VERSION`` one step at
 # a time.  Gaps in the chain mean the migration is unsupported and the
 # caller must handle a ``RebuildRequiredError``.
-_MIGRATIONS: dict[tuple[int, int], object] = {
+_MIGRATIONS: dict[tuple[int, int], Callable[[sqlite3.Connection], None]] = {
     (3, 4): _migrate_v3_to_v4,
     (4, 5): _migrate_v4_to_v5,
     (5, 6): _migrate_v5_to_v6,
@@ -1191,7 +1191,7 @@ class PackageDB:
                         (schema_hash, now, errors_json, table_type, row[0]),
                     )
                 self._conn.commit()
-                return row[0]
+                return int(row[0])
             cur = self._conn.execute(
                 "INSERT INTO tables "
                 "(source_key, name, schema_hash, last_built_at, errors_json, table_type) "
@@ -1199,6 +1199,7 @@ class PackageDB:
                 (source_key, name, schema_hash, now, errors_json, table_type),
             )
             self._conn.commit()
+            assert cur.lastrowid is not None
             return cur.lastrowid
 
     def get_table(self, source_key: str, name: str) -> dict | None:
@@ -1658,6 +1659,7 @@ class PackageDB:
                 (kind, payload_json, retrieval_text, fts_text, tags_json, now),
             )
             memory_id = cur.lastrowid
+            assert memory_id is not None
             self._conn.commit()
             if _auto_vector_enabled():
                 self._index_vector(memory_id, retrieval_text)
@@ -1716,7 +1718,7 @@ class PackageDB:
                     "SELECT COUNT(*) FROM memory_entries WHERE kind=? AND created_at<?",
                     (kind, before),
                 ).fetchone()
-                count = result[0]
+                count = int(result[0])
                 self._conn.execute(
                     "DELETE FROM memory_entries WHERE kind=? AND created_at<?",
                     (kind, before),
@@ -1731,7 +1733,7 @@ class PackageDB:
                 result = self._conn.execute(
                     "SELECT COUNT(*) FROM memory_entries WHERE kind=?", (kind,)
                 ).fetchone()
-                count = result[0]
+                count = int(result[0])
                 self._conn.execute("DELETE FROM memory_entries WHERE kind=?", (kind,))
             elif before:
                 ids_to_delete = [
@@ -1743,14 +1745,14 @@ class PackageDB:
                 result = self._conn.execute(
                     "SELECT COUNT(*) FROM memory_entries WHERE created_at<?", (before,)
                 ).fetchone()
-                count = result[0]
+                count = int(result[0])
                 self._conn.execute("DELETE FROM memory_entries WHERE created_at<?", (before,))
             else:
                 ids_to_delete = [
                     r[0] for r in self._conn.execute("SELECT id FROM memory_entries").fetchall()
                 ]
                 result = self._conn.execute("SELECT COUNT(*) FROM memory_entries").fetchone()
-                count = result[0]
+                count = int(result[0])
                 self._conn.execute("DELETE FROM memory_entries")
             for mid in ids_to_delete:
                 delete_vector(self._conn, mid)
@@ -2460,7 +2462,7 @@ class PackageDB:
     def clear_join_candidates(self) -> int:
         """Delete all generated join candidates and return the deleted row count."""
         with self._lock:
-            count = self._conn.execute("SELECT COUNT(*) FROM join_candidates").fetchone()[0]
+            count = int(self._conn.execute("SELECT COUNT(*) FROM join_candidates").fetchone()[0])
             self._conn.execute("DELETE FROM join_candidates")
             self._conn.commit()
             return count
@@ -2662,7 +2664,8 @@ class PackageDB:
                         now,
                     ),
                 )
-                pid = int(cur.lastrowid)
+                assert cur.lastrowid is not None
+                pid = cur.lastrowid
             self._conn.commit()
             return pid
 
@@ -2745,17 +2748,21 @@ class PackageDB:
         """Delete generated annotation suggestions and return the deleted row count."""
         with self._lock:
             if source_key is not None:
-                count = self._conn.execute(
-                    "SELECT COUNT(*) FROM annotation_suggestions WHERE source_key=?",
-                    (source_key,),
-                ).fetchone()[0]
+                count = int(
+                    self._conn.execute(
+                        "SELECT COUNT(*) FROM annotation_suggestions WHERE source_key=?",
+                        (source_key,),
+                    ).fetchone()[0]
+                )
                 self._conn.execute(
                     "DELETE FROM annotation_suggestions WHERE source_key=?", (source_key,)
                 )
             else:
-                count = self._conn.execute(
-                    "SELECT COUNT(*) FROM annotation_suggestions"
-                ).fetchone()[0]
+                count = int(
+                    self._conn.execute(
+                        "SELECT COUNT(*) FROM annotation_suggestions"
+                    ).fetchone()[0]
+                )
                 self._conn.execute("DELETE FROM annotation_suggestions")
             self._conn.commit()
             return count

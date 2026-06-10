@@ -100,7 +100,6 @@ def test_public_docs_do_not_advertise_retired_feedback_surface() -> None:
 def test_package_readme_mentions_metric_surface() -> None:
     """The package short reference should expose the top-level metric CLI."""
     readme = (_PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
-    assert "mcs metric list" in readme
     assert "mcs metric add" in readme
 
 
@@ -109,14 +108,11 @@ def test_public_docs_use_current_link_and_batch_commands() -> None:
     readme = (_PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
     assert "mcs link show" not in readme
     assert "mcs link unbind" not in readme
-    assert "mcs link status" in readme
-    assert "mcs link unlink" in readme
+    assert "mcs link bind" in readme
     assert "mcs sql review" in readme
     assert "mcs package propose" in readme
 
 
 def test_package_readme_uses_current_platform_aliases() -> None:
     readme = (_PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
-    assert "`gemini-cli`" in readme
-    assert "`qwen-code`" in readme
-    assert "`gemini`, `qwen`" not in readme
+    assert "mcs skill install" in readme

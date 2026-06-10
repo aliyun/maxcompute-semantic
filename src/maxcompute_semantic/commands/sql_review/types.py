@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from maxcompute_semantic.build.workload import SqlWorkloadEvidence
+from maxcompute_semantic.errors.base import ErrorCode
 from maxcompute_semantic.mc_client.errors import McsError
 
 Severity = Literal["error", "warning"]
@@ -104,5 +105,5 @@ class ReviewUnsupportedError(McsError):
     re-classifying the SQL.
     """
 
-    code = "MCS_REVIEW_UNSUPPORTED"
+    code = ErrorCode.REVIEW_UNSUPPORTED
     exit_code = 2

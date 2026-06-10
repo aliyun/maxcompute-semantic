@@ -40,6 +40,8 @@ def check_string_date_compare(ctx: ReviewContext) -> list[Issue]:
     because ``-`` is ``0x2D`` and ``1`` is ``0x31``), and missing zero-
     padding can also slip past naive range filters.
     """
+    if ctx.db is None:
+        return []
     issues: list[Issue] = []
     for stmt in parse_statements(ctx.sql):
         ctes = cte_names(stmt)

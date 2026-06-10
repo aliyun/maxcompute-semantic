@@ -89,12 +89,15 @@ from maxcompute_semantic.mc_client.tier import get_tier
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import Profile
     from maxcompute_semantic.build.storage import PackageDB
+    from maxcompute_semantic.mc_client.client import MaxComputeClient
 
 
 def _parse_tables(sql: str) -> list[sqlglot.exp.Table]:
     """Flat list of ``Table`` references in *sql*; ``[]`` on parse failure."""
     try:
-        statements = sqlglot.parse(sql, error_level=sqlglot.ErrorLevel.IGNORE)
+        from maxcompute_semantic.dialect import parse_mc
+
+        statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
     except Exception:
         return []
     tables: list[sqlglot.exp.Table] = []
@@ -323,7 +326,7 @@ def _client_and_schema_for_sql(
     profile: str | None,
     schema: str | None,
     sql: str,
-):
+) -> tuple[MaxComputeClient, str]:
     """Resolve routed client + tier-aware schema for SQL execution verbs."""
     target_project = _route_project(project, profile, sql)
     client = make_client_for_project(target_project, profile_name=profile)

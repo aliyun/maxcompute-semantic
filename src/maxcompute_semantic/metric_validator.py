@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 import sqlglot
 from sqlglot import exp
 
+from maxcompute_semantic.dialect import parse_mc_one
+
 if TYPE_CHECKING:
     from maxcompute_semantic.build.storage import PackageDB
 
@@ -39,7 +41,7 @@ def validate_metric_expression(expression: str, db: PackageDB) -> ValidationResu
     issue so the user can notice schema drift over time.
     """
     try:
-        tree = sqlglot.parse_one(expression)
+        tree = parse_mc_one(expression)
     except sqlglot.errors.ParseError as exc:
         return ValidationResult(ok=False, error=f"could not parse expression: {exc}")
     except Exception as exc:  # noqa: BLE001 — sqlglot raises many types

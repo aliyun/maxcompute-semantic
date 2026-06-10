@@ -46,6 +46,7 @@ from maxcompute_semantic.errors.base import McsError
 
 if TYPE_CHECKING:
     from maxcompute_semantic.build.storage import PackageDB
+    from maxcompute_semantic.mc_client.client import MaxComputeClient
 
 
 @dataclass(frozen=True)
@@ -186,7 +187,7 @@ def resolve_profile_for_project(
 def make_client_for_project(
     project: str | None = None,
     profile_name: str | None = None,
-):
+) -> MaxComputeClient:
     """Create a MaxComputeClient using the standard profile resolution chain."""
     from maxcompute_semantic.mc_client.client import MaxComputeClient
 
