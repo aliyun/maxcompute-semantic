@@ -254,7 +254,7 @@ class MaxComputeParser(HiveParser):
             return self._parse_range_clustered_by()
         if self._match_text_seq("AUTO"):
             return self._parse_auto_partition()
-        return super()._parse_property()
+        return super()._parse_property()  # type: ignore[return-value]
 
     def _parse_named_expression(self) -> t.Optional[exp.Expression]:
         """Parse ``expr [AS alias]`` for AUTO PARTITIONED BY."""
@@ -262,4 +262,4 @@ class MaxComputeParser(HiveParser):
         if self._match(TokenType.ALIAS):
             alias = self._parse_id_var()
             return exp.Alias(this=this, alias=alias)
-        return this
+        return t.cast(t.Optional[exp.Expression], this)

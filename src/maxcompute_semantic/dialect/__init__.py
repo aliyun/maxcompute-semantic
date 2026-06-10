@@ -17,15 +17,12 @@ this module has been imported.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 import sqlglot
 from sqlglot import exp
 
 from maxcompute_semantic.dialect._dialect import MaxCompute  # noqa: F401 — triggers registration
-
-if TYPE_CHECKING:
-    pass
 
 _DIALECT = "maxcompute"
 
@@ -36,9 +33,11 @@ def parse_mc(
     error_level: sqlglot.ErrorLevel = sqlglot.ErrorLevel.WARN,
 ) -> list[exp.Expression | None]:
     """Parse *sql* as MaxCompute SQL, returning a list of statements."""
-    return sqlglot.parse(sql, read=_DIALECT, error_level=error_level)
+    result: Any = sqlglot.parse(sql, read=_DIALECT, error_level=error_level)
+    return result  # type: ignore[no-any-return]
 
 
 def parse_mc_one(sql: str) -> exp.Expression:
     """Parse *sql* as a single MaxCompute statement."""
-    return sqlglot.parse_one(sql, read=_DIALECT)
+    result: Any = sqlglot.parse_one(sql, read=_DIALECT)
+    return result  # type: ignore[no-any-return]

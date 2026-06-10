@@ -94,12 +94,12 @@ def _partitioned_by_sql(
     """Render PARTITIONED BY or AUTO PARTITIONED BY."""
     schema = expression.this
     if schema and any(
-        isinstance(col, exp.Alias) or isinstance(col, exp.TimestampTrunc)
+        isinstance(col, (exp.Alias, exp.TimestampTrunc))
         for col in (schema.expressions if isinstance(schema, exp.Schema) else [])
     ):
         cols = self.expressions(schema, flat=True)
         return f"AUTO PARTITIONED BY({cols})"
-    return self.partitionedby_sql(expression)
+    return f"PARTITIONED BY {self.sql(expression, 'this')}"
 
 
 def _clusteredbyproperty_sql(
