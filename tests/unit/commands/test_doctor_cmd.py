@@ -11,6 +11,7 @@ the detail string instead of truncating raw exception text.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -185,7 +186,16 @@ class TestLocalConfigChecks:
         ypath.parent.mkdir(parents=True, exist_ok=True)
         ypath.write_text("profiles: {}\n", encoding="utf-8")
 
-        with patch("maxcompute_semantic.commands.doctor.os.stat", side_effect=OSError("no stat")):
+        original_stat = os.stat
+
+        def fail_direct_config_stat(path, *args, **kwargs):
+            if kwargs.get("follow_symlinks") is True:
+                return original_stat(path, *args, **kwargs)
+            if Path(path) in {ypath.parent, ypath}:
+                raise OSError("no stat")
+            return original_stat(path, *args, **kwargs)
+
+        with patch("maxcompute_semantic.commands.doctor.os.stat", side_effect=fail_direct_config_stat):
             name, status, detail = _check_config_permissions()
 
         assert name == "config_permissions"
