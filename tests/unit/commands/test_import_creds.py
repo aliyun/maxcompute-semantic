@@ -23,8 +23,13 @@ from maxcompute_semantic.auth.schema import (
 from maxcompute_semantic.commands._import_creds import (
     ImportedCreds,
     _classify_auth_kind,
+    _default_locations,
+    _maxc_default_config_path,
+    _odpscmd_default_config_path,
     discover_mcs_profiles,
+    discover_creds,
     is_canonical_ncs_process_auth,
+    parse_creds_at,
     parse_maxc_config,
     parse_odpscmd_config,
 )
@@ -161,6 +166,92 @@ auth:
         p.write_text(":\n  - [garbage", encoding="utf-8")
         assert parse_maxc_config(p) is None
 
+    def test_non_mapping_yaml_is_not_importable(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text("- not\n- a\n- mapping\n", encoding="utf-8")
+
+        assert parse_maxc_config(p) is None
+
+    def test_external_provider_rejects_missing_external_block(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text(
+            """\
+auth:
+  provider: external
+  project: p
+  endpoint: https://x/api
+""",
+            encoding="utf-8",
+        )
+
+        assert parse_maxc_config(p) is None
+
+    def test_external_provider_rejects_empty_process_command(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text(
+            """\
+auth:
+  provider: external
+  project: p
+  endpoint: https://x/api
+  external:
+    process_command: ""
+""",
+            encoding="utf-8",
+        )
+
+        assert parse_maxc_config(p) is None
+
+    def test_external_provider_bad_timeout_defaults_to_60(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text(
+            f"""\
+auth:
+  provider: external
+  project: p
+  endpoint: https://x/api
+  external:
+    process_command: {_NCS_CMD}
+    process_timeout: not-a-number
+""",
+            encoding="utf-8",
+        )
+
+        creds = parse_maxc_config(p)
+
+        assert creds is not None
+        assert isinstance(creds.auth, ProcessAuth)
+        assert creds.auth.timeout == 60
+
+    def test_external_provider_requires_project_and_endpoint(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text(
+            f"""\
+auth:
+  provider: external
+  external:
+    process_command: {_NCS_CMD}
+""",
+            encoding="utf-8",
+        )
+
+        assert parse_maxc_config(p) is None
+
+    def test_access_key_provider_requires_all_fields(self, tmp_path: Path) -> None:
+        p = tmp_path / "config.yaml"
+        p.write_text(
+            """\
+auth:
+  provider: access_key
+  access_id: X
+  endpoint: https://x/api
+default_project: p
+""",
+            encoding="utf-8",
+        )
+
+        assert parse_maxc_config(p) is None
+
 
 # ── parse_odpscmd_config ─────────────────────────────────────────────
 
@@ -273,6 +364,111 @@ end_point=https://x/api
 
     def test_missing_file(self, tmp_path: Path) -> None:
         assert parse_odpscmd_config(tmp_path / "nonexistent.ini") is None
+
+    def test_malformed_properties_file_is_not_importable(self, tmp_path: Path) -> None:
+        p = tmp_path / "odps_config.ini"
+        p.write_text("[unterminated\n", encoding="utf-8")
+
+        assert parse_odpscmd_config(p) is None
+
+    def test_process_bad_timeout_defaults_to_60(self, tmp_path: Path) -> None:
+        p = tmp_path / "odps_config.ini"
+        p.write_text(
+            """\
+account_provider=external
+processCommand=ncs create credential odpsuser --employee-id 1 -o template -t odpscmd
+processCommandTimeout=not-a-number
+project_name=p
+end_point=https://x/api
+""",
+            encoding="utf-8",
+        )
+
+        creds = parse_odpscmd_config(p)
+
+        assert creds is not None
+        assert isinstance(creds.auth, ProcessAuth)
+        assert creds.auth.timeout == 60
+
+
+# ── default discovery locations ──────────────────────────────────────
+
+
+class TestDefaultCredentialLocations:
+    def test_odpscmd_default_config_path_missing_binary(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "maxcompute_semantic.commands._import_creds.shutil.which",
+            lambda _name: None,
+        )
+
+        assert _odpscmd_default_config_path() is None
+
+    def test_odpscmd_default_config_path_resolves_sibling_conf(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        install_root = tmp_path / "odpscmd_public"
+        binary = install_root / "bin" / "odpscmd"
+        config = install_root / "conf" / "odps_config.ini"
+        binary.parent.mkdir(parents=True)
+        config.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\n", encoding="utf-8")
+        config.write_text(_VALID_ODPSCMD_INI, encoding="utf-8")
+        monkeypatch.setattr(
+            "maxcompute_semantic.commands._import_creds.shutil.which",
+            lambda _name: str(binary),
+        )
+
+        assert _odpscmd_default_config_path() == config
+
+    def test_maxc_default_config_path_uses_home(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        path = home / ".maxc" / "config.yaml"
+        path.parent.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+
+        assert _maxc_default_config_path() is None
+
+        path.write_text(_VALID_MAXC_YAML, encoding="utf-8")
+        assert _maxc_default_config_path() == path
+
+    def test_default_locations_preserve_maxc_then_odpscmd_order(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        maxc = tmp_path / "maxc.yaml"
+        odpscmd = tmp_path / "odps_config.ini"
+        monkeypatch.setattr(
+            "maxcompute_semantic.commands._import_creds._maxc_default_config_path",
+            lambda: maxc,
+        )
+        monkeypatch.setattr(
+            "maxcompute_semantic.commands._import_creds._odpscmd_default_config_path",
+            lambda: odpscmd,
+        )
+
+        assert _default_locations() == [("maxc", maxc), ("odpscmd", odpscmd)]
+
+    def test_parse_creds_at_unknown_label_returns_none(self, tmp_path: Path) -> None:
+        assert parse_creds_at("unknown", tmp_path / "creds") is None
+
+    def test_discover_creds_keeps_only_parseable_defaults(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        maxc = tmp_path / "config.yaml"
+        odpscmd = tmp_path / "odps_config.ini"
+        maxc.write_text("auth: {provider: ram_role}\n", encoding="utf-8")
+        odpscmd.write_text(_VALID_ODPSCMD_INI, encoding="utf-8")
+        monkeypatch.setattr(
+            "maxcompute_semantic.commands._import_creds._default_locations",
+            lambda: [("maxc", maxc), ("odpscmd", odpscmd)],
+        )
+
+        found = discover_creds()
+
+        assert len(found) == 1
+        assert found[0].source_label == "odpscmd"
+        assert found[0].compute_project == "odpscmd_proj"
 
 
 # ── ImportedCreds.display() ──────────────────────────────────────────

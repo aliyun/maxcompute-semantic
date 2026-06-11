@@ -1,0 +1,170 @@
+name: Lint (ruff + ty)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "site/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "site/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-diff:
+    name: ruff + ty diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install ruff + ty
+        run: |
+          uv tool install ruff
+          uv tool install ty
+
+      - name: Determine base ref
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF_NAME: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE_SHA=$(git merge-base "origin/$BASE_REF_NAME" HEAD)
+            echo "sha=${BASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "ref=origin/${BASE_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+            echo "sha=${BASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "ref=HEAD~1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run ruff + ty on HEAD
+        run: |
+          mkdir -p .lint-reports/head
+          ruff check src/ tests/ \
+            --output-format json --exit-zero \
+            > .lint-reports/head/ruff.json || true
+          ty check src/ tests/ \
+            --output-format gitlab --exit-zero \
+            > .lint-reports/head/ty.json || true
+
+      - name: Run ruff + ty on base (via git worktree)
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          mkdir -p .lint-reports/base
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
+            echo "Base SHA == HEAD SHA, skipping base scan."
+            echo '[]' > .lint-reports/base/ruff.json
+            echo '[]' > .lint-reports/base/ty.json
+          else
+            git worktree add --detach /tmp/lint-base "$BASE_SHA"
+            (
+              cd /tmp/lint-base
+              ruff check src/ tests/ \
+                --output-format json --exit-zero \
+                > "$GITHUB_WORKSPACE/.lint-reports/base/ruff.json" || true
+              ty check src/ tests/ \
+                --output-format gitlab --exit-zero \
+                > "$GITHUB_WORKSPACE/.lint-reports/base/ty.json" || true
+            )
+            git worktree remove --force /tmp/lint-base
+          fi
+
+      - name: Generate diff summary
+        env:
+          BASE_REF: ${{ steps.base.outputs.ref }}
+          HEAD_REF_PR: ${{ github.head_ref }}
+          HEAD_REF_PUSH: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            HEAD_REF="$HEAD_REF_PR"
+          else
+            HEAD_REF="$HEAD_REF_PUSH"
+          fi
+          python scripts/lint_diff.py \
+            --base-ruff .lint-reports/base/ruff.json \
+            --head-ruff .lint-reports/head/ruff.json \
+            --base-ty   .lint-reports/base/ty.json \
+            --head-ty   .lint-reports/head/ty.json \
+            --base-dir  /tmp/lint-base \
+            --base-ref  "$BASE_REF" \
+            --head-ref  "$HEAD_REF" \
+            --output    .lint-reports/summary.md
+          cat .lint-reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post / update PR comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('.lint-reports/summary.md', 'utf8');
+            const marker = '<!-- lint-diff-summary -->';
+            const fullBody = marker + '\n' + body;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }
+
+  ruff-blocking:
+    name: ruff enforcement (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install ruff
+        run: uv tool install ruff
+
+      - name: ruff check
+        run: ruff check src/ tests/

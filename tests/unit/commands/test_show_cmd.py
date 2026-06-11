@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -298,6 +299,119 @@ def test_show_table_sample_sql_filter_applies_before_limit(isolated_config: Path
     assert patterns[0]["sql"] == "SELECT id FROM cards WHERE id = 10"
 
 
+def test_sample_sql_extractors_skip_bad_and_unverified_entries() -> None:
+    from maxcompute_semantic.commands.show import (
+        _extract_sample_sql_patterns,
+        _extract_sample_sqls,
+    )
+
+    class FakeDB:
+        def list_sample_sqls(self, **_kwargs):
+            return [
+                {"payload_json": "{not json"},
+                {"payload_json": json.dumps(["not", "a", "dict"])},
+                {"payload_json": json.dumps({"sql": ""})},
+                {
+                    "payload_json": json.dumps(
+                        {
+                            "sql": "SELECT * FROM mined",
+                            "confidence": "mined_low",
+                        }
+                    )
+                },
+                {
+                    "payload_json": json.dumps(
+                        {
+                            "sql": "SELECT * FROM verified",
+                            "canonical_sql": "SELECT * FROM verified",
+                            "shape_key": "verified_shape",
+                            "frequency": 3,
+                            "verified_count": 2,
+                            "confidence": "user_verified",
+                            "provenance": "user_verified",
+                        }
+                    )
+                },
+            ]
+
+    db = FakeDB()
+
+    assert _extract_sample_sqls(db, _DEFAULT_SOURCE_KEY, "orders") == [
+        "SELECT * FROM verified"
+    ]
+    assert _extract_sample_sql_patterns(db, _DEFAULT_SOURCE_KEY, "orders") == [
+        {
+            "canonical_sql": "SELECT * FROM verified",
+            "shape_key": "verified_shape",
+            "normalizer_version": 0,
+            "frequency": 3,
+            "verified_count": 2,
+            "confidence": "user_verified",
+            "provenance": "user_verified",
+            "where_predicates": [],
+            "join_edges": [],
+            "sql": "SELECT * FROM verified",
+        }
+    ]
+
+
+def test_show_table_json_without_db_returns_markdown(isolated_config: Path) -> None:
+    from maxcompute_semantic._internal.paths import profile_data_dir
+
+    profile = _profile()
+    upsert(profile)
+    pdir = profile_data_dir(profile)
+    _seed_table(pdir, "orders", "# orders markdown\n")
+
+    result = CliRunner().invoke(
+        cli,
+        ["-f", "json", "show", "--table", "orders", "--profile", profile.name],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["data"] == {
+        "profile": profile.name,
+        "table": "orders",
+        "markdown": "# orders markdown\n",
+    }
+
+
+def test_show_overview_json_without_db_returns_markdown(isolated_config: Path) -> None:
+    from maxcompute_semantic._internal.paths import profile_data_dir
+
+    profile = _profile()
+    upsert(profile)
+    pdir = profile_data_dir(profile)
+    _seed_overview(pdir, "# overview only\n")
+
+    result = CliRunner().invoke(cli, ["-f", "json", "show", "--profile", profile.name])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["data"] == {
+        "profile": profile.name,
+        "table": None,
+        "markdown": "# overview only\n",
+    }
+
+
+def test_read_sources_state_handles_missing_bad_and_non_mapping(tmp_path: Path) -> None:
+    from maxcompute_semantic.commands.show import _read_sources_state
+
+    assert _read_sources_state(tmp_path) == {}
+
+    state = tmp_path / "_state.json"
+    state.write_text("{not json", encoding="utf-8")
+    assert _read_sources_state(tmp_path) == {}
+
+    state.write_text(json.dumps({"sources": ["not", "mapping"]}), encoding="utf-8")
+    assert _read_sources_state(tmp_path) == {}
+
+    state.write_text(json.dumps({"sources": {_DEFAULT_SOURCE_KEY: {"tier": "2"}}}), encoding="utf-8")
+    assert _read_sources_state(tmp_path) == {_DEFAULT_SOURCE_KEY: {"tier": "2"}}
+
+
 def test_show_tables_plain_concatenates_with_separator(isolated_config: Path) -> None:
     """``--tables T1,T2`` concatenates per-table markdown with ``---`` separator."""
     p = _profile()
@@ -411,6 +525,99 @@ def test_show_tables_json_returns_batch_payload(isolated_config: Path) -> None:
     assert by_name["customers"]["status"] == "ok"
     assert by_name["missing_table"]["status"] == "error"
     assert by_name["missing_table"]["error"]["code"] == "TableNotFound"
+
+
+def test_show_tables_json_all_errors_returns_error_envelope(isolated_config: Path) -> None:
+    from maxcompute_semantic._internal.paths import profile_data_dir
+    from maxcompute_semantic.build.storage import PackageDB
+
+    profile = Profile(
+        name="multi",
+        compute_project="test_proj",
+        endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=(
+            DataSource(project="proj_a", schema="default", tables="*"),
+            DataSource(project="proj_b", schema="default", tables="*"),
+        ),
+    )
+    upsert(profile)
+    pdir = profile_data_dir(profile)
+    pdir.mkdir(parents=True, exist_ok=True)
+    db = PackageDB(pdir / "package.db")
+    db.close()
+
+    result = CliRunner().invoke(
+        cli,
+        ["-f", "json", "show", "--tables", "missing", "--profile", profile.name],
+    )
+
+    assert result.exit_code == 5, result.output
+    payload = json.loads(result.output.strip().splitlines()[-1])
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "TableNotFound"
+    assert "none of the requested tables resolved" in payload["error"]["message"]
+
+
+def test_show_multi_source_single_table_resolves_via_package_db(
+    isolated_config: Path,
+) -> None:
+    from maxcompute_semantic._internal.paths import profile_data_dir
+    from maxcompute_semantic.build.storage import PackageDB
+
+    profile = Profile(
+        name="multi-source",
+        compute_project="test_proj",
+        endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=(
+            DataSource(project="proj_a", schema="default", tables="*"),
+            DataSource(project="proj_b", schema="default", tables="*"),
+        ),
+    )
+    upsert(profile)
+    pdir = profile_data_dir(profile)
+    pdir.mkdir(parents=True, exist_ok=True)
+    sk = "proj_b__default"
+    db = PackageDB(pdir / "package.db")
+    db.upsert_table(sk, "orders", "hash")
+    db.close()
+    _seed_table(pdir, "orders", "# orders from proj_b\n", source_key=sk)
+
+    result = CliRunner().invoke(cli, ["show", "--table", "orders", "--profile", profile.name])
+
+    assert result.exit_code == 0, result.output
+    assert "orders from proj_b" in result.output
+
+
+def test_show_multi_source_single_table_ambiguous_name_errors(
+    isolated_config: Path,
+) -> None:
+    from maxcompute_semantic._internal.paths import profile_data_dir
+    from maxcompute_semantic.build.storage import PackageDB
+
+    profile = Profile(
+        name="ambiguous",
+        compute_project="test_proj",
+        endpoint="https://service.cn-hangzhou.maxcompute.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=(
+            DataSource(project="proj_a", schema="default", tables="*"),
+            DataSource(project="proj_b", schema="default", tables="*"),
+        ),
+    )
+    upsert(profile)
+    pdir = profile_data_dir(profile)
+    pdir.mkdir(parents=True, exist_ok=True)
+    db = PackageDB(pdir / "package.db")
+    db.upsert_table("proj_a__default", "orders", "hash_a")
+    db.upsert_table("proj_b__default", "orders", "hash_b")
+    db.close()
+
+    result = CliRunner().invoke(cli, ["show", "--table", "orders", "--profile", profile.name])
+
+    assert result.exit_code == 2, result.output
+    assert "exists in 2 sources" in result.output
 
 
 def test_show_tables_empty_list_rejects(isolated_config: Path) -> None:

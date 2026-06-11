@@ -1,0 +1,30 @@
+name: PR-Agent AI Review
+
+on: # zizmor: ignore[dangerous-triggers] -- uses pull_request_target without checkout or PR code execution; PR-Agent only reads PR metadata and posts review comments.
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  pr_agent:
+    runs-on: ubuntu-latest
+    name: AI code review
+    timeout-minutes: 10
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: PR Agent action step
+        uses: Codium-ai/pr-agent@ffe1f89a4dafc7d8e88b9cf010a3233e30b49f43 # v0.36.0
+        env:
+          OPENAI_KEY: ${{ secrets.CI_OPENAI_KEY }}
+          OPENAI__API_BASE: ${{ secrets.CI_OPENAI_BASEURL }}
+          CONFIG__MODEL: ${{ secrets.CI_OPENAI_MODEL }}
+          CONFIG__FALLBACK_MODELS: ${{ secrets.CI_OPENAI_FALLBACK_MODELS }}
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: ${{ secrets.CI_OPENAI_MAX_TOKENS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTION_CONFIG.AUTO_DESCRIBE: "false"
+          GITHUB_ACTION_CONFIG.AUTO_REVIEW: "true"
+          GITHUB_ACTION_CONFIG.AUTO_IMPROVE: "false"

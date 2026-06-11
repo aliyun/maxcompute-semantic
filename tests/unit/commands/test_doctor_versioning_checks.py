@@ -43,10 +43,15 @@ from maxcompute_semantic.commands.doctor import (
     _check_forks_healthy,
     _check_git_available,
     _check_inference_logic_current,
+    _check_update_channel_reachable,
+    _check_update_version_current,
     _check_package_sql_parses,
     _check_profile_versioned,
     _check_working_tree_clean,
+    _run_update_check_fetch,
 )
+from maxcompute_semantic._internal.update_check import LatestMetadata
+from maxcompute_semantic.versioning.errors import GitNotAvailable
 from maxcompute_semantic.versioning.git_repo import GitRepo
 
 pytestmark = pytest.mark.skipif(
@@ -103,6 +108,30 @@ def test_git_available_warn_when_binary_missing(monkeypatch: pytest.MonkeyPatch)
     name, status, detail = _check_git_available()
     assert status == "warn"
     assert "MCS_NO_VERSIONING" in detail
+
+
+def test_git_available_fails_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(["git", "--version"], timeout=5)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    name, status, detail = _check_git_available()
+
+    assert name == "git_available"
+    assert status == "fail"
+    assert "timed out" in detail
+
+
+def test_git_available_fails_on_nonzero_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+    proc = subprocess.CompletedProcess(["git", "--version"], returncode=42, stdout="", stderr="bad")
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: proc)
+
+    name, status, detail = _check_git_available()
+
+    assert name == "git_available"
+    assert status == "fail"
+    assert "exited 42" in detail
 
 
 # ── _check_profile_versioned ────────────────────────────────────────
@@ -199,6 +228,54 @@ def test_working_tree_clean_skip_when_prereq_did_not_pass(
     assert status == "skip"
 
 
+def test_working_tree_clean_skip_when_profile_missing() -> None:
+    assert _check_working_tree_clean(None, "pass") == (
+        "working_tree_clean",
+        "skip",
+        "skipped: prerequisite failed",
+    )
+
+
+def test_working_tree_clean_skip_when_fork_parent_missing(isolated_config: Path) -> None:
+    fork = Profile(
+        name="ghost@x",
+        compute_project="acme",
+        endpoint="https://odps.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=(DataSource(project="acme", schema="default", tables="*"),),
+        kind="fork",
+        parent_profile="ghost",
+        git_sha="0" * 40,
+        package_path=isolated_config / "ghost_wt",
+    )
+
+    assert _check_working_tree_clean(fork, "pass") == (
+        "working_tree_clean",
+        "skip",
+        "skipped: fork parent missing from profiles.yaml",
+    )
+
+
+def test_working_tree_clean_fails_when_repo_status_raises(
+    versioned_profile: Profile,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BrokenRepo:
+        def __init__(self, root):
+            self.root = root
+
+        def has_uncommitted_changes(self):
+            raise RuntimeError("status broke")
+
+    monkeypatch.setattr("maxcompute_semantic.versioning.git_repo.GitRepo", BrokenRepo)
+
+    name, status, detail = _check_working_tree_clean(versioned_profile, "pass")
+
+    assert name == "working_tree_clean"
+    assert status == "fail"
+    assert "status broke" in detail
+
+
 # ── _check_forks_healthy ─────────────────────────────────────────────
 
 
@@ -261,6 +338,81 @@ def test_forks_healthy_fail_on_double_orphan(
     assert "double-orphan" in detail
 
 
+def test_forks_healthy_skips_when_profiles_yaml_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "maxcompute_semantic.auth.profile_store.load_all",
+        lambda: (_ for _ in ()).throw(RuntimeError("yaml broke")),
+    )
+
+    name, status, detail = _check_forks_healthy()
+
+    assert name == "forks_healthy"
+    assert status == "skip"
+    assert "yaml broke" in detail
+
+
+def test_forks_healthy_warns_when_parent_repo_missing(isolated_config: Path) -> None:
+    parent = Profile(
+        name="parent",
+        compute_project="acme",
+        endpoint="https://odps.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=(DataSource(project="acme", schema="default", tables="*"),),
+    )
+    fork = Profile(
+        name="parent@old",
+        compute_project="acme",
+        endpoint="https://odps.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=parent.sources,
+        kind="fork",
+        parent_profile=parent.name,
+        git_sha="0" * 40,
+        package_path=isolated_config / "fork-wt",
+    )
+    upsert(parent)
+    upsert(fork)
+    fork.package_path.mkdir(parents=True)
+
+    name, status, detail = _check_forks_healthy()
+
+    assert name == "forks_healthy"
+    assert status == "warn"
+    assert "orphan" in detail
+
+
+def test_forks_healthy_skips_when_git_unavailable_on_merge_base(
+    versioned_profile: Profile,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fork = Profile(
+        name="parent@old",
+        compute_project="acme",
+        endpoint="https://odps.aliyun.com/api",
+        auth=AkAuth("${env:AK_ID}", "${env:AK_SECRET}"),
+        sources=versioned_profile.sources,
+        kind="fork",
+        parent_profile=versioned_profile.name,
+        git_sha="0" * 40,
+        package_path=profile_data_dir(versioned_profile) / "fork-wt",
+    )
+    fork.package_path.mkdir()
+    upsert(fork)
+
+    def fake_merge_base(self, *args, **kwargs):
+        raise GitNotAvailable("git missing")
+
+    monkeypatch.setattr(GitRepo, "merge_base_is_ancestor", fake_merge_base)
+
+    name, status, detail = _check_forks_healthy()
+
+    assert name == "forks_healthy"
+    assert status == "skip"
+    assert "git binary not available" in detail
+
+
 # ── _check_package_sql_parses ───────────────────────────────────────
 
 
@@ -318,6 +470,30 @@ def test_package_sql_parses_fail_on_corrupt_sql_with_rollback_hint(
     assert "failed to parse" in detail
     assert "mcs profile reset --to" in detail
     assert rollback_sha[:7] in detail or rollback_sha[:12] in detail
+
+
+def test_package_sql_parses_fails_when_file_unreadable(
+    versioned_profile: Profile,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdir = profile_data_dir(versioned_profile)
+    sql_path = pdir / "package.sql"
+    sql_path.write_text("CREATE TABLE t (id INTEGER);\n", encoding="utf-8")
+
+    original_read_text = Path.read_text
+
+    def fake_read_text(self: Path, *args, **kwargs):
+        if self == sql_path:
+            raise OSError("permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+
+    name, status, detail = _check_package_sql_parses(versioned_profile)
+
+    assert name == "package_sql_parses"
+    assert status == "fail"
+    assert "permission denied" in detail
 
 
 # ── _check_inference_logic_current ──────────────────────────────────
@@ -396,6 +572,134 @@ def test_inference_logic_check_warns_on_missing_stamp(
     _, status, detail = _check_inference_logic_current()
     assert status == "warn"
     assert versioned_profile.name in detail
+
+
+def test_inference_logic_check_skips_when_profiles_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "maxcompute_semantic.auth.profile_store.load_all",
+        lambda: (_ for _ in ()).throw(RuntimeError("yaml broke")),
+    )
+
+    name, status, detail = _check_inference_logic_current()
+
+    assert name == "inference_logic_current"
+    assert status == "skip"
+    assert "yaml broke" in detail
+
+
+def test_inference_logic_check_ignores_unopenable_package_db(
+    versioned_profile: Profile,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdir = profile_data_dir(versioned_profile)
+    (pdir / "package.db").write_bytes(b"not sqlite")
+
+    class BrokenPackageDB:
+        def __init__(self, path):
+            raise RuntimeError("cannot open db")
+
+    monkeypatch.setattr("maxcompute_semantic.build.storage.PackageDB", BrokenPackageDB)
+
+    name, status, detail = _check_inference_logic_current()
+
+    assert name == "inference_logic_current"
+    assert status == "pass"
+    assert "no built profiles" in detail
+
+
+def test_update_channel_and_version_render_failure_and_skip() -> None:
+    fetch_result = (None, "HTTP 500 from https://example.test/latest.json")
+
+    channel = _check_update_channel_reachable(fetch_result)
+    version = _check_update_version_current(fetch_result)
+
+    assert channel[0] == "update_channel"
+    assert channel[1] == "fail"
+    assert "HTTP 500" in (channel[2] or "")
+    assert version == (
+        "update_version",
+        "skip",
+        "skipped: update_channel check failed (see line above)",
+    )
+
+
+def test_update_version_pass_and_upgrade_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    md_current = LatestMetadata(
+        schema_version=1,
+        latest_version="0.1.0",
+        min_supported="0.0.1",
+        disabled=[],
+        wheel_url="https://example.test/mcs.whl",
+        sha256="a" * 64,
+        released_at="2026-01-01T00:00:00Z",
+        notice="",
+    )
+    md_newer = LatestMetadata(
+        schema_version=1,
+        latest_version="999.0.0",
+        min_supported="0.0.1",
+        disabled=[],
+        wheel_url="https://example.test/mcs.whl",
+        sha256="a" * 64,
+        released_at="2026-01-01T00:00:00Z",
+        notice="upgrade now",
+    )
+
+    assert _check_update_version_current((md_current, ""))[1] == "pass"
+    result = _check_update_version_current((md_newer, ""))
+    assert result[1] == "skip"
+    assert "upgrade available" in (result[2] or "")
+    assert "upgrade now" in (result[2] or "")
+
+
+def test_run_update_check_fetch_classifies_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+
+    monkeypatch.setattr(
+        "maxcompute_semantic.commands.doctor.fetch_latest_metadata",
+        lambda: None,
+    )
+
+    def fake_urlopen(*args, **kwargs):
+        raise urllib.error.HTTPError(
+            url="https://example.test/latest.json",
+            code=503,
+            msg="unavailable",
+            hdrs=None,
+            fp=None,
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    md, err = _run_update_check_fetch()
+
+    assert md is None
+    assert "HTTP 503" in err
+
+
+def test_run_update_check_fetch_classifies_malformed_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, _limit):
+            return b"{not json"
+
+    monkeypatch.setattr(
+        "maxcompute_semantic.commands.doctor.fetch_latest_metadata",
+        lambda: None,
+    )
+    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: FakeResponse())
+
+    md, err = _run_update_check_fetch()
+
+    assert md is None
+    assert "unparseable response" in err
 
 
 # ── doctor_cmd integration: warn status renders & exits 0 ───────────

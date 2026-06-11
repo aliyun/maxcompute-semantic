@@ -3,22 +3,43 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "site/**"
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "site/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Set up Python
         run: uv python install ${{ matrix.python-version }}
@@ -28,14 +49,71 @@ jobs:
 
       - name: Check license headers
         run: |
-          missing=$(grep -rL 'SPDX-License-Identifier' src/ tests/ --include='*.py' | grep -v __pycache__ || true)
+          missing=$(
+            git ls-files '*.py' | while IFS= read -r file; do
+              grep -q 'SPDX-License-Identifier' "$file" || echo "$file"
+            done
+          )
           if [ -n "$missing" ]; then echo "Missing SPDX header in:"; echo "$missing"; exit 1; fi
-
-      - name: Lint
-        run: uv run ruff check src/ tests/
 
       - name: Type check
         run: uv run mypy src/
 
       - name: Test
-        run: uv run pytest tests/ -m 'not live' -x -q
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then
+            uv run pytest tests/ -m 'not live' -x -q \
+              --junitxml=junit-${{ matrix.python-version }}.xml \
+              --cov=maxcompute_semantic \
+              --cov-report=xml \
+              --cov-report=html:htmlcov \
+              --cov-report=term-missing:skip-covered \
+              --cov-fail-under=90
+          else
+            uv run pytest tests/ -m 'not live' -x -q \
+              --junitxml=junit-${{ matrix.python-version }}.xml
+          fi
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: junit-py${{ matrix.python-version }}
+          path: junit-${{ matrix.python-version }}.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload coverage HTML
+        if: always() && matrix.python-version == '3.10'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-html-py310
+          path: htmlcov
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Check diff coverage
+        if: github.event_name == 'pull_request' && matrix.python-version == '3.10'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set +e
+          uv run diff-cover coverage.xml \
+            --compare-branch "origin/$BASE_REF" \
+            --fail-under=80 \
+            --format markdown:diff-cover-report.md
+          diff_status=$?
+          cat diff-cover-report.md >> "$GITHUB_STEP_SUMMARY"
+          exit "$diff_status"
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.10'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: ./coverage.xml
+          disable_search: true
+          flags: unittests
+          name: maxcompute-semantic-py310
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          disable_telem: true

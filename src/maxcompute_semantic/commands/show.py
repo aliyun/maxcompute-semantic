@@ -71,6 +71,8 @@ def _extract_sample_sqls(db: Any, source_key: str, table: str) -> list[str]:
             payload = json.loads(entry["payload_json"])
         except (json.JSONDecodeError, TypeError):
             continue
+        if not isinstance(payload, dict):
+            continue
         sql = payload.get("sql")
         if not isinstance(sql, str) or not sql:
             continue

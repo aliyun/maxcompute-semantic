@@ -822,6 +822,11 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
     import urllib.request
 
     from maxcompute_semantic import __version__
+    from maxcompute_semantic._internal.update_check import (
+        LatestMetadata as _LM,
+        MalformedMetadataError,
+        UnsupportedSchemaError,
+    )
 
     md = fetch_latest_metadata()
     if md is None:
@@ -845,14 +850,6 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
         # pull a discriminating error.
         try:
             parsed = json.loads(_body.decode("utf-8"))
-            from maxcompute_semantic._internal.update_check import (
-                LatestMetadata as _LM,
-            )
-            from maxcompute_semantic._internal.update_check import (
-                MalformedMetadataError,
-                UnsupportedSchemaError,
-            )
-
             _LM.from_dict(parsed)
             return (None, f"{url} response shape is not the expected metadata")
         except UnsupportedSchemaError as e:

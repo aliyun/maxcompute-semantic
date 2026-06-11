@@ -139,6 +139,8 @@ Profile resolution order: `--profile` flag → `MCS_PROFILE` env → cwd binding
 ```bash
 uv sync --extra dev
 uv run pytest tests/ -m 'not live'
+uv run pytest tests/ -m 'not live' --cov=maxcompute_semantic --cov-report=xml --cov-fail-under=85
+uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 uv run ruff check src/ tests/
 uv run mypy src/
 ```

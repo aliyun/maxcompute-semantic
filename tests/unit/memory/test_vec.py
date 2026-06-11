@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import sys
+from types import SimpleNamespace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from maxcompute_semantic.build.storage import PackageDB
@@ -95,6 +97,89 @@ class TestVecExtension:
         result = clear_all_vectors(conn)
         assert result == -1
         conn.close()
+
+    def test_load_extension_success_toggles_extension_loading(self) -> None:
+        conn = MagicMock()
+        fake_sqlite_vec = SimpleNamespace(load=MagicMock())
+
+        with patch.dict(sys.modules, {"sqlite_vec": fake_sqlite_vec}):
+            assert load_vec_extension(conn) is True
+
+        assert conn.enable_load_extension.call_args_list[0].args == (True,)
+        assert conn.enable_load_extension.call_args_list[1].args == (False,)
+        fake_sqlite_vec.load.assert_called_once_with(conn)
+
+    def test_create_vec_table_success_commits(self) -> None:
+        conn = MagicMock()
+
+        with (
+            patch("maxcompute_semantic.memory.vec_ext.vec_extension_loaded", return_value=False),
+            patch("maxcompute_semantic.memory.vec_ext.load_vec_extension", return_value=True),
+        ):
+            assert create_vec_table(conn) is True
+
+        conn.execute.assert_called_once()
+        assert "CREATE VIRTUAL TABLE" in conn.execute.call_args.args[0]
+        conn.commit.assert_called_once_with()
+
+    def test_vec_table_exists_true_when_probe_query_succeeds(self) -> None:
+        conn = MagicMock()
+
+        with patch("maxcompute_semantic.memory.vec_ext.vec_extension_loaded", return_value=True):
+            assert vec_table_exists(conn) is True
+
+        assert "SELECT count(*)" in conn.execute.call_args.args[0]
+
+    def test_insert_and_delete_vector_execute_expected_statements(self) -> None:
+        conn = MagicMock()
+
+        insert_vector(conn, 42, [0.1, 0.2])
+        with patch("maxcompute_semantic.memory.vec_ext.vec_table_exists", return_value=True):
+            delete_vector(conn, 42)
+
+        assert conn.execute.call_count == 2
+        assert "INSERT INTO vec_index" in conn.execute.call_args_list[0].args[0]
+        assert "DELETE FROM vec_index" in conn.execute.call_args_list[1].args[0]
+        assert conn.commit.call_count == 2
+
+    def test_clear_all_vectors_deletes_each_rowid(self) -> None:
+        conn = MagicMock()
+        count_cursor = MagicMock()
+        count_cursor.fetchone.return_value = (2,)
+        rowid_cursor = MagicMock()
+        rowid_cursor.fetchall.return_value = [(10,), (11,)]
+        conn.execute.side_effect = [
+            count_cursor,
+            rowid_cursor,
+            None,
+            None,
+        ]
+
+        with patch("maxcompute_semantic.memory.vec_ext.vec_table_exists", return_value=True):
+            assert clear_all_vectors(conn) == 2
+
+        executed = [call.args[0] for call in conn.execute.call_args_list]
+        assert executed[0].startswith("SELECT count(*)")
+        assert executed[1].startswith("SELECT rowid")
+        assert executed[2].startswith("DELETE FROM vec_index")
+        assert executed[3].startswith("DELETE FROM vec_index")
+        conn.commit.assert_called_once_with()
+
+    def test_clear_all_vectors_returns_neg1_on_operational_error(self) -> None:
+        conn = MagicMock()
+        conn.execute.side_effect = sqlite3.OperationalError("vec unavailable")
+
+        with patch("maxcompute_semantic.memory.vec_ext.vec_table_exists", return_value=True):
+            assert clear_all_vectors(conn) == -1
+
+    def test_query_vectors_returns_rowid_distance_pairs(self) -> None:
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [(10, 0.125), (11, 0.5)]
+
+        with patch("maxcompute_semantic.memory.vec_ext.vec_table_exists", return_value=True):
+            assert query_vectors(conn, [0.1, 0.2], top_k=2) == [(10, 0.125), (11, 0.5)]
+
+        assert "WHERE embedding MATCH ?" in conn.execute.call_args.args[0]
 
 
 @pytest.mark.skipif(not is_available(), reason="sqlite-vec + sentence-transformers not installed")
@@ -283,6 +368,60 @@ class TestHybridSearcher:
             db.upsert_memory("user_note", f'{{"q":{i}}}', f"card games number {i}")
         results = searcher.search("card games", top_k=3, no_vector=True)
         assert len(results) == 3
+
+    def test_vector_results_are_fused_and_rehydrated(self) -> None:
+        db = MagicMock()
+        db._conn = object()
+        db.get_memory.side_effect = lambda mid: {
+            1: {
+                "kind": "user_note",
+                "payload_json": '{"id":1}',
+                "retrieval_text": "lexical and vector",
+                "tags_json": "[]",
+                "created_at": "2026-01-01T00:00:00Z",
+            },
+            2: {
+                "kind": "sample_sql",
+                "payload_json": '{"id":2}',
+                "retrieval_text": "lexical only",
+                "tags_json": "[]",
+                "created_at": "2026-01-02T00:00:00Z",
+            },
+            3: {
+                "kind": "user_note",
+                "payload_json": '{"id":3}',
+                "retrieval_text": "vector only",
+                "tags_json": "[]",
+                "created_at": "2026-01-03T00:00:00Z",
+            },
+        }.get(mid)
+
+        fake_fts = MagicMock()
+        fake_fts.search.return_value = [
+            {"id": 1, "score": 10.0},
+            {"id": 2, "score": 5.0},
+        ]
+
+        with (
+            patch("maxcompute_semantic.memory.hybrid.FTS5Searcher", return_value=fake_fts),
+            patch("maxcompute_semantic.memory.embedding.embed", return_value=[0.1, 0.2]),
+            patch(
+                "maxcompute_semantic.memory.vec_ext.query_vectors",
+                return_value=[(3, 0.1), (1, 0.2)],
+            ),
+        ):
+            searcher = HybridSearcher(db)
+            results = searcher.search("cards", kind_filter=["user_note"], top_k=3)
+
+        assert [row["id"] for row in results] == [1, 3]
+        assert all(row["kind"] == "user_note" for row in results)
+        assert all(isinstance(row["score"], float) for row in results)
+
+    def test_vector_search_returns_empty_when_embedding_unavailable(self) -> None:
+        db = MagicMock()
+        db._conn = object()
+        with patch("maxcompute_semantic.memory.embedding.embed", return_value=None):
+            assert HybridSearcher(db)._vector_search("cards") == []
 
 
 # ---------------------------------------------------------------------------
