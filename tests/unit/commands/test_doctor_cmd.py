@@ -10,13 +10,21 @@ the detail string instead of truncating raw exception text.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
+from maxcompute_semantic.auth.schema import AkAuth, DataSource, ProcessAuth, Profile
 from maxcompute_semantic.commands.doctor import (
+    _check_auth,
+    _check_build_data,
+    _check_config_permissions,
     _check_connectivity,
+    _check_link_json,
+    _check_ncs_available,
+    _check_profile_resolution,
+    _check_profiles_yaml,
     _check_skill_install,
     _check_tier,
 )
@@ -122,6 +130,156 @@ def test_check_env_fallback_endpoint_warns_with_stale_link(
     assert "custom env fallback endpoint" in detail
 
 
+class TestLocalConfigChecks:
+    def test_profiles_yaml_fails_when_file_has_no_profiles(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profiles_yaml_path
+
+        ypath = profiles_yaml_path()
+        ypath.parent.mkdir(parents=True, exist_ok=True)
+        ypath.write_text("version: 1\nprofiles: {}\n", encoding="utf-8")
+
+        assert _check_profiles_yaml() == (
+            "profiles_yaml",
+            "fail",
+            "profiles.yaml exists but defines no profiles",
+        )
+
+    def test_profiles_yaml_reports_read_errors(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profiles_yaml_path
+
+        ypath = profiles_yaml_path()
+        ypath.parent.mkdir(parents=True, exist_ok=True)
+        ypath.write_text("profiles: {}\n", encoding="utf-8")
+
+        with patch(
+            "maxcompute_semantic.auth.profile_store._read_raw",
+            side_effect=RuntimeError("yaml broke"),
+        ):
+            name, status, detail = _check_profiles_yaml()
+
+        assert name == "profiles_yaml"
+        assert status == "fail"
+        assert "yaml broke" in (detail or "")
+
+    def test_config_permissions_warns_for_group_world_bits(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profiles_yaml_path
+
+        ypath = profiles_yaml_path()
+        ypath.parent.mkdir(parents=True, exist_ok=True)
+        ypath.write_text("profiles: {}\n", encoding="utf-8")
+        ypath.parent.chmod(0o755)
+        ypath.chmod(0o644)
+
+        name, status, detail = _check_config_permissions()
+
+        assert name == "config_permissions"
+        assert status == "warn"
+        assert detail is not None
+        assert "chmod 700" in detail
+        assert "chmod 600" in detail
+
+    def test_config_permissions_warns_when_stat_fails(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profiles_yaml_path
+
+        ypath = profiles_yaml_path()
+        ypath.parent.mkdir(parents=True, exist_ok=True)
+        ypath.write_text("profiles: {}\n", encoding="utf-8")
+
+        with patch("maxcompute_semantic.commands.doctor.os.stat", side_effect=OSError("no stat")):
+            name, status, detail = _check_config_permissions()
+
+        assert name == "config_permissions"
+        assert status == "warn"
+        assert "cannot stat config dir" in (detail or "")
+        assert "cannot stat profiles.yaml" in (detail or "")
+
+    def test_link_json_reports_bound_cwd_and_malformed_json(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from maxcompute_semantic._internal.paths import link_json_path
+
+        monkeypatch.chdir(isolated_config)
+        link_json_path().parent.mkdir(parents=True, exist_ok=True)
+        link_json_path().write_text(
+            json.dumps({str(Path.cwd()): "prod"}),
+            encoding="utf-8",
+        )
+        assert _check_link_json() == ("link_json", "pass", "cwd → profile 'prod'")
+
+        link_json_path().write_text("{not json", encoding="utf-8")
+        name, status, detail = _check_link_json()
+        assert name == "link_json"
+        assert status == "fail"
+        assert "cannot read link.json" in (detail or "")
+
+
+class TestProfileAndAuthChecks:
+    def test_profile_resolution_reports_named_profile_slot(self, isolated_config: Path) -> None:
+        from maxcompute_semantic.auth.profile_store import upsert
+
+        p = _ak_profile()
+        upsert(p)
+
+        result, resolved = _check_profile_resolution(p.name)
+
+        assert result == ("profile_resolution", "pass", f"profile '{p.name}' via --profile")
+        assert resolved == p
+
+    def test_profile_resolution_reports_mcs_error(self, isolated_config: Path) -> None:
+        result, resolved = _check_profile_resolution("missing")
+
+        assert result[0] == "profile_resolution"
+        assert result[1] == "fail"
+        assert "not found" in (result[2] or "").lower()
+        assert resolved is None
+
+    def test_profile_resolution_fails_when_compute_project_missing(self) -> None:
+        fake = MagicMock()
+        fake.compute_project = ""
+        fake.name = "env"
+
+        with patch(
+            "maxcompute_semantic.commands.doctor.resolve_profile_for_project",
+            return_value=fake,
+        ):
+            result, resolved = _check_profile_resolution(None)
+
+        assert result == (
+            "profile_resolution",
+            "fail",
+            "env-var fallback has no compute_project; set MAXCOMPUTE_PROJECT",
+        )
+        assert resolved is None
+
+    def test_auth_pass_includes_sts_expiration(self) -> None:
+        from datetime import datetime, timezone
+
+        p = _ak_profile()
+        creds = MagicMock()
+        creds.security_token = "token"
+        creds.expiration = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        with patch(
+            "maxcompute_semantic.auth.credential.resolve_credentials",
+            return_value=creds,
+        ):
+            name, status, detail = _check_auth(p)
+
+        assert name == "auth"
+        assert status == "pass"
+        assert "STS" in (detail or "")
+        assert "2026-01-01" in (detail or "")
+
+    def test_auth_generic_exception_fails_with_message(self) -> None:
+        with patch(
+            "maxcompute_semantic.auth.credential.resolve_credentials",
+            side_effect=RuntimeError("helper crashed"),
+        ):
+            result = _check_auth(_ak_profile())
+
+        assert result == ("auth", "fail", "helper crashed")
+
+
 # ── _check_connectivity ────────────────────────────────────────────
 
 
@@ -193,6 +351,16 @@ class TestCheckConnectivity:
 
         assert result == ("connectivity", "pass", "SELECT 1 OK on test_proj")
 
+    def test_non_success_envelope_returns_fail(self) -> None:
+        p = _ak_profile()
+        envelope = MagicMock()
+        envelope.status = "failed"
+        mock_cls, _ = _mock_client_cls(return_value=envelope)
+        with patch("maxcompute_semantic.mc_client.client.MaxComputeClient", mock_cls):
+            result = _check_connectivity(p)
+
+        assert result == ("connectivity", "fail", "SELECT 1 returned status=failed")
+
     def test_none_profile_returns_skip(self) -> None:
         """None profile (prerequisite failed) returns skip."""
         result = _check_connectivity(None)
@@ -203,6 +371,21 @@ class TestCheckConnectivity:
 
 
 class TestCheckTier:
+    def test_env_override_returns_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("MCS_TIER_OVERRIDE", "3")
+
+        assert _check_tier(_ak_profile()) == ("tier", "pass", "tier=3 (MCS_TIER_OVERRIDE)")
+
+    def test_cache_file_returns_cached_tier(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profile_data_dir
+
+        p = _ak_profile()
+        cache_path = profile_data_dir(p) / "tier_cache" / p.compute_project
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text("2\n", encoding="utf-8")
+
+        assert _check_tier(p) == ("tier", "pass", "tier=2-level (cached)")
+
     def test_mcs_error_preserves_code_and_message(self) -> None:
         """McsError from tier probe preserves code + message in detail."""
         p = _ak_profile()
@@ -264,6 +447,88 @@ class TestCheckTier:
         """None profile (prerequisite failed) returns skip."""
         result = _check_tier(None)
         assert result == ("tier", "skip", "skipped: prerequisite failed")
+
+
+class TestBuildAndLocalToolChecks:
+    def test_build_data_passes_with_artifacts(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profile_data_dir
+
+        p = _ak_profile()
+        pdir = profile_data_dir(p)
+        pdir.mkdir(parents=True, exist_ok=True)
+        (pdir / "package.db").write_bytes(b"sqlite")
+        (pdir / "_overview.md").write_text("# overview\n", encoding="utf-8")
+        (pdir / "_state.json").write_text('{"last_built_at":"2026-01-01T00:00:00Z"}', encoding="utf-8")
+        source_dir = pdir / "test_proj__default"
+        source_dir.mkdir()
+        (source_dir / "orders.md").write_text("# orders\n", encoding="utf-8")
+
+        name, status, detail = _check_build_data(p)
+
+        assert name == "build_data"
+        assert status == "pass"
+        assert detail is not None
+        assert "package.db" in detail
+        assert "_overview.md" in detail
+        assert "_state.json" in detail
+        assert "1 table .md files across 1 source(s)" in detail
+        assert "built 2026-01-01T00:00:00Z" in detail
+
+    def test_build_data_ignores_malformed_state_json(self, isolated_config: Path) -> None:
+        from maxcompute_semantic._internal.paths import profile_data_dir
+
+        p = _ak_profile()
+        pdir = profile_data_dir(p)
+        pdir.mkdir(parents=True, exist_ok=True)
+        (pdir / "package.db").write_bytes(b"sqlite")
+        (pdir / "_state.json").write_text("{bad", encoding="utf-8")
+
+        name, status, detail = _check_build_data(p)
+
+        assert name == "build_data"
+        assert status == "pass"
+        assert "built" not in (detail or "")
+
+    def test_ncs_available_skips_for_ak_and_custom_process(self) -> None:
+        assert _check_ncs_available(None) == (
+            "ncs_available",
+            "skip",
+            "skipped: prerequisite failed",
+        )
+        assert _check_ncs_available(_ak_profile()) == (
+            "ncs_available",
+            "skip",
+            "profile does not use ncs",
+        )
+
+        p = Profile(
+            name="proc",
+            compute_project="p",
+            endpoint="https://service.odps.aliyun.com/api",
+            auth=ProcessAuth("python helper.py", 60),
+        )
+        assert _check_ncs_available(p) == (
+            "ncs_available",
+            "skip",
+            "profile does not use ncs",
+        )
+
+    def test_ncs_available_fail_and_pass_for_ncs_process(self) -> None:
+        p = Profile(
+            name="proc",
+            compute_project="p",
+            endpoint="https://service.odps.aliyun.com/api",
+            auth=ProcessAuth("ncs create credential odpsuser --employee-id 1", 60),
+        )
+
+        with patch("shutil.which", return_value=None):
+            name, status, detail = _check_ncs_available(p)
+        assert name == "ncs_available"
+        assert status == "fail"
+        assert "ncs" in (detail or "").lower()
+
+        with patch("shutil.which", return_value="/usr/bin/ncs"):
+            assert _check_ncs_available(p) == ("ncs_available", "pass", "ncs is on PATH")
 
 
 class TestCheckSkillInstall:

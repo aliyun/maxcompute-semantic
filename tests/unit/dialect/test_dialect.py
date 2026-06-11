@@ -155,6 +155,39 @@ class TestRoundTrip:
         assert output == expected_sql
 
 
+class TestGeneratorTransforms:
+    @pytest.mark.parametrize(
+        ("input_sql", "expected_sql"),
+        [
+            ("SELECT DATEADD(dt, 1, 'dd')", "SELECT DATEADD(dt, 1, 'DD')"),
+            ("SELECT DATEDIFF(dt1, dt2, 'mm')", "SELECT DATEDIFF(dt1, dt2, 'MM')"),
+            ("SELECT DATETRUNC(dt, 'month')", "SELECT DATETRUNC(dt, 'MONTH')"),
+            ("SELECT DATEPART(dt, 'yyyy')", "SELECT DATEPART(dt, 'yyyy')"),
+            ("SELECT WM_CONCAT(',', col)", "SELECT WM_CONCAT(',', col)"),
+            ("SELECT SUBSTR(s, 1)", "SELECT SUBSTR(s, 1)"),
+            ("SELECT INSTR(s, sub)", "SELECT INSTR(s, sub)"),
+            ("SELECT INSTR(s, sub, 3)", "SELECT INSTR(s, sub, 3)"),
+        ],
+    )
+    def test_custom_generator_transforms(self, input_sql: str, expected_sql: str) -> None:
+        assert parse_mc_one(input_sql).sql(dialect="maxcompute") == expected_sql
+
+    def test_lifecycle_kept_outside_tblproperties_when_other_properties_exist(self) -> None:
+        output = parse_mc_one(
+            "CREATE TABLE t (id BIGINT) LIFECYCLE 7 TBLPROPERTIES ('k'='v')"
+        ).sql(dialect="maxcompute")
+
+        assert "TBLPROPERTIES ('k'='v')" in output
+        assert "LIFECYCLE 7" in output
+
+    def test_partitioned_by_roundtrip_uses_partitioned_by_clause(self) -> None:
+        output = parse_mc_one("CREATE TABLE t (id BIGINT) PARTITIONED BY (ds STRING)").sql(
+            dialect="maxcompute"
+        )
+
+        assert "PARTITIONED BY (ds STRING)" in output
+
+
 # ── DDL properties ────────────────────────────────────────────────────
 
 

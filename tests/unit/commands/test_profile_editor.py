@@ -21,6 +21,7 @@ from maxcompute_semantic.auth.schema import (
     DataSource,
     ProcessAuth,
     Profile,
+    TableSpec,
 )
 from maxcompute_semantic.commands._profile_editor import edit_profile
 
@@ -119,6 +120,19 @@ class TestEditComputeProject:
 
 
 class TestEditEndpoint:
+    def test_empty_input_reprompts(self, mock_picker: list[object]) -> None:
+        p = _profile()
+        client = MagicMock()
+        with patch(
+            "maxcompute_semantic.commands._profile_editor.click.prompt",
+            side_effect=["", "https://odps.aliyun.com/api"],
+        ):
+            mock_picker.append("endpoint")
+            mock_picker.append("DONE")
+            result = edit_profile(p, client)
+        assert result is not None
+        assert result.endpoint == "https://odps.aliyun.com/api"
+
     def test_rejects_no_scheme(self, mock_picker: list[object]) -> None:
         p = _profile()
         client = MagicMock()
@@ -178,6 +192,39 @@ class TestEditAuth:
         assert isinstance(result.auth, AkAuth)
         assert result.auth.access_key_id == "NEW_ID"
         assert result.auth.access_key_secret == "NEW_SECRET"
+
+    def test_ak_auth_empty_value_keeps_existing(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_ak_auth
+
+        p = _profile(auth=AkAuth("OLD_ID", "OLD_SECRET"))
+        with patch(
+            "maxcompute_semantic.commands._profile_editor.click.prompt",
+            side_effect=["", "NEW_SECRET"],
+        ):
+            result = _edit_ak_auth(p)
+        assert result is p
+
+    def test_process_auth_empty_command_keeps_existing(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_process_auth
+
+        p = _profile(auth=ProcessAuth("old-cmd", timeout=60))
+        with patch(
+            "maxcompute_semantic.commands._profile_editor.click.prompt",
+            side_effect=["", 60],
+        ):
+            result = _edit_process_auth(p)
+        assert result is p
+
+    def test_process_auth_invalid_timeout_keeps_existing(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_process_auth
+
+        p = _profile(auth=ProcessAuth("old-cmd", timeout=60))
+        with patch(
+            "maxcompute_semantic.commands._profile_editor.click.prompt",
+            side_effect=["new-cmd", 0],
+        ):
+            result = _edit_process_auth(p)
+        assert result is p
 
     def test_auth_type_default_passes_value_not_title(self) -> None:
         r"""Regression: ``_edit_auth`` used to pass the Choice ``title``
@@ -240,6 +287,18 @@ class TestFormatAuthAndPrincipal:
         rendered = _format_auth(AkAuth("ABCDEFGH", "s"))
         assert "ABCDEFGH" not in rendered
         assert "***" in rendered
+
+    def test_format_auth_truncates_long_process_command(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _format_auth
+
+        rendered = _format_auth(ProcessAuth("python -m helper with many many arguments", 60))
+        assert rendered.startswith("Process (python -m helper")
+        assert rendered.endswith("…)")
+
+    def test_format_auth_falls_back_to_type_name(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _format_auth
+
+        assert _format_auth(object()) == "object"
 
     def test_live_identity_ak_happy_path(self) -> None:
         """``commands._identity.live_identity`` is the shared helper
@@ -440,6 +499,42 @@ class TestEditSources:
         # Duplicate not appended; original profile preserved
         assert result is not None
         assert len(result.sources) == 1
+
+    def test_add_source_project_escape_keeps_sources(self, mock_picker: list[object]) -> None:
+        p = _profile()
+        client = MagicMock()
+        with patch(
+            "maxcompute_semantic.commands._profile_editor._pick_project",
+            return_value=None,
+        ):
+            mock_picker.append("sources")
+            mock_picker.append("ADD")
+            mock_picker.append("BACK")
+            mock_picker.append("DONE")
+            result = edit_profile(p, client)
+        assert result is not None
+        assert result.sources == ()
+
+    def test_add_source_schema_escape_keeps_sources(self, mock_picker: list[object]) -> None:
+        p = _profile()
+        client = MagicMock()
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_project",
+                return_value="acme",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_schema",
+                return_value=None,
+            ),
+        ):
+            mock_picker.append("sources")
+            mock_picker.append("ADD")
+            mock_picker.append("BACK")
+            mock_picker.append("DONE")
+            result = edit_profile(p, client)
+        assert result is not None
+        assert result.sources == ()
 
     def test_remove_source_filters_at_index(self, mock_picker: list[object]) -> None:
         s1 = DataSource("acme", "s1", tables="*")
@@ -726,7 +821,9 @@ class TestEditSourceIncludeAllListed:
     def test_empty_source_include_all_appends_all_listed(self) -> None:
         from maxcompute_semantic.commands._profile_editor import _edit_source
 
-        profile = self._profile_with_empty_source()
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables=()),)
+        )
         client = MagicMock()
         client.list_tables.return_value = ["t1", "t2", "t3"]
         with patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice:
@@ -753,12 +850,356 @@ class TestEditSourceIncludeAllListed:
         assert not by_name["t2"].columns_exclude
         assert not by_name["t3"].columns_exclude
 
+    def test_listing_failure_from_generic_exception_still_shows_selected(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = _profile(
+            sources=(
+                DataSource(
+                    project="proj_a",
+                    schema="default",
+                    tables=(TableSpec(name="selected"),),
+                ),
+            )
+        )
+        client = MagicMock()
+        client.list_tables.side_effect = RuntimeError("boom")
+        with patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice:
+            mock_choice.return_value = "BACK"
+            result = _edit_source(profile, idx=0, client=client)
+        assert result is profile
+        first_choices = mock_choice.call_args.kwargs["choices"]
+        titles = [getattr(choice, "title", "") for choice in first_choices]
+        assert any("selected" in title for title in titles)
+
+    def test_switch_to_wildcard_replaces_enumerated_tables(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = _profile(
+            sources=(
+                DataSource(
+                    project="proj_a",
+                    schema="default",
+                    tables=(TableSpec(name="t1", columns_exclude=("pii",)),),
+                ),
+            )
+        )
+        client = MagicMock()
+        client.list_tables.return_value = ["t1"]
+        with (
+            patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice,
+            patch("maxcompute_semantic.commands._profile_editor.click.confirm", return_value=True),
+        ):
+            mock_choice.side_effect = ["SWITCH_TO_WILDCARD", "BACK"]
+            result = _edit_source(profile, idx=0, client=client)
+        assert result.sources[0].tables == "*"
+
+    def test_switch_wildcard_to_enumerated_uses_listed_tables(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables="*"),)
+        )
+        client = MagicMock()
+        client.list_tables.return_value = ["t1", "t2"]
+        with patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice:
+            mock_choice.side_effect = ["SWITCH_TO_ENUM", "BACK"]
+            result = _edit_source(profile, idx=0, client=client)
+        tables = result.sources[0].tables
+        assert isinstance(tables, tuple)
+        assert [ts.name for ts in tables] == ["t1", "t2"]
+
+    def test_switch_wildcard_to_enumerated_keeps_wildcard_on_empty_listing(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables="*"),)
+        )
+        client = MagicMock()
+        client.list_tables.return_value = []
+        with patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice:
+            mock_choice.side_effect = ["SWITCH_TO_ENUM", "BACK"]
+            result = _edit_source(profile, idx=0, client=client)
+        assert result.sources[0].tables == "*"
+
+    def test_manual_add_appends_named_table(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables=()),)
+        )
+        client = MagicMock()
+        client.list_tables.return_value = []
+        with (
+            patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice,
+            patch(
+                "maxcompute_semantic.commands._profile_editor.click.prompt",
+                return_value="manual_table",
+            ),
+        ):
+            mock_choice.side_effect = ["MANUAL_ADD", "BACK"]
+            result = _edit_source(profile, idx=0, client=client)
+        tables = result.sources[0].tables
+        assert isinstance(tables, tuple)
+        assert [ts.name for ts in tables] == ["manual_table"]
+
+    def test_manual_add_duplicate_keeps_existing_table(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _edit_source
+
+        profile = self._profile_with_partial_source()
+        client = MagicMock()
+        client.list_tables.return_value = []
+        with (
+            patch("maxcompute_semantic.commands._profile_editor._pick_choice") as mock_choice,
+            patch(
+                "maxcompute_semantic.commands._profile_editor.click.prompt",
+                return_value="t1",
+            ),
+        ):
+            mock_choice.side_effect = ["MANUAL_ADD", "BACK"]
+            result = _edit_source(profile, idx=0, client=client)
+        assert result.sources[0].tables == profile.sources[0].tables
+
+
+class TestCachedClient:
+    def test_catalog_calls_are_cached_by_lookup_key(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _CachedClient
+
+        inner = MagicMock()
+        inner.profile.compute_project = "home_proj"
+        inner.list_projects.return_value = ["home_proj", "other_proj"]
+        inner.list_schemas.return_value = ["default"]
+        inner.list_tables.return_value = ["orders"]
+        inner.describe_table.return_value = {"columns": [{"name": "id"}]}
+
+        cached = _CachedClient(inner)
+
+        assert cached.profile is inner.profile
+        assert cached.execute_sql is inner.execute_sql
+        assert cached.list_projects() == ["home_proj", "other_proj"]
+        assert cached.list_projects() == ["home_proj", "other_proj"]
+        assert cached.list_schemas() == ["default"]
+        assert cached.list_schemas() == ["default"]
+        assert cached.list_tables(schema="default") == ["orders"]
+        assert cached.list_tables(schema="default") == ["orders"]
+        assert cached.describe_table("orders", schema="default") == {"columns": [{"name": "id"}]}
+        assert cached.describe_table("orders", schema="default") == {"columns": [{"name": "id"}]}
+
+        inner.list_projects.assert_called_once_with()
+        inner.list_schemas.assert_called_once_with(project=None)
+        inner.list_tables.assert_called_once_with(project=None, schema="default")
+        inner.describe_table.assert_called_once_with("orders", project=None, schema="default")
+
+
+class TestEditorFormattingHelpers:
+    def test_source_and_table_scope_labels_cover_all_states(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import (
+            _format_sources_summary,
+            _format_table_scope,
+            _source_summary_with_breakdown,
+            _table_status_icon,
+        )
+
+        whitelist = TableSpec(name="orders", columns=("id", "amount"))
+        blacklist = TableSpec(name="users", columns_exclude=("secret",))
+        full = TableSpec(name="products")
+
+        assert _table_status_icon(whitelist) == "🔒"
+        assert _table_status_icon(blacklist).startswith("✂")
+        assert _table_status_icon(full) == "📋"
+        assert _format_table_scope(whitelist) == "whitelist: 2 col(s)"
+        assert _format_table_scope(blacklist) == "hide 1 col(s)"
+        assert _format_table_scope(full) == "all columns visible"
+
+        assert _format_sources_summary(()) == "(none yet)"
+        many = tuple(DataSource(f"p{i}", "s", tables=()) for i in range(4))
+        assert _format_sources_summary(many) == "p0.s, p1.s, p2.s + 1 more"
+        assert _source_summary_with_breakdown(DataSource("p", "s", tables="*")).startswith(
+            "wildcard"
+        )
+        assert _source_summary_with_breakdown(DataSource("p", "s", tables=())) == "no tables yet"
+        assert (
+            _source_summary_with_breakdown(
+                DataSource("p", "s", tables=(full, blacklist, whitelist))
+            )
+            == "3 table(s) · 1 full · 2 col-scoped"
+        )
+
+
+class TestTableActionMenu:
+    def _profile_for_table_actions(
+        self, tables: str | tuple[TableSpec, ...] = ()
+    ) -> Profile:
+        return _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables=tables),)
+        )
+
+    def test_defensive_wildcard_source_returns_unchanged(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions("*")
+        result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result is profile
+
+    def test_missing_table_back_keeps_profile(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(())
+        with patch("maxcompute_semantic.commands._profile_editor._pick_choice", return_value="BACK"):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result is profile
+
+    def test_missing_table_include_all_appends_full_scope(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(())
+        with patch(
+            "maxcompute_semantic.commands._profile_editor._pick_choice",
+            return_value="INCLUDE_ALL",
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        tables = result.sources[0].tables
+        assert isinstance(tables, tuple)
+        assert tables == (TableSpec(name="orders"),)
+
+    def test_missing_table_include_refined_appends_blacklist_scope(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(())
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_choice",
+                return_value="INCLUDE_REFINED",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_columns_exclude",
+                return_value=("pii",),
+            ),
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        tables = result.sources[0].tables
+        assert isinstance(tables, tuple)
+        assert tables == (TableSpec(name="orders", columns_exclude=("pii",)),)
+
+    def test_missing_table_include_refined_cancel_keeps_profile(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(())
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_choice",
+                return_value="INCLUDE_REFINED",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_columns_exclude",
+                return_value=None,
+            ),
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result is profile
+
+    def test_existing_full_table_remove_deletes_spec(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(
+            (TableSpec(name="orders"), TableSpec(name="users"))
+        )
+        with patch(
+            "maxcompute_semantic.commands._profile_editor._pick_choice",
+            return_value="REMOVE",
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result.sources[0].tables == (TableSpec(name="users"),)
+
+    def test_existing_blacklist_reset_returns_full_scope(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(
+            (TableSpec(name="orders", columns_exclude=("pii",)),)
+        )
+        with patch(
+            "maxcompute_semantic.commands._profile_editor._pick_choice",
+            return_value="RESET",
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result.sources[0].tables == (TableSpec(name="orders"),)
+
+    def test_existing_blacklist_edit_updates_excluded_columns(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(
+            (TableSpec(name="orders", columns_exclude=("old",)),)
+        )
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_choice",
+                return_value="EDIT",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_columns_exclude",
+                return_value=("new",),
+            ),
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result.sources[0].tables == (TableSpec(name="orders", columns_exclude=("new",)),)
+
+    def test_existing_blacklist_edit_empty_resets_to_full_scope(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(
+            (TableSpec(name="orders", columns_exclude=("old",)),)
+        )
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_choice",
+                return_value="EDIT",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_columns_exclude",
+                return_value=(),
+            ),
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result.sources[0].tables == (TableSpec(name="orders"),)
+
+    def test_existing_blacklist_edit_cancel_keeps_profile(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions(
+            (TableSpec(name="orders", columns_exclude=("old",)),)
+        )
+        with (
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_choice",
+                return_value="EDIT",
+            ),
+            patch(
+                "maxcompute_semantic.commands._profile_editor._pick_columns_exclude",
+                return_value=None,
+            ),
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result is profile
+
+    def test_whitelist_table_can_be_removed(self) -> None:
+        from maxcompute_semantic.commands._profile_editor import _table_action_menu
+
+        profile = self._profile_for_table_actions((TableSpec(name="orders", columns=("id",)),))
+        with patch(
+            "maxcompute_semantic.commands._profile_editor._pick_choice",
+            return_value="REMOVE",
+        ):
+            result = _table_action_menu(profile, 0, "orders", MagicMock())
+        assert result.sources[0].tables == ()
+
     def test_include_all_row_hidden_when_listing_failed(self) -> None:
         """When list_tables raises, the include-all row isn't offered."""
         from maxcompute_semantic.commands._profile_editor import _edit_source
         from maxcompute_semantic.mc_client.errors import McsError
 
-        profile = self._profile_with_empty_source()
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables=()),)
+        )
         client = MagicMock()
         client.list_tables.side_effect = McsError(
             code="permission_denied",
@@ -781,7 +1222,9 @@ class TestEditSourceIncludeAllListed:
     def test_include_all_row_hidden_when_no_tables_listed(self) -> None:
         from maxcompute_semantic.commands._profile_editor import _edit_source
 
-        profile = self._profile_with_empty_source()
+        profile = _profile(
+            sources=(DataSource(project="proj_a", schema="default", tables=()),)
+        )
         client = MagicMock()
         client.list_tables.return_value = []
         captured_choices = []

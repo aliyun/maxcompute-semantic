@@ -1,6 +1,6 @@
 name: PR-Agent AI Review
 
-on:
+on: # zizmor: ignore[dangerous-triggers] -- uses pull_request_target without checkout or PR code execution; PR-Agent only reads PR metadata and posts review comments.
   pull_request_target:
     types: [opened, reopened, synchronize]
 
@@ -13,6 +13,7 @@ jobs:
   pr_agent:
     runs-on: ubuntu-latest
     name: AI code review
+    timeout-minutes: 10
     if: github.event.pull_request.draft == false
     steps:
       - name: PR Agent action step

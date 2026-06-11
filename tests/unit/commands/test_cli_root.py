@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import sys as _sys
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 from maxcompute_semantic.cli import _cli_main, cli
@@ -510,3 +512,139 @@ def test_probe_does_not_block_command_exit(
         f"command exit took {elapsed:.2f} s — daemon-thread probe is "
         f"apparently blocking the foreground."
     )
+
+
+def _patch_cli_main_banner_io(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("maxcompute_semantic.cli.banner_suppressed", lambda *_a, **_kw: True)
+    monkeypatch.setattr("maxcompute_semantic.cli.read_cache", lambda: None)
+    monkeypatch.setattr("maxcompute_semantic.cli.is_hard_block", lambda *_a, **_kw: False)
+    monkeypatch.setattr("maxcompute_semantic.cli.format_banner", lambda *_a, **_kw: None)
+
+
+class TestCliMainExceptionShield:
+    def test_click_exit_code_is_preserved(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            raise click.exceptions.Exit(7)
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        assert exc.value.code == 7
+
+    def test_abort_maps_to_exit_one(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            raise click.exceptions.Abort()
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        assert exc.value.code == 1
+
+    def test_click_exception_shows_message_and_uses_exception_exit_code(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            err = click.ClickException("bad command")
+            err.exit_code = 6
+            raise err
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        assert exc.value.code == 6
+        assert "bad command" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        ("system_exit_code", "expected"),
+        [(None, 0), ("fatal", 1)],
+    )
+    def test_system_exit_normalizes_non_integer_codes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        system_exit_code: object,
+        expected: int,
+    ) -> None:
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            raise SystemExit(system_exit_code)
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        assert exc.value.code == expected
+
+    def test_unclassified_exception_mapped_to_mcs_error_envelope(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from maxcompute_semantic.errors import McsError
+
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("raw pyodps-ish error")
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+        monkeypatch.setattr(
+            "maxcompute_semantic.errors.map_pyodps_exception",
+            lambda _exc: McsError("mapped error", code="MappedError", exit_code=4),
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        assert exc.value.code == 4
+        payload = json.loads(capsys.readouterr().err)
+        assert payload["error"]["code"] == "MappedError"
+        assert payload["error"]["message"] == "mapped error"
+
+    def test_unmapped_internal_exception_prints_trace_in_debug(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        _patch_cli_main_banner_io(monkeypatch)
+        monkeypatch.setattr(_sys, "argv", ["mcs", "--debug"])
+
+        def fake_cli(*_args: object, **_kwargs: object) -> None:
+            raise RuntimeError("raw boom")
+
+        monkeypatch.setattr("maxcompute_semantic.cli.cli", fake_cli)
+        monkeypatch.setattr(
+            "maxcompute_semantic.errors.map_pyodps_exception",
+            lambda _exc: (_ for _ in ()).throw(RuntimeError("mapper boom")),
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            _cli_main()
+
+        err = capsys.readouterr().err
+        assert exc.value.code == 1
+        assert "mcs internal error: raw boom" in err
+        assert "Traceback" in err

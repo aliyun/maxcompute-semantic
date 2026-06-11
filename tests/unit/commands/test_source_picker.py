@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import click
 from maxcompute_semantic.auth.schema import DataSource, TableSpec
 from maxcompute_semantic.commands._source_picker import (
     _is_dev_name,
@@ -386,6 +387,34 @@ class TestPickSource:
         assert ds is not None
         assert ds.project == "proj_a"
 
+    def test_pick_source_returns_none_when_schema_picker_cancels(self) -> None:
+        client = _mock_client_with(
+            projects=["proj_a"],
+            schemas=["default", "analytics"],
+            tables=["t1"],
+        )
+        with patch("maxcompute_semantic.commands._source_picker._iterfzf") as mock_fzf:
+            mock_fzf.side_effect = [
+                "proj_a",
+                None,
+            ]
+
+            assert pick_source(client) is None
+
+    def test_pick_source_returns_none_when_table_mode_picker_cancels(self) -> None:
+        client = _mock_client_with(
+            projects=["proj_a"],
+            schemas=["default"],
+            tables=["t1"],
+        )
+        with patch("maxcompute_semantic.commands._source_picker._iterfzf") as mock_fzf:
+            mock_fzf.side_effect = [
+                "proj_a",
+                None,
+            ]
+
+            assert pick_source(client) is None
+
 
 class TestPickerEcho:
     """Echo line printed to stdout after a successful fzf pick."""
@@ -490,6 +519,48 @@ class TestPickerEcho:
             mock_sel.return_value.ask.return_value = "proj_a"
             _pick_one("Project:", choices=["proj_a"], echo_label="Project", echo_emoji="🎯")
         assert "✓" not in capsys.readouterr().out
+
+    def test_pick_many_questionary_fallback_uses_checkbox(self) -> None:
+        from maxcompute_semantic.commands._source_picker import _pick_many
+
+        with (
+            patch("maxcompute_semantic.commands._source_picker._iterfzf", None),
+            patch("maxcompute_semantic.commands._source_picker.questionary.checkbox") as mock_cb,
+        ):
+            mock_cb.return_value.unsafe_ask.return_value = ["orders"]
+            result = _pick_many(
+                "Tables:",
+                items=["orders", "customers"],
+                pre_selected={"customers"},
+            )
+
+        assert result == ["orders"]
+        choices = mock_cb.call_args.kwargs["choices"]
+        checked = {choice.value: choice.checked for choice in choices}
+        assert checked == {"orders": False, "customers": True}
+
+    def test_pick_choice_questionary_fallback_uses_select(self) -> None:
+        import questionary
+        from maxcompute_semantic.commands._source_picker import _pick_choice
+
+        custom_style = object()
+        choices = [questionary.Choice("orders", value="orders")]
+        with (
+            patch("maxcompute_semantic.commands._source_picker._iterfzf", None),
+            patch("maxcompute_semantic.commands._source_picker.questionary.select") as mock_sel,
+        ):
+            mock_sel.return_value.ask.return_value = "orders"
+            result = _pick_choice(
+                "Table:",
+                choices=choices,
+                default="orders",
+                style=custom_style,
+                instruction="pick one",
+            )
+
+        assert result == "orders"
+        assert mock_sel.call_args.kwargs["style"] is custom_style
+        assert mock_sel.call_args.kwargs["instruction"] == "pick one"
 
 
 class TestPickerKeyboardInterrupt:
@@ -749,6 +820,24 @@ class TestPickColumnsManualEntry:
         err = capsys.readouterr().err
         assert "describe_table denied" in err
 
+    def test_manual_columns_reprompts_empty_then_returns_partial_on_abort(self, capsys) -> None:
+        from maxcompute_semantic.commands._source_picker import _prompt_manual_columns
+
+        with (
+            patch(
+                "maxcompute_semantic.commands._source_picker.click.prompt",
+                side_effect=["", "pii", click.exceptions.Abort()],
+            ),
+            patch(
+                "maxcompute_semantic.commands._source_picker.click.confirm",
+                return_value=True,
+            ),
+        ):
+            result = _prompt_manual_columns()
+
+        assert result == ["pii"]
+        assert "Column name must be non-empty" in capsys.readouterr().err
+
 
 class TestPickProjectOtherSentinel:
     """`<other:>` row always offered, even when the suggested project is in the list."""
@@ -788,6 +877,29 @@ class TestPickProjectOtherSentinel:
             answer = _pick_project(client, default="proj_a", existing=None, cached_projects=None)
         assert answer == "manual_proj"
 
+    def test_mcs_error_falls_back_to_manual_prompt(self) -> None:
+        from maxcompute_semantic.commands._source_picker import _pick_project
+        from maxcompute_semantic.mc_client.errors import McsError
+
+        client = MagicMock()
+        client.list_projects.side_effect = McsError(
+            "catalog denied",
+            code="ListProjectsDenied",
+            remediation="Ask for ListProjects.",
+        )
+        with (
+            patch("maxcompute_semantic.commands._source_picker.click.confirm", return_value=False),
+            patch("maxcompute_semantic.commands._source_picker.click.prompt", return_value="typed"),
+        ):
+            answer = _pick_project(
+                client,
+                default="default_proj",
+                existing=None,
+                cached_projects=None,
+            )
+
+        assert answer == "typed"
+
 
 class TestEchoLabelWiring:
     """Verify the label/emoji kwargs reach the picker from _pick_project /
@@ -804,6 +916,62 @@ class TestEchoLabelWiring:
         ):
             _pick_schema(client, project="p", existing=None)
         assert "✓ 🗂 Schema: s1" in capsys.readouterr().out
+
+    def test_pick_schema_mcs_error_falls_back_to_manual_entry(self) -> None:
+        from maxcompute_semantic.commands._source_picker import _pick_schema
+        from maxcompute_semantic.mc_client.errors import McsError
+
+        client = MagicMock()
+        client.list_schemas.side_effect = McsError(
+            "schema list denied",
+            code="ListSchemasDenied",
+            remediation="Ask for schema listing.",
+        )
+        existing = DataSource(project="p", schema="existing_schema", tables="*")
+        with patch(
+            "maxcompute_semantic.commands._source_picker.click.prompt",
+            return_value="typed_schema",
+        ):
+            assert _pick_schema(client, project="p", existing=existing) == "typed_schema"
+
+    def test_pick_schema_empty_list_falls_back_to_manual_entry(self) -> None:
+        from maxcompute_semantic.commands._source_picker import _pick_schema
+
+        client = MagicMock()
+        client.list_schemas.return_value = []
+        with patch(
+            "maxcompute_semantic.commands._source_picker.click.prompt",
+            return_value="typed_schema",
+        ):
+            assert _pick_schema(client, project="p", existing=None) == "typed_schema"
+
+    def test_pick_schema_other_row_falls_back_to_manual_entry(self) -> None:
+        from maxcompute_semantic.commands._source_picker import _pick_schema
+
+        client = MagicMock()
+        client.list_schemas.return_value = ["default", "analytics"]
+        with (
+            patch(
+                "maxcompute_semantic.commands._source_picker._iterfzf",
+                return_value="<other: type a schema name>",
+            ),
+            patch(
+                "maxcompute_semantic.commands._source_picker.click.prompt",
+                return_value="typed_schema",
+            ),
+        ):
+            assert _pick_schema(client, project="p", existing=None) == "typed_schema"
+
+    def test_prompt_schema_name_reprompts_empty_then_aborts(self, capsys) -> None:
+        from maxcompute_semantic.commands._source_picker import _prompt_schema_name
+
+        with patch(
+            "maxcompute_semantic.commands._source_picker.click.prompt",
+            side_effect=["", click.exceptions.Abort()],
+        ):
+            assert _prompt_schema_name("default") is None
+
+        assert "Schema name must be non-empty" in capsys.readouterr().err
 
 
 class TestDevProdHelpers:
