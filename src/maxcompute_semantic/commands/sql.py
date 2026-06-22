@@ -455,6 +455,7 @@ def execute_cmd(
         instance_id = str(e.context.get("instance_id") or "")
         if client is None or not instance_id:
             _emit_mcs_error(sql, client.profile if client is not None else None, e)
+            return  # _emit_mcs_error is NoReturn (sys.exit); this is for readers + linters
         try:
             status = client.get_instance_status(instance_id)
         except Exception:

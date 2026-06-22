@@ -401,7 +401,9 @@ def phase_column_sampling(
         # (profile_budget_cny in BuildOptions) and run non-interactively, so
         # the per-call cost gate should not prompt — the blocked-ceiling
         # still fires and is caught as McsError below.
-        envelope = client.execute_sql(sql, schema=source.schema, hints=extra_hints, assume_yes=True)
+        envelope = client.execute_sql(
+            sql, schema=source.schema, hints=extra_hints, assume_yes=True, timeout=120,
+        )
         rows = envelope.data.get("rows", []) if envelope.data else []
     except McsError as exc:
         return PhaseResult(
@@ -576,7 +578,9 @@ def phase_column_profiling(
     try:
         # assume_yes=True: see sampling phase comment — build owns its
         # own cost budget; per-call cost gate should not prompt.
-        envelope = client.execute_sql(sql, schema=source.schema, hints=extra_hints, assume_yes=True)
+        envelope = client.execute_sql(
+            sql, schema=source.schema, hints=extra_hints, assume_yes=True, timeout=120,
+        )
     except McsError as exc:
         return PhaseResult(
             status="partial_failure",
@@ -675,7 +679,7 @@ def phase_mine_history(
     try:
         # assume_yes=True: see sampling phase comment — build owns its
         # own cost budget; per-call cost gate should not prompt.
-        envelope = client.execute_sql(sql, hints=hints, assume_yes=True)
+        envelope = client.execute_sql(sql, hints=hints, assume_yes=True, timeout=120)
         rows = envelope.data.get("rows", []) if envelope.data else []
     except McsError as exc:
         return PhaseResult(
