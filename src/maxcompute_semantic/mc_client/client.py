@@ -200,7 +200,7 @@ class MaxComputeClient:
         sql: str,
         *,
         hints: dict[str, str] | None = None,
-        timeout: int = 120,
+        timeout: int = 30,
         use_interactive: bool = False,
         schema: str | None = None,
         assume_yes: bool = False,
@@ -258,10 +258,28 @@ class MaxComputeClient:
             try:
                 instance.wait_for_success(interval=2, timeout=timeout)
             except TimeoutError as e:
+                # The instance keeps running server-side after the sync wait
+                # elapses. Surface its id + logview so callers (the `mcs sql
+                # execute` CLI) can hand off to the async lifecycle instead of
+                # discarding the already-submitted job.
+                instance_id = str(getattr(instance, "id", "") or "")
+                try:
+                    logview = instance.get_logview_address()
+                except Exception:
+                    logview = ""
                 raise McsTimeoutError(
-                    f"SQL execution exceeded {timeout}s",
-                    remediation="raise --timeout or split SQL into smaller queries",
+                    f"SQL execution exceeded the synchronous {timeout}s wait; "
+                    f"instance {instance_id} is still running",
+                    remediation=(
+                        "the query is still running — do not resubmit. Poll it "
+                        f"with `mcs sql wait --project {self._profile.compute_project}"
+                        f" {instance_id}`, then read rows with `mcs sql result "
+                        f"--project {self._profile.compute_project} {instance_id}`"
+                        + (f". Logview: {logview}" if logview else "")
+                    ),
                     sql=sql,
+                    instance_id=instance_id,
+                    logview_url=logview,
                 ) from e
         return self._build_success_envelope(
             instance,

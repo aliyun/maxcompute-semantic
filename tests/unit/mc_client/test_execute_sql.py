@@ -233,6 +233,35 @@ def test_permission_denied_raises_classified() -> None:
         c.execute_sql("SELECT * FROM t")
 
 
+def test_execute_sql_timeout_carries_instance_id_for_async_handoff() -> None:
+    """A synchronous wait timeout must not lose the running job: the raised
+    error carries instance_id + logview so the CLI can hand off to the async
+    lifecycle (sql wait / sql result) instead of discarding the submission."""
+    c = _make_client()
+    c._tier = "3"
+
+    fake_inst = MagicMock()
+    fake_inst.id = "20260622083000_inst_001"
+    fake_inst.get_logview_address.return_value = "http://logview/xyz"
+    fake_inst.wait_for_success.side_effect = TimeoutError("deadline exceeded")
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = fake_inst
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    with pytest.raises(McsTimeoutError) as excinfo:
+        c.execute_sql("SELECT * FROM t", timeout=1)
+
+    ctx = excinfo.value.context
+    assert ctx["instance_id"] == "20260622083000_inst_001"
+    assert ctx["logview_url"] == "http://logview/xyz"
+    # The remediation must steer to the async lifecycle, not a nonexistent
+    # --timeout flag on `mcs sql execute`.
+    assert "sql wait" in excinfo.value.remediation
+    assert "do not resubmit" in excinfo.value.remediation.lower()
+
+
 def test_uses_interactive_when_requested() -> None:
     c = _make_client()
     c._tier = None

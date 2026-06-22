@@ -77,6 +77,7 @@ from maxcompute_semantic.auth.context import (
 )
 from maxcompute_semantic.commands._profile_command import profile_command
 from maxcompute_semantic.commands._schema_resolve import resolve_schema_for_tier
+from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
 from maxcompute_semantic.mc_client.errors import McsError, WriteOpRejectedError
 from maxcompute_semantic.mc_client.sql_guard import (
     classify_sql as _classify_sql,
@@ -392,6 +393,17 @@ def sql_group() -> None:
         "before any cost-estimate round-trip."
     ),
 )
+@click.option(
+    "--timeout",
+    default=30,
+    type=click.IntRange(min=1),
+    help=(
+        "seconds to wait synchronously for the result (default: 30). On "
+        "timeout the query keeps running — the command returns its "
+        "instance_id + logview so you can continue with `mcs sql wait` / "
+        "`mcs sql result` instead of resubmitting."
+    ),
+)
 @click.argument("sql")
 @click.pass_context
 def execute_cmd(
@@ -403,6 +415,7 @@ def execute_cmd(
     result_offset: int,
     assume_yes: bool,
     allow_write: bool,
+    timeout: int,
     sql: str,
 ) -> None:
     """Execute a SQL statement against MaxCompute.
@@ -433,7 +446,36 @@ def execute_cmd(
             max_rows=max_rows,
             result_offset=result_offset,
             allow_write=allow_write,
+            timeout=timeout,
         )
+    except McsTimeoutError as e:
+        # The sync wait elapsed but the instance is still running. Hand it off
+        # to the async lifecycle so the caller continues with the instance_id
+        # (sql wait / sql result) instead of resubmitting the query.
+        instance_id = str(e.context.get("instance_id") or "")
+        if client is None or not instance_id:
+            _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        try:
+            status = client.get_instance_status(instance_id)
+        except Exception:
+            status = {
+                "instance_id": instance_id,
+                "logview_url": e.context.get("logview_url", ""),
+                "lifecycle_state": "running",
+                "terminal": False,
+            }
+        # Include the routed project so the follow-up commands target the same
+        # project the query ran in (a multi-source profile routes execute to a
+        # source project that differs from the profile's default compute project).
+        proj = client.profile.compute_project
+        prof = f"--profile {profile} " if profile else ""
+        status["sync_timed_out"] = True
+        status["next_step"] = (
+            f"mcs sql wait {prof}--project {proj} {instance_id}; "
+            f"then mcs sql result {prof}--project {proj} {instance_id}"
+        )
+        emit_status(status)
+        return
     except McsError as e:
         _emit_mcs_error(sql, client.profile if client is not None else None, e)
 

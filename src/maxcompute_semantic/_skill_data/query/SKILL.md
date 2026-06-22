@@ -95,6 +95,11 @@ rebuilds use `mcs build`.
    ```bash
    mcs -f json sql execute '<SQL>'
    ```
+   `execute` waits `--timeout` seconds (default 30). If it exceeds that wait it
+   does **not** fail: the instance keeps running, so it returns
+   `data.sync_timed_out: true` with `data.instance_id` (+ `data.logview_url` /
+   `data.next_step`). Continue with the async path below using that
+   `instance_id` — do **not** resubmit the SQL.
    Async path:
    ```bash
    mcs -f json sql submit -y '<SQL>'
