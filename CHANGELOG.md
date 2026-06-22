@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-06-22
+
+### Fixed
+
+- **`mcs sql execute` no longer fails on sync timeout.** The instance keeps
+  running and the command returns `sync_timed_out: true` with the real
+  `instance_id`, `logview_url`, and a copy-pasteable `next_step` (including
+  `--profile` / `--project`). The old remediation message referenced a
+  nonexistent `--timeout` flag; it now carries real values.
+- Added `--timeout` flag to `mcs sql execute` (default **30s**, down from the
+  old hard-coded 120s). Build phases keep the original 120s timeout.
+- Fixed the old timeout error remediation text that told users to "raise
+  `--timeout`" on a command that had no such flag.
+- Bumped `torch` 2.12.0 → 2.12.1 to clear CVE-2025-3000 (low; transitive via
+  the optional `vec` extra).
+
+### Changed
+
+- **`report-issue` skill:** added sensitive-info redaction model (credentials
+  stripped unconditionally; other items flagged for user review) and a hard
+  confirmation gate before any submit or paste. Added a manual hand-off path
+  for sandboxed / headless environments where neither `a1` nor `gh` can
+  authenticate.
+- GitHub Releases are now created automatically from `CHANGELOG.md` when a
+  `v*` tag is pushed (new `github-release` job in `publish.yml`).
+
 ## [0.17.0] — 2026-06-22
 
 ### Added
