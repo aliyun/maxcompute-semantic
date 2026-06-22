@@ -222,6 +222,13 @@ verdict and query shape:
   prior timeout; any `verdict=confirm` query after user confirmation; or any
   query the user says can run in the background.
 
+Synchronous `execute` degrades into the async lifecycle on timeout: it waits
+`--timeout` seconds (default 30); if that elapses, the instance keeps running and
+`execute` returns `data.sync_timed_out: true` with `data.instance_id`,
+`data.logview_url`, and a `data.next_step` rather than failing. Pick up that
+`instance_id` with `sql wait` / `sql result`; never resubmit the same SQL after a
+sync timeout. Raise `--timeout` only when you want to keep waiting inline.
+
 ```bash
 mcs -f json sql submit -y '<SQL>'          # returns data.instance_id immediately
 mcs -f json sql status <instance_id>       # inspect data.lifecycle_state
