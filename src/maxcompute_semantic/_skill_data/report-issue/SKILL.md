@@ -5,18 +5,28 @@ description: Use when the user wants to file an upstream bug / issue / feature r
 
 # Report an upstream issue for maxcompute-semantic
 
-File a bug report or feature request upstream. There are two destinations and
+File a bug report or feature request upstream. There are three destinations;
 the skill auto-selects based on the environment:
 
-- **Internal (Aone)** — chosen when the `a1` CLI is installed (Alibaba-internal
-  machines). The project still serves internal users; their reports land in the
-  maintainer's Aone "My workitems" view.
-- **GitHub** — chosen otherwise. The public upstream tracker.
+- **Internal (Aone)** — when the `a1` CLI is installed *and* can authenticate
+  (Alibaba-internal machines). Reports land in the maintainer's Aone
+  "My workitems" view.
+- **GitHub** — when `gh` is installed *and* authenticated. The public upstream
+  tracker.
+- **Manual hand-off** — when neither CLI can actually submit (sandbox, no
+  browser for BUC / OAuth login, no network, auth failure). The skill prints the
+  finished issue for the user to copy-paste. This path is **always available**
+  and must never be a dead end.
 
-**Always show the drafted title + body + destination to the user and get
-confirmation before submitting. Never submit silently.**
+**Always (1) redact sensitive information — see "Redact sensitive information"
+below — then (2) show the drafted title + body + destination to the user and get
+confirmation before submitting or printing. Never submit silently.**
 
 ## Choose the destination
+
+Presence of a CLI is **not** the same as being able to submit. A sandboxed or
+headless environment often has `a1` / `gh` installed but cannot complete the
+browser-based BUC / OAuth login, so submission will fail.
 
 1. Probe both CLIs:
 
@@ -27,11 +37,16 @@ confirmation before submitting. Never submit silently.**
 2. Route:
    - `a1` present → **internal Aone flow** (default for internal users).
    - else `gh` present → **GitHub flow**.
-   - neither present → ask the user to install one (internal users: `a1`;
-     external users: `gh`) — see each flow's prerequisites below.
+   - neither present → **manual hand-off** (below).
 
-3. The user may override the auto-choice (e.g. "file it on GitHub" even on an
-   internal box). Honor the explicit request.
+3. If the chosen CLI **cannot authenticate or the submit step fails** — e.g. a
+   sandbox with no browser for `a1 auth login --buc`, no network, or an auth
+   error — do **not** stop at an error. Fall through to **manual hand-off**: the
+   drafted body is already done, so hand it to the user to paste.
+
+4. The user may override the auto-choice (e.g. "file it on GitHub" even on an
+   internal box, or "just give me the text to paste"). Honor the explicit
+   request.
 
 ## When to trigger
 
@@ -52,8 +67,45 @@ Collect from the conversation regardless of destination:
 - `code_refs` — `path:line` entries touched this session.
 - `plugin_version` — output of `mcs --version`. **Required**.
 - `doctor_snapshot` — output of `mcs doctor` (plain form, not `-f json`).
-  **Required** in every bug report. If `mcs doctor` errors, paste whatever it
-  produced plus the error.
+  **Required** in every bug report. If `mcs doctor` errors, include whatever it
+  produced plus the error. **Redact it first — see below.**
+
+## Redact sensitive information
+
+The SQL and `mcs doctor` output carry data only **you** can judge as safe. The
+agent's masking is **help, not a guarantee** — the binding safeguard is your
+confirmation (next section). Two rules:
+
+**1. The agent always strips, no exceptions** — access-key secrets, tokens,
+passwords, full credentials. These never belong in an issue, on any destination;
+remove them before the draft is even shown.
+
+**2. The agent flags and proposes masking** for anything else that looks
+sensitive, and points each one out so you can decide at confirmation time —
+never silently. Common cases:
+- SQL: real table / project / schema names; literal values in `WHERE` / `IN` /
+  `CASE WHEN` (event keys, ids, phone numbers, account names); inline sample data
+  or pasted result rows.
+- `mcs doctor`: profile names (can encode tenant / account ids); absolute paths
+  that reveal the OS user or home; internal endpoints / bucket URLs / hostnames;
+  access-key ids / account / principal strings.
+
+Proposed masking keeps the diagnostic *shape* but drops the specifics — e.g. a
+table FQN → `<project>.<table>`, a literal → `'<val>'`, a path → `/home/<user>`,
+a profile name → `<name>_***`. Keep what makes the bug actionable: the error
+message, which `doctor` checks failed, the SQL structure, versions, and tier. The
+agent can't know your business context, so it must propose, not decide.
+
+## Confirm before submitting — hard gate
+
+Submitting or pasting is **never** automatic. For every destination — Aone,
+GitHub, and manual hand-off:
+
+1. Show the user the **final, exact** text that will be sent: the
+   `[maxcompute-semantic]` title and the full body, after redaction.
+2. Ask explicitly — e.g. "OK to submit this? Anything else to redact?"
+3. Submit / paste **only** after the user explicitly approves. If they want
+   changes, edit and re-confirm; earlier approval never covers edited content.
 
 ---
 
@@ -85,7 +137,8 @@ miscellaneous tasks.
    - Otherwise run `a1 project list --quiet` (add `--keyword <kw>` to filter),
      show the list, and ask which to file under. The ID is `<target_project>`.
 
-2. **Show the drafted title and body to the user** for approval.
+2. **Redact (see "Redact sensitive information"), then get the user's explicit
+   confirmation of the final content (see "Confirm before submitting").**
 
 3. **Write the body to a temp file first, then submit.** Write straight into
    `/tmp/mcs-report-issue-<timestamp>.md`, **not** via a bash heredoc (heredocs
@@ -162,7 +215,8 @@ authenticated, ask the user to run `gh auth login` first.
 ### Steps
 
 1. **Classify**: bug, feature request, or question.
-2. **Show the drafted title and body to the user** for approval.
+2. **Redact (see "Redact sensitive information"), then get the user's explicit
+   confirmation of the final content (see "Confirm before submitting").**
 3. **Create**:
 
    ```bash
@@ -190,3 +244,26 @@ authenticated, ask the user to run `gh auth login` first.
    For feature requests: `--label enhancement`, title prefix `[feat]`.
 
 4. **Report back**: show the issue URL to the user.
+
+---
+
+## Manual hand-off (cannot submit)
+
+Use this whenever neither CLI can submit — sandbox, no browser for BUC / OAuth,
+no network, a missing or unauthenticated CLI, or a submit that errored. **Never
+dead-end on "run `a1 auth login --buc`"** when that login is impossible in the
+environment.
+
+1. **Redact** the draft (see "Redact sensitive information"). This matters even
+   more here — the user may paste it into a chat or ticket you don't control.
+2. Print the finished issue as a single copy-paste block: the
+   `[maxcompute-semantic]` title plus the full body (Summary / Reproduction /
+   redacted SQL / redacted `mcs doctor` snapshot / Root cause / Code references).
+3. Tell the user how to deliver it — for example:
+   - paste it to the maintainer directly (in this conversation, IM, or email);
+   - or, from a machine that *can* authenticate, file it via the Aone or GitHub
+     steps above (the body is ready for `--body-file` / `--body`);
+   - or paste it into the Aone / GitHub web UI by hand.
+
+Do **not** attempt the BUC / OAuth login yourself in a restricted environment —
+just produce the clean, redacted text and hand it off.
