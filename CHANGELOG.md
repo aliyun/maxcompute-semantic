@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.2] — 2026-06-22
+
+### Added
+
+- **Code coverage badge.** Codecov tokenless (OIDC) upload is now wired up:
+  `ci.yml` grants `id-token: write` and sets `use_oidc: true` so coverage
+  uploads from protected branches authenticate via the Codecov GitHub App
+  without a token. README badge:
+  `[![codecov](https://codecov.io/gh/aliyun/maxcompute-semantic/graph/badge.svg)]`.
+- **Python classifiers** in `pyproject.toml` (`3.10` / `3.11` / `3.12` + Apache
+  license) so the shields.io `pypi/pyversions` badge renders instead of
+  "missing".
+
+### Changed
+
+- `report-issue` skill: internal Aone upstream project id `2155299` → `871418`.
+
 ## [0.17.1] — 2026-06-22
 
 ### Fixed
