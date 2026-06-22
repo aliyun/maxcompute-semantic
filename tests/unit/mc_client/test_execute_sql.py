@@ -262,6 +262,30 @@ def test_execute_sql_timeout_carries_instance_id_for_async_handoff() -> None:
     assert "do not resubmit" in excinfo.value.remediation.lower()
 
 
+def test_execute_sql_timeout_survives_logview_failure() -> None:
+    """If get_logview_address() throws, the timeout error still carries the
+    instance_id with an empty logview (the defensive except branch)."""
+    c = _make_client()
+    c._tier = "3"
+
+    fake_inst = MagicMock()
+    fake_inst.id = "inst_logview_fail"
+    fake_inst.get_logview_address.side_effect = RuntimeError("logview unavailable")
+    fake_inst.wait_for_success.side_effect = TimeoutError("deadline exceeded")
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = fake_inst
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    with pytest.raises(McsTimeoutError) as excinfo:
+        c.execute_sql("SELECT * FROM t", timeout=1)
+
+    ctx = excinfo.value.context
+    assert ctx["instance_id"] == "inst_logview_fail"
+    assert ctx["logview_url"] == ""
+
+
 def test_uses_interactive_when_requested() -> None:
     c = _make_client()
     c._tier = None

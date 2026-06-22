@@ -365,6 +365,69 @@ class TestSqlExecute:
         # It must reuse the running instance, not resubmit the query.
         mock_client.get_instance_status.assert_called_once_with("20260622083000_inst_001")
 
+    def test_execute_sync_timeout_fallback_when_status_probe_fails(
+        self, isolated_config: Path
+    ) -> None:
+        """When get_instance_status throws after a sync timeout, the CLI must
+        still emit a success envelope with the instance_id from the error
+        context (the defensive except branch in execute_cmd)."""
+        from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
+
+        mock_profile = _mock_profile()
+        mock_client = _mock_client(mock_profile)
+        mock_client.execute_sql.side_effect = McsTimeoutError(
+            "exceeded 30s",
+            remediation="poll",
+            sql="SELECT 1",
+            instance_id="inst_status_fail",
+            logview_url="http://logview/abc",
+        )
+        mock_client.get_instance_status.side_effect = RuntimeError("network down")
+
+        with patch.multiple(
+            "maxcompute_semantic.commands.sql",
+            make_client_for_project=MagicMock(return_value=mock_client),
+            get_tier=MagicMock(return_value="2"),
+        ):
+            result = _invoke(
+                ["execute", "--project", "my_proj", "--schema", "default", "SELECT 1"]
+            )
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        data = output["data"]
+        assert data["sync_timed_out"] is True
+        assert data["instance_id"] == "inst_status_fail"
+        assert data["logview_url"] == "http://logview/abc"
+
+    def test_execute_sync_timeout_no_instance_id_falls_through_to_error(
+        self, isolated_config: Path
+    ) -> None:
+        """When the timeout error carries no instance_id, the CLI must fall
+        through to the normal error path (line 457 coverage)."""
+        from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
+
+        mock_profile = _mock_profile()
+        mock_client = _mock_client(mock_profile)
+        mock_client.execute_sql.side_effect = McsTimeoutError(
+            "exceeded 30s",
+            remediation="poll",
+            sql="SELECT 1",
+        )
+
+        with patch.multiple(
+            "maxcompute_semantic.commands.sql",
+            make_client_for_project=MagicMock(return_value=mock_client),
+            get_tier=MagicMock(return_value="2"),
+        ):
+            result = _invoke(
+                ["execute", "--project", "my_proj", "--schema", "default", "SELECT 1"]
+            )
+
+        assert result.exit_code == 1
+        output = json.loads(result.output)
+        assert output["status"] == "error"
+
     def test_execute_failure_outputs_error_envelope(self, isolated_config: Path) -> None:
         """On execution failure, output error envelope and exit 1."""
         mock_profile = _mock_profile()
