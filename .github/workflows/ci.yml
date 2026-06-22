@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write  # Codecov tokenless (OIDC) upload — required for protected branches
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
