@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-06-22
+
+### Added
+
+- **MaxCompute SQLGlot dialect** with ANTLR grammar validation — the dialect is
+  cross-checked against the ANTLR parser to keep parsing behaviour aligned
+  (`tests/grammar/test_antlr_vs_sqlglot.py`, `tests/unit/dialect/`).
+- `ALTER TABLE` parser support for 5 ODPS extensions.
+- **Internal Aone destination restored in the `report-issue` skill.** The skill
+  now auto-detects the environment: `a1` CLI present → internal Aone workitem
+  tracker; otherwise → GitHub Issues. It confirms title/body/destination before
+  submitting and lets the user override the auto-choice.
+- GitHub Actions CI/CD: lint, dependency review, GitHub Pages, PR-agent review,
+  uv lockfile check, zizmor security scan, and PyPI publish on tag; PR template;
+  raised coverage gates and security checks.
+- i18n documentation site with locale auto-detection and a language dropdown.
+
+### Changed
+
+- Rewrote `README.md` / `README.zh-cn.md`: new intro framing, explicit CLI quick
+  start, a safety & privacy section, and an expanded feature table.
+
+### Fixed
+
+- Resolved mypy type errors across the dialect package and the wider codebase;
+  cleared lint errors (unused imports, f-strings); added missing SPDX headers.
+- Synced `uv.lock` with the `antlr4-python3-runtime` dev dependency.
+
 ## [0.16.2] — 2026-06-09
 
 ### Fixed
