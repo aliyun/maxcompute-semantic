@@ -7,35 +7,47 @@
 [![English](https://img.shields.io/badge/lang-English-blue)](README.md)
 [![中文](https://img.shields.io/badge/lang-中文-red)](README.zh-cn.md)
 
-**Give your AI agent a semantic understanding of your MaxCompute data.**
+**Give AI agents the context they need to query your MaxCompute data.**
 
-`mcs` builds a local semantic package — table descriptions, column hints, JOIN
-relationships, verified SQL patterns, and business metrics — so your AI agent
-can write correct MaxCompute SQL sooner, with fewer retry loops.
+`mcs` is a CLI for building a local semantic package from your MaxCompute
+project: table and column descriptions, JOIN relationships, UDFs, business
+metrics, verified SQL, and notes from past queries. Your agent reads that
+package before it writes SQL, then uses `mcs` to review, cost-check, and execute
+the query.
 
 [Documentation](https://aliyun.github.io/maxcompute-semantic/) · [PyPI](https://pypi.org/project/maxcompute-semantic/) · [Changelog](CHANGELOG.md)
 
-## Three Things
+## Why mcs?
+
+AI agents can call MaxCompute, but they do not know your data warehouse. They
+guess table names, miss JOIN keys, and write SQL that runs but answers the wrong
+question.
+
+`mcs` gives the agent a local source of truth:
+
+- **Semantic package** - `mcs build` scans table metadata and produces a
+  structured package the agent can read before writing SQL.
+- **Memory** - verified queries, failed patterns, and domain notes accumulate
+  over time. Similar questions can reuse known-good SQL instead of starting
+  cold.
+- **SQL guard rails** - cost estimation, write protection, dialect review, and
+  tier-aware schema resolution run before the query reaches MaxCompute.
+- **Agent integration** - the packaged skill works with Claude Code, Cursor,
+  Codex, Gemini CLI, Qwen Code, OpenCode, and many other agent platforms.
+
+## How it works
 
 **You configure a `profile` → `mcs build` produces a semantic package → agent reads it to write SQL**
 
-- **`[A] profile`** — your identity + which tables to cover (AK or keyless auth + a set of sources). One profile = one business scenario.
-- **`[B] semantic package`** — local knowledge base (tables / columns / JOINs / UDFs) produced by `mcs build`. The agent reads it before writing SQL instead of re-scanning MaxCompute metadata every time.
-- **`[C] agent`** — connects via SKILL.md; runs `mcs sql cost` (cost gate) then `mcs sql execute` to query.
+- **`[A] profile`** - identity, compute project, cost thresholds, and table
+  scope. One profile usually maps to one business scenario.
+- **`[B] semantic package`** - local SQLite + markdown knowledge base produced
+  by `mcs build`.
+- **`[C] agent`** - connects through the generated skill; reads the package,
+  runs `mcs sql cost`, and then runs `mcs sql execute` or the async SQL
+  lifecycle.
 
-Business scenario = `[A]` profile + `[B]` semantic package + accumulated *annotations* / *memory* (gets better over time).
-
-## Why mcs?
-
-AI agents can query MaxCompute, but they don't know *your* data. They guess
-table names, miss JOIN keys, and write SQL that fails or returns wrong results.
-
-`mcs` closes the gap:
-
-- **Semantic package** — `mcs build` scans your project's schema and produces a structured knowledge base (SQLite + markdown) the agent reads before writing SQL.
-- **Memory** — verified queries, failed patterns, and domain notes accumulate over time. The agent gets better the more you use it.
-- **SQL guard rails** — cost estimation, write protection, dialect review, and tier-aware schema resolution, all before the query hits MaxCompute.
-- **Agent-agnostic** — works with Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, OpenCode, and 50+ more. Run `mcs skill install --detect -g` for agents found on your machine, or `--all -g` for every supported platform.
+Business scenario = profile + semantic package + metrics + query memory.
 
 ## Quick Start
 
@@ -45,48 +57,92 @@ cover, and SELECT permission on those tables.
 
 ### 1. Install
 
-Tell any connected AI agent:
+```bash
+uv tool install maxcompute-semantic
+mcs --version
+```
+
+Then register the skill with the agents on this machine:
+
+```bash
+mcs skill install --detect -g
+```
+
+Prefer an agent-assisted install? Tell any connected AI agent:
 
 > Install mcs for me, read this guide fully then follow step by step: curl -fsSL https://raw.githubusercontent.com/aliyun/maxcompute-semantic/main/scripts/install.md
 
-The agent will install the CLI and skill in one go. The guide tells it to show
-you the exact command before running any remote bootstrap or final install step.
-Prefer manual setup? See [Manual Install](#manual-install).
+The guide tells the agent to show you the exact command before running any
+remote bootstrap or final install step.
 
-### 2. Let the agent build your semantic layer
+### 2. Create a profile
 
-Once the skill is installed, **describe your business scenario** and let the agent set up the profile + semantic package:
+```bash
+mcs profile create
+mcs link bind <profile-name>
+```
 
-> *"I'm doing monthly analysis on warehouse A, mainly looking at the order and user tables in the dwd/dws layers of `your_project` — help me build the semantic layer"*
+`profile create` opens an interactive wizard for endpoint, auth, project,
+sources, and cost thresholds. `link bind` ties the current directory to that
+profile so future commands can resolve it automatically.
 
-The agent will:
+### 3. Build the semantic package
 
-1. **profile create** — guide you through MaxCompute identity setup, auto-probe auth.
-2. **link bind** — bind the current directory to the profile so future commands auto-resolve.
-3. **mcs build** — scan all tables in scope, produce the local semantic package.
+```bash
+mcs build
+mcs doctor
+```
 
-### 3. Ask in natural language
+### 4. Ask through your agent
 
 > *"How did last month's order GMV compare year-over-year?"*
 
-The agent runs `mcs show` (read semantic package) → `mcs sql cost` (cost gate) → `mcs sql execute` (run query). Have it record the working SQL so similar questions get BM25 recall next time:
+The agent reads `mcs show`, checks the query with `mcs sql review`, estimates
+cost with `mcs sql cost`, and then runs `mcs sql execute` when the query is
+safe to run. Have it record working SQL so similar questions get BM25 recall
+next time:
 
 ```bash
 mcs memory verify --question "How did last month's order GMV compare year-over-year?" --sql "SELECT ..." --tables your_project.your_schema.orders
 ```
+
+You can also let the agent do steps 2 and 3. After installing the skill, describe
+your business scenario:
+
+> *"I'm doing monthly analysis on warehouse A, mainly looking at the order and user tables in the dwd/dws layers of `your_project`; help me build the semantic layer."*
+
+The agent will guide profile setup, bind the working directory, and run
+`mcs build`.
+
+## Safety and privacy
+
+- `mcs` stores profiles and semantic packages locally. The semantic package is
+  SQLite + markdown, not a hosted service.
+- Credentials stay in your profile configuration. You can store AK values as
+  environment-variable references instead of literals.
+- `mcs build` reads metadata and optional samples only for the sources you put
+  in the profile.
+- `mcs sql cost`, `mcs sql review`, and write protection are designed to catch
+  expensive or unsafe SQL before execution.
+- Agents use `mcs` as the gatekeeper. They do not need direct MaxCompute
+  credentials outside the configured profile.
 
 ## Key Features
 
 | Feature | Command | What it does |
 |---------|---------|--------------|
 | **Build** | `mcs build` | Scan schema → produce semantic package |
+| **Inspect** | `mcs show` / `mcs status` | Read package data and build status |
+| **Catalog** | `mcs meta ...` | Discover projects, schemas, tables, and columns |
 | **Query** | `mcs sql execute '...'` | Run SQL with tier-aware resolution |
+| **Async SQL** | `mcs sql submit` / `wait` / `result` | Run and retrieve long queries |
 | **Cost gate** | `mcs sql cost '...'` | Estimate cost before running |
 | **Review** | `mcs sql review '...'` | Lint SQL for dialect / schema issues |
 | **Memory** | `mcs memory verify ...` | Record a verified query for future recall |
 | **Recall** | `mcs memory recall '<q>'` | BM25 search across verified SQL + notes |
 | **Metrics** | `mcs metric add ...` | Define reusable business metrics |
-| **Proposals** | `mcs package propose --from-suggestions` | Suggest semantic annotations from build |
+| **Proposals** | `mcs package propose --from-suggestions` | Turn build suggestions into reviewable package changes |
+| **UDFs** | `mcs udf ...` | List, inspect, create, test, and remove UDFs |
 | **Doctor** | `mcs doctor` | Diagnose profile / auth / skill state |
 
 Run `mcs <command> --help` for the full option surface.
@@ -147,4 +203,4 @@ uv run mypy src/
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Third-party notices in [NOTICE](NOTICE).
+Apache License 2.0 - see [LICENSE](LICENSE). Third-party notices in [NOTICE](NOTICE).
