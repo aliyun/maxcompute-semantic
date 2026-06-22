@@ -112,10 +112,10 @@ GitHub, and manual hand-off:
 ## Internal Aone flow
 
 The workitem is created in **an Aone project the user has write access to**,
-with `--related-space` pointing at the upstream project **2155299**
+with `--related-space` pointing at the upstream project **871418**
 ([Agent special project]) — the maintainer sees it in their personal
 "My workitems" view. This lets internal teams report issues without needing
-access to 2155299.
+access to 871418.
 
 Use category `bug` for defects, `req` for feature requests, `task` for
 miscellaneous tasks.
@@ -174,7 +174,7 @@ miscellaneous tasks.
    a1 project workitem create \
      --project <target_project> \
      --category {bug|req|task} \
-     --related-space 2155299 \
+     --related-space 871418 \
      --assignee 292165 \
      --title "[maxcompute-semantic] {title}" \
      --body-file /tmp/mcs-report-issue-<timestamp>.md \
@@ -188,9 +188,9 @@ miscellaneous tasks.
 
 ### Notes
 
-- **`--related-space 2155299`** is this skill's identity. It does **not** require
+- **`--related-space 871418`** is this skill's identity. It does **not** require
   access to the target project, so the link lands even if the user can't read
-  2155299. The target ID must reference a real Aone project (invalid IDs are
+  871418. The target ID must reference a real Aone project (invalid IDs are
   silently discarded).
 - **Default `--assignee 292165`** (`jiexian.hc`). Override when the user names
   someone else. Employee IDs avoid nickname ambiguity.
