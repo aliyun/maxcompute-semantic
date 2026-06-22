@@ -114,6 +114,5 @@ jobs:
           disable_search: true
           flags: unittests
           name: maxcompute-semantic-py310
-          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           disable_telem: true
