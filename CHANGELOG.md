@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.17.3] — 2026-06-22
+
+### Fixed
+
+- **Site version badge stuck on v0.16.** The six `<span class="ver">` markers
+  had been hand-edited to the literal `v0.16`, so the pages.yml deploy-time
+  `sed s/v__MINOR__/v${MINOR}/` matched nothing and every release showed
+  `v0.16`. Restored the `v__MINOR__` placeholder; the deployed site now shows
+  the current minor (`v0.17`).
+
+### Changed
+
+- **PyPI publish now goes through the `pypi` GitHub Actions environment**
+  (matching the PyPI-side Trusted Publisher environment-protected setup),
+  giving a proper deployment record per release and enabling required-reviewer
+  / branch protection on publishes.
+
 ## [0.17.2] — 2026-06-22
 
 ### Added
