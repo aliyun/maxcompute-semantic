@@ -12,116 +12,69 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 from pathlib import Path
 
 import pytest
 
 
 class TestLatestMetadata:
-    def test_parse_full_payload(self) -> None:
+    def test_parse_pypi_payload(self, pypi_project_payload) -> None:
         from maxcompute_semantic._internal.update_check import LatestMetadata
 
-        raw = {
-            "schema_version": 1,
-            "latest_version": "0.4.0a40",
-            "released_at": "2026-05-22T12:00:00Z",
-            "wheel_url": "https://example.test/wheels/x.whl",
-            "min_supported": "0.4.0a30",
-            "disabled": ["0.4.0a32", "0.4.0a35"],
-            "notice": "scheduled maintenance",
-            "sha256": "A" * 64,
-        }
-        m = LatestMetadata.from_dict(raw)
+        raw = pypi_project_payload("0.17.3", sha256="A" * 64)
+        m = LatestMetadata.from_pypi_dict(raw)
         assert m.schema_version == 1
-        assert m.latest_version == "0.4.0a40"
-        assert m.released_at == "2026-05-22T12:00:00Z"
-        assert m.wheel_url == "https://example.test/wheels/x.whl"
-        assert m.min_supported == "0.4.0a30"
-        assert m.disabled == ("0.4.0a32", "0.4.0a35")
-        assert m.notice == "scheduled maintenance"
-        assert m.sha256 == "a" * 64
-
-    def test_parse_minimal_payload(self) -> None:
-        """Optional fields default to empty values."""
-        from maxcompute_semantic._internal.update_check import LatestMetadata
-
-        m = LatestMetadata.from_dict(
-            {
-                "schema_version": 1,
-                "latest_version": "0.4.0a40",
-                "released_at": "2026-05-22T12:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "min_supported": "0.4.0a30",
-                "disabled": [],
-                "sha256": "a" * 64,
-                "notice": "",
-            }
+        assert m.latest_version == "0.17.3"
+        assert m.released_at == "2026-06-22T15:45:27.936944Z"
+        assert m.wheel_url == (
+            "https://files.pythonhosted.org/packages/py3/"
+            "maxcompute_semantic-0.17.3-py3-none-any.whl"
         )
+        assert m.min_supported == "0"
         assert m.disabled == ()
         assert m.notice == ""
         assert m.sha256 == "a" * 64
 
-    def test_parse_missing_sha256_field(self) -> None:
-        """Remote latest.json must carry a wheel digest."""
+    def test_parse_missing_sha256_field(self, pypi_project_payload) -> None:
+        """PyPI project JSON must carry the wheel digest."""
         from maxcompute_semantic._internal.update_check import (
             LatestMetadata,
             MalformedMetadataError,
         )
 
+        raw = pypi_project_payload("0.17.3")
+        wheel = raw["urls"][1]
+        assert isinstance(wheel, dict)
+        digests = wheel["digests"]
+        assert isinstance(digests, dict)
+        del digests["sha256"]
+
         with pytest.raises(MalformedMetadataError, match="sha256"):
-            LatestMetadata.from_dict(
-                {
-                    "schema_version": 1,
-                    "latest_version": "0.4.0a40",
-                    "released_at": "2026-05-22T12:00:00Z",
-                    "wheel_url": "https://example.test/wheels/x.whl",
-                    "min_supported": "0.4.0a30",
-                    "disabled": [],
-                    "notice": "",
-                }
-            )
+            LatestMetadata.from_pypi_dict(raw)
 
     @pytest.mark.parametrize("sha256", ["abc123", "g" * 64])
-    def test_parse_rejects_malformed_sha256_field(self, sha256: str) -> None:
-        """Remote latest.json must carry a full hex SHA256 digest."""
+    def test_parse_rejects_malformed_sha256_field(
+        self, sha256: str, pypi_project_payload
+    ) -> None:
+        """PyPI project JSON must carry a full hex SHA256 digest."""
         from maxcompute_semantic._internal.update_check import (
             LatestMetadata,
             MalformedMetadataError,
         )
 
         with pytest.raises(MalformedMetadataError, match="SHA256"):
-            LatestMetadata.from_dict(
-                {
-                    "schema_version": 1,
-                    "latest_version": "0.4.0a40",
-                    "released_at": "2026-05-22T12:00:00Z",
-                    "wheel_url": "https://example.test/wheels/x.whl",
-                    "min_supported": "0.4.0a30",
-                    "disabled": [],
-                    "notice": "",
-                    "sha256": sha256,
-                }
-            )
+            LatestMetadata.from_pypi_dict(pypi_project_payload("0.17.3", sha256=sha256))
 
-    def test_parse_rejects_unknown_schema_version(self) -> None:
+    def test_parse_rejects_missing_matching_wheel(self, pypi_project_payload) -> None:
         from maxcompute_semantic._internal.update_check import (
             LatestMetadata,
-            UnsupportedSchemaError,
+            MalformedMetadataError,
         )
 
-        with pytest.raises(UnsupportedSchemaError):
-            LatestMetadata.from_dict(
-                {
-                    "schema_version": 99,
-                    "latest_version": "0.4.0a40",
-                    "released_at": "2026-05-22T12:00:00Z",
-                    "wheel_url": "https://example.test/wheels/x.whl",
-                    "min_supported": "0.4.0a30",
-                    "disabled": [],
-                    "notice": "",
-                }
-            )
+        raw = pypi_project_payload("0.17.3", yanked=True)
+
+        with pytest.raises(MalformedMetadataError, match="no non-yanked wheel"):
+            LatestMetadata.from_pypi_dict(raw)
 
     def test_parse_missing_required_field(self) -> None:
         from maxcompute_semantic._internal.update_check import (
@@ -130,77 +83,66 @@ class TestLatestMetadata:
         )
 
         with pytest.raises(MalformedMetadataError):
-            LatestMetadata.from_dict({"schema_version": 1})  # missing the rest
+            LatestMetadata.from_pypi_dict({"urls": []})  # missing info.version
 
 
-class TestLatestJsonServer:
+class TestPyPIJsonServer:
     """Sanity check the fixture itself — every test that exercises
     fetch_latest_metadata depends on it."""
 
-    def test_serves_dict_payload(self, latest_json_server) -> None:
+    def test_serves_dict_payload(self, pypi_json_server) -> None:
         import urllib.request
 
-        base_url, setter = latest_json_server
+        base_url, setter = pypi_json_server
         setter({"hello": "world"})
-        with urllib.request.urlopen(f"{base_url}/latest.json", timeout=2.0) as r:
+        with urllib.request.urlopen(f"{base_url}/pypi/maxcompute-semantic/json", timeout=2.0) as r:
             body = r.read().decode("utf-8")
         assert json.loads(body) == {"hello": "world"}
 
-    def test_serves_500_status(self, latest_json_server) -> None:
+    def test_serves_500_status(self, pypi_json_server) -> None:
         import urllib.error
         import urllib.request
 
-        base_url, setter = latest_json_server
+        base_url, setter = pypi_json_server
         setter(503)
         with pytest.raises(urllib.error.HTTPError) as ei:
-            urllib.request.urlopen(f"{base_url}/latest.json", timeout=2.0)
+            urllib.request.urlopen(f"{base_url}/pypi/maxcompute-semantic/json", timeout=2.0)
         assert ei.value.code == 503
 
 
 class TestFetchLatestMetadata:
-    _VALID_PAYLOAD = {
-        "schema_version": 1,
-        "latest_version": "0.4.0a40",
-        "released_at": "2026-05-22T12:00:00Z",
-        "wheel_url": "https://example.test/wheels/x.whl",
-        "sha256": "a" * 64,
-        "min_supported": "0.4.0a30",
-        "disabled": [],
-        "notice": "",
-    }
-
-    def test_returns_metadata_on_200(self, latest_json_server) -> None:
+    def test_returns_metadata_on_200(self, pypi_json_server, pypi_project_payload) -> None:
         from maxcompute_semantic._internal.update_check import (
             LatestMetadata,
             fetch_latest_metadata,
         )
 
-        _, setter = latest_json_server
-        setter(self._VALID_PAYLOAD)
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("0.4.0a40"))
         result = fetch_latest_metadata(timeout_s=2.0)
         assert isinstance(result, LatestMetadata)
         assert result.latest_version == "0.4.0a40"
 
-    def test_returns_none_on_5xx(self, latest_json_server) -> None:
+    def test_returns_none_on_5xx(self, pypi_json_server) -> None:
         from maxcompute_semantic._internal.update_check import fetch_latest_metadata
 
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(503)
         assert fetch_latest_metadata(timeout_s=2.0) is None
 
-    def test_returns_none_on_invalid_json(self, latest_json_server) -> None:
+    def test_returns_none_on_invalid_json(self, pypi_json_server) -> None:
         from maxcompute_semantic._internal.update_check import fetch_latest_metadata
 
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter("not-valid-json{{{")
         assert fetch_latest_metadata(timeout_s=2.0) is None
 
-    def test_returns_none_on_unsupported_schema(self, latest_json_server) -> None:
+    def test_returns_none_on_malformed_pypi_payload(self, pypi_json_server) -> None:
         from maxcompute_semantic._internal.update_check import fetch_latest_metadata
 
-        _, setter = latest_json_server
-        setter({**self._VALID_PAYLOAD, "schema_version": 99})
-        # UnsupportedSchemaError is raised by from_dict() and folded
+        _, setter = pypi_json_server
+        setter({"info": {"version": "0.17.3"}, "urls": []})
+        # MalformedMetadataError is raised by from_pypi_dict() and folded
         # into None by fetch_latest_metadata's catch-all.
         assert fetch_latest_metadata(timeout_s=2.0) is None
 
@@ -222,15 +164,13 @@ class TestFetchLatestMetadata:
 
         assert fetch_latest_metadata(timeout_s=0.5) is None
 
-    def test_uses_base_url_from_env(
-        self, latest_json_server, monkeypatch: pytest.MonkeyPatch
+    def test_uses_metadata_url_provider(
+        self, pypi_json_server, pypi_project_payload, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The fixture sets MCS_UPDATE_BASE_URL. Confirm the fetcher
-        actually reads it: serve a payload, then verify the parsed
-        result matches."""
-        base_url, setter = latest_json_server
-        setter({**self._VALID_PAYLOAD, "latest_version": "9.9.9"})
-        assert os.environ["MCS_UPDATE_BASE_URL"] == base_url
+        """The fixture patches the resolved metadata URL. Confirm the
+        fetcher uses that PyPI JSON endpoint."""
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("9.9.9"))
 
         from maxcompute_semantic._internal.update_check import fetch_latest_metadata
 
@@ -238,44 +178,167 @@ class TestFetchLatestMetadata:
         assert result is not None
         assert result.latest_version == "9.9.9"
 
+    def test_parses_pypi_json_payload(
+        self, monkeypatch: pytest.MonkeyPatch, pypi_project_payload
+    ) -> None:
+        import json
+
+        from maxcompute_semantic._internal.update_check import (
+            LatestMetadata,
+            fetch_latest_metadata,
+        )
+
+        payload = pypi_project_payload(
+            "0.17.3",
+            wheel_url="https://files.pythonhosted.org/packages/w/wheel.whl",
+        )
+        called_urls: list[str] = []
+
+        class _Resp:
+            def __enter__(self) -> "_Resp":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self, _limit: int) -> bytes:
+                return json.dumps(payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout: float):  # type: ignore[no-untyped-def]
+            called_urls.append(request.full_url)
+            return _Resp()
+
+        monkeypatch.delenv("MCS_UPDATE_BASE_URL", raising=False)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+        result = fetch_latest_metadata(timeout_s=2.0)
+
+        assert isinstance(result, LatestMetadata)
+        assert called_urls == ["https://pypi.org/pypi/maxcompute-semantic/json"]
+        assert result.latest_version == "0.17.3"
+        assert result.released_at == "2026-06-22T15:45:27.936944Z"
+        assert result.wheel_url == "https://files.pythonhosted.org/packages/w/wheel.whl"
+        assert result.sha256 == "a" * 64
+        assert result.min_supported == "0"
+        assert result.disabled == ()
+
+    def test_pypi_json_request_identifies_mcs_user_agent(
+        self, monkeypatch: pytest.MonkeyPatch, pypi_project_payload
+    ) -> None:
+        import json
+
+        from maxcompute_semantic._internal.update_check import fetch_latest_metadata
+
+        payload = pypi_project_payload("0.17.3")
+        called_urls: list[str] = []
+        called_headers: list[dict[str, str]] = []
+
+        class _Resp:
+            def __enter__(self) -> "_Resp":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self, _limit: int) -> bytes:
+                return json.dumps(payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout: float):  # type: ignore[no-untyped-def]
+            assert hasattr(request, "full_url")
+            called_urls.append(request.full_url)
+            called_headers.append({k.lower(): v for k, v in request.header_items()})
+            return _Resp()
+
+        monkeypatch.delenv("MCS_UPDATE_BASE_URL", raising=False)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+        result = fetch_latest_metadata(timeout_s=2.0)
+
+        assert result is not None
+        assert called_urls == ["https://pypi.org/pypi/maxcompute-semantic/json"]
+        assert called_headers
+        user_agent = called_headers[0].get("user-agent", "")
+        assert user_agent.startswith("mcs/")
+        assert "maxcompute-semantic" in user_agent
+
 
 class TestBaseUrlValidation:
     def test_default_base_url_is_trusted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from maxcompute_semantic._internal.update_check import DEFAULT_BASE_URL, _base_url
 
         monkeypatch.delenv("MCS_UPDATE_BASE_URL", raising=False)
-        monkeypatch.delenv("MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL", raising=False)
 
         assert _base_url() == DEFAULT_BASE_URL
+        assert _base_url() == "https://pypi.org/pypi/maxcompute-semantic"
+
+    def test_pypi_host_is_trusted_without_escape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from maxcompute_semantic._internal.update_check import _base_url
+
+        monkeypatch.setenv("MCS_UPDATE_BASE_URL", "https://pypi.org")
+
+        assert _base_url() == "https://pypi.org"
+
+    @pytest.mark.parametrize(
+        ("base_url", "metadata_url"),
+        [
+            (
+                "https://pypi.org",
+                "https://pypi.org/pypi/maxcompute-semantic/json",
+            ),
+            (
+                "https://pypi.org/pypi/maxcompute-semantic",
+                "https://pypi.org/pypi/maxcompute-semantic/json",
+            ),
+            (
+                "https://pypi.org/pypi/maxcompute-semantic/json",
+                "https://pypi.org/pypi/maxcompute-semantic/json",
+            ),
+        ],
+    )
+    def test_metadata_url_normalizes_pypi_project_paths(
+        self, base_url: str, metadata_url: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from maxcompute_semantic._internal.update_check import _metadata_url
+
+        monkeypatch.setenv("MCS_UPDATE_BASE_URL", base_url)
+
+        assert _metadata_url() == metadata_url
 
     @pytest.mark.parametrize("url", ["http://example.test", "file:///tmp/latest"])
-    def test_rejects_non_https_scheme_even_with_escape(
+    def test_rejects_non_https_scheme(
         self, url: str, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from maxcompute_semantic._internal.update_check import _base_url
 
         monkeypatch.setenv("MCS_UPDATE_BASE_URL", url)
-        monkeypatch.setenv("MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL", "1")
 
         with pytest.raises(ValueError, match="https"):
             _base_url()
 
-    def test_rejects_untrusted_https_without_escape(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://mirror.example.test/mcs",
+            "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com",
+        ],
+    )
+    def test_rejects_non_pypi_https(
+        self, url: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         from maxcompute_semantic._internal.update_check import _base_url
 
-        monkeypatch.setenv("MCS_UPDATE_BASE_URL", "https://mirror.example.test/mcs")
-        monkeypatch.delenv("MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL", raising=False)
+        monkeypatch.setenv("MCS_UPDATE_BASE_URL", url)
 
         with pytest.raises(ValueError, match="trusted allowlist"):
             _base_url()
 
-    def test_allows_untrusted_https_with_escape(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from maxcompute_semantic._internal.update_check import _base_url
+    def test_rejects_wrong_pypi_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from maxcompute_semantic._internal.update_check import _metadata_url
 
-        monkeypatch.setenv("MCS_UPDATE_BASE_URL", "https://mirror.example.test/mcs/")
-        monkeypatch.setenv("MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL", "1")
+        monkeypatch.setenv("MCS_UPDATE_BASE_URL", "https://pypi.org/simple")
 
-        assert _base_url() == "https://mirror.example.test/mcs"
+        with pytest.raises(ValueError, match="PyPI project JSON"):
+            _metadata_url()
 
 
 class TestIsDisabled:
@@ -287,7 +350,7 @@ class TestIsDisabled:
             schema_version=1,
             latest_version="0.4.0a99",
             released_at="2026-05-22T00:00:00Z",
-            wheel_url="https://example.test/wheels/x.whl",
+            wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
             min_supported=min_supported,
             disabled=disabled,
             notice="",
@@ -389,7 +452,7 @@ class TestCache:
             checked_at="2026-05-22T09:55:00Z",
             current_at_check="0.4.0a38",
             latest_version="0.4.0a40",
-            wheel_url="https://example.test/wheels/x.whl",
+            wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
             min_supported="0.4.0a30",
             disabled=("0.4.0a32",),
             notice="hello",
@@ -420,7 +483,7 @@ class TestCache:
             checked_at="2026-05-22T09:00:00Z",
             current_at_check="0.4.0a38",
             latest_version="0.4.0a39",
-            wheel_url="https://example.test/wheels/x.whl",
+            wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
             min_supported="0.4.0a30",
             disabled=(),
             notice="",
@@ -529,7 +592,7 @@ class TestFormatBanner:
             checked_at="2026-05-22T09:55:00Z",
             current_at_check="0.4.0a38",
             latest_version="0.4.0a40",
-            wheel_url="https://example.test/wheels/x.whl",
+            wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
             min_supported="0.4.0a30",
             disabled=(),
             notice="",
@@ -839,25 +902,15 @@ class TestBackgroundProbe:
 
     def test_run_probe_writes_successful_cache(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
         monkeypatch: pytest.MonkeyPatch,
+        pypi_project_payload,
     ) -> None:
         """The synchronous probe routine (the body the daemon thread
         runs) populates the cache file from the served metadata."""
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "0.4.0a99",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.4.0a30",
-                "disabled": [],
-                "notice": "synced",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("0.4.0a99"))
 
         from maxcompute_semantic._internal.update_check import (
             _run_probe,
@@ -870,17 +923,17 @@ class TestBackgroundProbe:
         loaded = read_cache()
         assert loaded is not None
         assert loaded.latest_version == "0.4.0a99"
-        assert loaded.notice == "synced"
+        assert loaded.notice == ""
         assert loaded.fetch_error == ""
         assert loaded.current_at_check == "0.4.0a38"
         assert cache_path().exists()
 
     def test_run_probe_records_fetch_error_on_5xx(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
     ) -> None:
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(503)
         from maxcompute_semantic._internal.update_check import _run_probe, read_cache
 
@@ -893,25 +946,15 @@ class TestBackgroundProbe:
 
     def test_run_probe_preserves_prior_on_transient_error(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
+        pypi_project_payload,
     ) -> None:
         from maxcompute_semantic._internal.update_check import _run_probe, read_cache
 
         # First probe: successful.
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "0.4.0a99",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.4.0a30",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("0.4.0a99"))
         _run_probe(current_version="0.4.0a38")
         good = read_cache()
         assert good is not None
@@ -931,31 +974,21 @@ class TestBackgroundProbe:
 
     def test_start_background_probe_returns_immediately(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
+        pypi_project_payload,
     ) -> None:
         """The public entry point is non-blocking. We assert that by
         wrapping the probe body with a delay and confirming the spawn
         call returns before the delay would have completed."""
         import time
 
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         # Slow the server-side response by serving a payload that
         # takes a moment — the simplest knob is just the wall-clock of
         # the fetch when the server is up vs the wall-clock of the
         # spawn call, which should be sub-millisecond regardless.
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "0.4.0a99",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.4.0a30",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        setter(pypi_project_payload("0.4.0a99"))
 
         from maxcompute_semantic._internal.update_check import start_background_probe
 
@@ -983,7 +1016,7 @@ class TestBackgroundProbe:
 
     def test_start_background_probe_skips_when_ttl_fresh(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -1007,7 +1040,7 @@ class TestBackgroundProbe:
                 checked_at=_utcnow_iso(),
                 current_at_check="0.4.0a38",
                 latest_version="0.4.0a40",
-                wheel_url="https://example.test/wheels/x.whl",
+                wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
                 min_supported="0.4.0a30",
                 disabled=(),
                 notice="",
@@ -1033,25 +1066,15 @@ class TestBackgroundProbe:
 
     def test_start_background_probe_force_bypasses_ttl(
         self,
-        latest_json_server,
+        pypi_json_server,
         _cache_tmp: Path,
         monkeypatch: pytest.MonkeyPatch,
+        pypi_project_payload,
     ) -> None:
         """``force=True`` (used by ``mcs doctor`` for a fresh probe)
         runs even when the cache is fresh."""
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "0.4.0a99",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.4.0a30",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("0.4.0a99"))
 
         from maxcompute_semantic._internal.update_check import (
             CacheEntry,

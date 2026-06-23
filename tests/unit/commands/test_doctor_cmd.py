@@ -614,26 +614,15 @@ class TestUpdateChannelChecks:
     from click.testing import CliRunner
 
     def test_channel_pass_and_version_current_pass(
-        self, latest_json_server, isolated_config: Path
+        self, pypi_json_server, isolated_config: Path, pypi_project_payload
     ) -> None:
-        """latest.json is reachable and the running version >=
+        """PyPI project JSON is reachable and the running version >=
         latest_version → both checks PASS."""
         from maxcompute_semantic import __version__
         from maxcompute_semantic.commands.doctor import doctor_cmd
 
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": __version__,
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.0.1",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload(__version__))
 
         runner = self.CliRunner()
         result = runner.invoke(doctor_cmd, ["--offline"])
@@ -652,11 +641,11 @@ class TestUpdateChannelChecks:
         assert "update version" in out_lc
 
     def test_channel_fail_when_metadata_5xx(
-        self, latest_json_server, isolated_config: Path
+        self, pypi_json_server, isolated_config: Path
     ) -> None:
         from maxcompute_semantic.commands.doctor import doctor_cmd
 
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(503)
 
         runner = self.CliRunner()
@@ -672,7 +661,7 @@ class TestUpdateChannelChecks:
         assert "fail" in out_lc or "❌" in result.output
 
     def test_channel_pass_version_info_when_upgrade_available(
-        self, latest_json_server, isolated_config: Path
+        self, pypi_json_server, isolated_config: Path, pypi_project_payload
     ) -> None:
         """Channel reachable, but a newer version is published. The
         version check is an informational line — call it a "skip
@@ -681,19 +670,8 @@ class TestUpdateChannelChecks:
         from maxcompute_semantic import __version__
         from maxcompute_semantic.commands.doctor import doctor_cmd
 
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "9.9.9",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.0.1",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("9.9.9"))
 
         runner = self.CliRunner()
         result = runner.invoke(doctor_cmd, [])
@@ -703,62 +681,6 @@ class TestUpdateChannelChecks:
         # has no profile, so profile_resolution fails → exit code 1.
         # The upgrade-available signal is informational and appears in
         # the output regardless.
-
-    def test_version_fails_when_running_is_disabled(
-        self, latest_json_server, isolated_config: Path
-    ) -> None:
-        """Disabled-list match → version check FAILs. Doctor exit code
-        is 1 (the standard "any fail" rule)."""
-        from maxcompute_semantic import __version__
-        from maxcompute_semantic.commands.doctor import doctor_cmd
-
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "9.9.9",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.0.1",
-                "disabled": [__version__],
-                "notice": "withdrawn for CVE-2026-1234",
-            }
-        )
-
-        runner = self.CliRunner()
-        result = runner.invoke(doctor_cmd, [])
-        out_lc = result.output.lower()
-        assert "disabled" in out_lc or "withdrawn" in out_lc or "cve-2026-1234" in out_lc
-        # ``mcs doctor`` exits 1 on any FAIL.
-        assert result.exit_code == 1
-
-    def test_version_fails_when_below_min_supported(
-        self, latest_json_server, isolated_config: Path
-    ) -> None:
-        from maxcompute_semantic.commands.doctor import doctor_cmd
-
-        _, setter = latest_json_server
-        # min_supported is way ahead of the running version, so
-        # current < min → FAIL.
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "9.9.9",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "9.0.0",
-                "disabled": [],
-                "notice": "",
-            }
-        )
-
-        runner = self.CliRunner()
-        result = runner.invoke(doctor_cmd, [])
-        out_lc = result.output.lower()
-        assert "min_supported" in out_lc or "minimum" in out_lc or "below" in out_lc
-        assert result.exit_code == 1
 
     def test_offline_skips_both_update_checks(self, isolated_config: Path) -> None:
         """``--offline`` short-circuits all network probes, including
@@ -776,9 +698,10 @@ class TestUpdateChannelChecks:
 
     def test_fetcher_called_once_when_both_checks_run(
         self,
-        latest_json_server,
+        pypi_json_server,
         isolated_config: Path,
         monkeypatch: pytest.MonkeyPatch,
+        pypi_project_payload,
     ) -> None:
         """The spec says the two checks share **one** fetch via a
         closure. We assert that by counting the wrapped
@@ -786,19 +709,8 @@ class TestUpdateChannelChecks:
         from maxcompute_semantic._internal import update_check as uc
         from maxcompute_semantic.commands import doctor as doc
 
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "0.0.1",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.0.0",
-                "disabled": [],
-                "notice": "",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("0.0.1"))
 
         counter = {"calls": 0}
         real = uc.fetch_latest_metadata
@@ -826,10 +738,11 @@ class TestUpdateChannelChecks:
 
     def test_doctor_warms_the_banner_cache(
         self,
-        latest_json_server,
+        pypi_json_server,
         tmp_path: Path,
         isolated_config: Path,
         monkeypatch: pytest.MonkeyPatch,
+        pypi_project_payload,
     ) -> None:
         """Side effect: after a successful doctor run, the update-check
         cache file is populated so the next foreground mcs command's
@@ -837,19 +750,8 @@ class TestUpdateChannelChecks:
         "doctor doubles as a cache warmup.")"""
         cdir = tmp_path / "cache"
         monkeypatch.setenv("MCS_CACHE_DIR", str(cdir))
-        _, setter = latest_json_server
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": "9.9.9",
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": "https://example.test/wheels/x.whl",
-                "sha256": "a" * 64,
-                "min_supported": "0.4.0",
-                "disabled": [],
-                "notice": "warmed by doctor",
-            }
-        )
+        _, setter = pypi_json_server
+        setter(pypi_project_payload("9.9.9"))
 
         from click.testing import CliRunner
         from maxcompute_semantic._internal.update_check import (
@@ -865,7 +767,7 @@ class TestUpdateChannelChecks:
         entry = read_cache()
         assert entry is not None
         assert entry.latest_version == "9.9.9"
-        assert entry.notice == "warmed by doctor"
+        assert entry.notice == ""
         assert entry.fetch_error == ""
 
 

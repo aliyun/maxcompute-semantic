@@ -37,7 +37,7 @@ from maxcompute_semantic._internal.paths import (
 from maxcompute_semantic._internal.update_check import (
     CacheEntry,
     LatestMetadata,
-    _base_url,
+    _metadata_url,
     fetch_latest_metadata,
     is_disabled,
     write_cache,
@@ -825,7 +825,6 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
     from maxcompute_semantic._internal.update_check import (
         LatestMetadata as _LM,
         MalformedMetadataError,
-        UnsupportedSchemaError,
     )
 
     md = fetch_latest_metadata()
@@ -833,7 +832,10 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
         # Re-issue to capture the exception class for the message.
         # Same timeout; the second probe is in the noise compared to
         # the first one's timeout already elapsing.
-        url = f"{_base_url()}/latest.json"
+        try:
+            url = _metadata_url()
+        except ValueError as e:
+            return (None, str(e))
         try:
             with urllib.request.urlopen(url, timeout=5.0) as resp:
                 _body = resp.read(64 * 1024)
@@ -850,10 +852,8 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
         # pull a discriminating error.
         try:
             parsed = json.loads(_body.decode("utf-8"))
-            _LM.from_dict(parsed)
+            _LM.from_pypi_dict(parsed)
             return (None, f"{url} response shape is not the expected metadata")
-        except UnsupportedSchemaError as e:
-            return (None, f"unsupported schema_version: {e}")
         except MalformedMetadataError as e:
             return (None, f"malformed metadata: {e}")
         except Exception as e:
@@ -880,13 +880,18 @@ def _check_update_channel_reachable(
     summary and a remediation pointer at the ``MCS_UPDATE_BASE_URL``
     env var override.
     """
+    def _metadata_url_for_message() -> str:
+        with contextlib.suppress(ValueError):
+            return _metadata_url()
+        return "PyPI update metadata endpoint"
+
     md, err = fetch_result
     if md is None:
         return (
             "update_channel",
             "fail",
             (
-                f"could not reach {_base_url()}/latest.json: {err}. "
+                f"could not reach {_metadata_url_for_message()}: {err}. "
                 f"Override with MCS_UPDATE_BASE_URL or check connectivity "
                 f"(corporate proxy / DNS). The banner and the auto-upgrade "
                 f"flow both read from this endpoint."
@@ -895,7 +900,7 @@ def _check_update_channel_reachable(
     return (
         "update_channel",
         "pass",
-        f"{_base_url()}/latest.json reachable; latest_version={md.latest_version}",
+        f"{_metadata_url_for_message()} reachable; latest_version={md.latest_version}",
     )
 
 
@@ -1001,11 +1006,11 @@ def doctor_cmd(ctx: click.Context, profile: str | None, offline: bool) -> None:
     tier, build data, skill installation, update channel reachable,
     update version current.
 
-    The two update checks share one HTTP fetch of
-    ``MCS_UPDATE_BASE_URL/latest.json`` (default OSS host); the
+    The two update checks share one HTTP fetch of the publisher
+    metadata document (default PyPI project JSON); the
     channel-reachable check is the "network up" verdict, the
-    version-current check is the "is this version on the publisher's
-    disabled list / behind min_supported / behind latest" verdict.
+    version-current check is the "is this version disabled / behind
+    min_supported / behind latest" verdict.
     The combined fetch result is also written to the update-check
     cache, so the next foreground mcs command's banner reflects the
     same state without firing its own probe.
