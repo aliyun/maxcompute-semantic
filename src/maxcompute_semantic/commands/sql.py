@@ -814,6 +814,7 @@ def review_cmd(
     )
     from maxcompute_semantic.mc_client.envelope import Envelope
 
+    stripped_sql, _set_hints = _split_or_emit(sql)
     profile_obj: Profile | None = None
     try:
         profile_obj = resolve_profile_for_project(project, profile_name=profile)
@@ -823,9 +824,9 @@ def review_cmd(
         # ``profile_obj`` is consumed downstream by ``build_review_envelope``,
         # ``get_tier``, and ``_emit_mcs_error``; the duplicate resolution
         # inside ``_route_project`` is the trade-off siblings already accept.
-        target_project = _route_project(project, profile, sql)
+        target_project = _route_project(project, profile, stripped_sql)
     except McsError as e:
-        _emit_mcs_error(sql, profile_obj, e)
+        _emit_mcs_error(stripped_sql, profile_obj, e)
     assert profile_obj is not None
 
     # Refuse writes / unparseable. The dispatcher would happily run rules
@@ -834,10 +835,10 @@ def review_cmd(
     # spec §5.4 refusal contract for the CLI seam folds both into one
     # MCS_REVIEW_UNSUPPORTED envelope so the agent can branch on
     # ``classification`` rather than parsing per-rule emit lists.
-    verdict = _classify_sql(sql)
+    verdict = _classify_sql(stripped_sql)
     if verdict != "read":
         _emit_mcs_error(
-            sql,
+            stripped_sql,
             profile_obj,
             ReviewUnsupportedError(
                 f"mcs sql review is read-only; got SQL classified as {verdict!r}",
@@ -867,7 +868,7 @@ def review_cmd(
     tier = get_tier(profile_obj, tier_project, allow_live_probe=False)
 
     data = build_review_envelope(
-        sql=sql,
+        sql=stripped_sql,
         profile=profile_obj,
         project=target_project,
         schema_name=schema,

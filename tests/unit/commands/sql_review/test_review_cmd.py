@@ -99,6 +99,37 @@ class TestSqlReviewCmd:
         # write vs unparseable when crafting the recovery prompt.
         assert out["error"]["context"]["classification"] == "write"
 
+    def test_set_then_select_is_reviewable(self, isolated_config: Path, make_review_package) -> None:
+        """SET key=val is extracted; the remaining SELECT is a read -> review runs."""
+        profile, _ = make_review_package(
+            tables=[
+                {
+                    "source_key": "rev_proj__default",
+                    "name": "orders",
+                    "columns": [{"name": "id"}],
+                },
+            ],
+        )
+        with patch.multiple(
+            "maxcompute_semantic.commands.sql",
+            resolve_profile_for_project=MagicMock(return_value=profile),
+            get_tier=MagicMock(return_value="2"),
+        ):
+            result = _invoke(
+                [
+                    "review",
+                    "--project",
+                    "rev_proj",
+                    "--schema",
+                    "default",
+                    "SET odps.sql.mapper.split.size = 4096; SELECT id FROM orders",
+                ]
+            )
+        assert result.exit_code == 0, result.output
+        out = json.loads(result.output)
+        assert out["status"] == "success"
+        assert out["data"]["sql"] == "SELECT id FROM orders"
+
     def test_review_profile_resolution_failure_returns_error_envelope(
         self, isolated_config: Path
     ) -> None:
