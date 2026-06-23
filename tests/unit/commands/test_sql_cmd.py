@@ -878,6 +878,39 @@ class TestSqlCost:
         output = json.loads(result.output)
         assert output["data"]["verdict"] == "blocked"
 
+    def test_cost_strips_set_and_passes_hints(self, isolated_config: Path) -> None:
+        """SET key=val is extracted to a hint; cost_estimate gets the stripped
+        SELECT + the SET as hints (so execute_sql_cost never sees the SET)."""
+        mock_profile = _mock_profile()
+        mock_client = _mock_client(mock_profile)
+        mock_client.cost_estimate.return_value = {
+            "estimated_input_bytes": 0,
+            "estimated_cost_cny": 0.0,
+            "verdict": "ok",
+            "thresholds": {"confirm_cny": 10.0, "blocked_cny": 100.0},
+        }
+
+        with patch.multiple(
+            "maxcompute_semantic.commands.sql",
+            make_client_for_project=MagicMock(return_value=mock_client),
+            get_tier=MagicMock(return_value="2"),
+        ):
+            result = _invoke(
+                [
+                    "cost",
+                    "--project",
+                    "my_proj",
+                    "--schema",
+                    "default",
+                    "SET odps.sql.mapper.split.size = 4096; SELECT * FROM t",
+                ]
+            )
+
+        assert result.exit_code == 0, result.output
+        call = mock_client.cost_estimate.call_args
+        assert call.args[0] == "SELECT * FROM t"
+        assert call.kwargs.get("hints") == {"odps.sql.mapper.split.size": "4096"}
+
     def test_3level_cost_applies_hints(self, isolated_config: Path) -> None:
         """3-level project cost must forward ``schema=`` so the client
         builds namespace/default-schema hints internally."""

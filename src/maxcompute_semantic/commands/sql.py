@@ -727,15 +727,16 @@ def cost_cmd(pctx: ProfileContext, sql: str) -> None:
     the JSON payload). On error, exits with the classified exit_code
     (4 for auth failures, 5 for permission/not-found).
     """
+    stripped_sql, set_hints = _split_or_emit(sql)
     client = None
     try:
-        target_project = _route_project(pctx.project_override, pctx.profile.name, sql)
+        target_project = _route_project(pctx.project_override, pctx.profile.name, stripped_sql)
         client = make_client_for_project(target_project, profile_name=pctx.profile.name)
         tier = get_tier(client.profile, client.profile.compute_project, client=client)
         schema = resolve_schema_for_tier(tier, pctx.schema_override, profile=client.profile)
-        result = client.cost_estimate(sql, schema=schema)
+        result = client.cost_estimate(stripped_sql, schema=schema, hints=set_hints or None)
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else pctx.profile, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else pctx.profile, e)
 
     emit_status(result)
 
@@ -767,15 +768,16 @@ def explain_cmd(
     Runs EXPLAIN <sql> and returns the plan text.
     Tier resolution is automatic (3-level projects get namespace/schema hints).
     """
+    stripped_sql, set_hints = _split_or_emit(sql)
     client = None
     try:
-        target_project = _route_project(project, profile, sql)
+        target_project = _route_project(project, profile, stripped_sql)
         client = make_client_for_project(target_project, profile_name=profile)
         tier = get_tier(client.profile, client.profile.compute_project, client=client)
         schema = resolve_schema_for_tier(tier, schema, profile=client.profile)
-        result = client.explain(sql, timeout=timeout, schema=schema)
+        result = client.explain(stripped_sql, timeout=timeout, schema=schema, hints=set_hints or None)
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
 
     emit_status(result)
 
