@@ -2661,7 +2661,16 @@ class TestClassifySql:
         assert _classify_sql("USE my_db") == "read"
 
     def test_set_is_write(self) -> None:
-        """SET mutates session state — requires --allow-write."""
+        """SET mutates session state — requires --allow-write.
+
+        This stays 'write' on purpose: classify_sql is NOT modified by
+        the SET-extraction feature (see
+        docs/superpowers/specs/2026-06-23-set-statement-extraction-design.md).
+        Extraction happens in the verbs before classification, so
+        extractable SETs never reach classify_sql; non-extractable SETs
+        (SET LABEL, SETPROJECT) still do and must stay gated as write.
+        Do not remove this assertion.
+        """
         from maxcompute_semantic.commands.sql import _classify_sql
 
         assert _classify_sql("SET odps.sql.allow.fullscan=true") == "write"
