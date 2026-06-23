@@ -326,10 +326,10 @@ def _guard_sql_execution(sql: str, profile: str | None, *, allow_write: bool) ->
 def _split_or_emit(sql: str) -> tuple[str, dict[str, str]]:
     """Extract SET→hints; emit+exit if the SQL is only SETs (no query).
 
-    Shared by the ``mcs sql execute`` / ``submit`` verbs so the write guard,
-    project routing, cost gate, and pyodps submission all see the SET-free
-    SQL and the extracted hints. (``cost`` / ``explain`` / ``review`` are
-    wired separately.) A standalone ``SET k=v`` (no query) is rejected with
+    Shared by every ``mcs sql`` verb (execute / submit / cost / explain /
+    review) so the write guard, project routing, cost gate, and pyodps
+    submission all see the SET-free SQL and the extracted hints. A
+    standalone ``SET k=v`` (no query) is rejected with
     ``WriteOpRejectedError`` because there is nothing to execute. If the SQL
     cannot be tokenized, ``split_set_hints`` returns it unchanged and the
     downstream write guard classifies it as ``unparseable`` (friendly
@@ -486,7 +486,7 @@ def execute_cmd(
         # (sql wait / sql result) instead of resubmitting the query.
         instance_id = str(e.context.get("instance_id") or "")
         if client is None or not instance_id:
-            _emit_mcs_error(sql, client.profile if client is not None else None, e)
+            _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
             return  # _emit_mcs_error is NoReturn (sys.exit); this is for readers + linters
         try:
             status = client.get_instance_status(instance_id)
@@ -510,7 +510,8 @@ def execute_cmd(
         emit_status(status)
         return
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
+
 
     # Emit the envelope dict as JSON on stdout.
     print(json.dumps(envelope.to_dict(), ensure_ascii=False))
@@ -577,7 +578,7 @@ def submit_cmd(
                 "status_probe_error": status_error.to_envelope()["error"],
             }
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
 
     emit_status(result)
 
