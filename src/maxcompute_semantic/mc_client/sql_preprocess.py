@@ -43,7 +43,14 @@ def split_set_hints(sql: str) -> tuple[str, dict[str, str]]:
     """
     hints: list[tuple[str, str]] = []
     kept: list[str] = []
-    toks = MaxCompute.Tokenizer().tokenize(sql)
+    try:
+        toks = MaxCompute.Tokenizer().tokenize(sql)
+    except sqlglot.errors.TokenError:
+        # Malformed SQL (e.g. unmatched quotes) cannot be tokenized; fall back
+        # to the original SQL with no hints so the caller's write guard /
+        # classifier can emit its friendly parse-error remediation instead of
+        # crashing. Keeps this function total for every caller.
+        return sql, {}
     semi_ends = [t.end for t in toks if t.token_type is TokenType.SEMICOLON]
     bounds = [-1, *semi_ends, len(sql)]
     for i in range(len(bounds) - 1):

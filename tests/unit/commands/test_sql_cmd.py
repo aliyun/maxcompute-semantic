@@ -543,7 +543,7 @@ class TestSqlAsync:
         assert output["data"]["instance_id"] == "inst_123"
         assert output["data"]["status"] == "Running"
         mock_client.run_sql_async.assert_called_once_with(
-            "SELECT 1", schema="default", assume_yes=True, allow_write=False
+            "SELECT 1", schema="default", hints=None, assume_yes=True, allow_write=False
         )
         mock_client.execute_sql.assert_not_called()
 
@@ -2823,6 +2823,37 @@ class TestSqlExecuteWriteGuard:
         )
         assert result.exit_code == 0
         assert mock_client.execute_sql.called
+
+    def test_set_then_select_runs_without_allow_write(self, isolated_config: Path) -> None:
+        # SET key=val is extracted to a hint; the remaining SELECT is a read,
+        # so --allow-write is NOT required.
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET odps.sql.mapper.split.size = 4096; SELECT 1"]
+        )
+        assert result.exit_code == 0, result.output
+        assert mock_client.execute_sql.called
+        call = mock_client.execute_sql.call_args
+        assert call.args[0] == "SELECT 1"
+        assert call.kwargs["hints"] == {"odps.sql.mapper.split.size": "4096"}
+
+    def test_set_label_still_requires_allow_write(self, isolated_config: Path) -> None:
+        # SET LABEL is not key=val -> not extracted -> stays -> rejected.
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET LABEL tbl TO user; SELECT 1"]
+        )
+        assert result.exit_code == 2
+        assert not mock_client.execute_sql.called
+
+    def test_standalone_set_is_rejected(self, isolated_config: Path) -> None:
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET odps.sql.mapper.split.size = 4096"]
+        )
+        assert result.exit_code == 2
+        assert not mock_client.execute_sql.called
+        assert "no query" in result.output
 
     def test_insert_default_rejected(self, isolated_config: Path) -> None:
         result, mock_client = self._run(

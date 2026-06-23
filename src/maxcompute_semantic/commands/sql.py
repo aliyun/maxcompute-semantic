@@ -85,6 +85,7 @@ from maxcompute_semantic.mc_client.sql_guard import (
 from maxcompute_semantic.mc_client.sql_guard import (
     last_parse_error as _last_parse_error,
 )
+from maxcompute_semantic.mc_client.sql_preprocess import split_set_hints
 from maxcompute_semantic.mc_client.tier import get_tier
 
 if TYPE_CHECKING:
@@ -322,6 +323,35 @@ def _guard_sql_execution(sql: str, profile: str | None, *, allow_write: bool) ->
     _emit_mcs_error(sql, profile_obj, exc)
 
 
+def _split_or_emit(sql: str) -> tuple[str, dict[str, str]]:
+    """Extract SET→hints; emit+exit if the SQL is only SETs (no query).
+
+    Shared by the ``mcs sql execute`` / ``submit`` verbs so the write guard,
+    project routing, cost gate, and pyodps submission all see the SET-free
+    SQL and the extracted hints. (``cost`` / ``explain`` / ``review`` are
+    wired separately.) A standalone ``SET k=v`` (no query) is rejected with
+    ``WriteOpRejectedError`` because there is nothing to execute. If the SQL
+    cannot be tokenized, ``split_set_hints`` returns it unchanged and the
+    downstream write guard classifies it as ``unparseable`` (friendly
+    parse-error remediation, e.g. the doubled-quote hint).
+    """
+    stripped_sql, set_hints = split_set_hints(sql)
+    if not stripped_sql.strip():
+        _emit_mcs_error(
+            sql,
+            None,
+            WriteOpRejectedError(
+                "SQL contained only SET statements with no query; nothing to execute",
+                remediation=(
+                    "add a SELECT/INSERT/... statement after the SET, or remove "
+                    "the SET if you only meant to set a session property"
+                ),
+                sql=sql,
+            ),
+        )
+    return stripped_sql, set_hints
+
+
 def _client_and_schema_for_sql(
     project: str | None,
     profile: str | None,
@@ -434,14 +464,16 @@ def execute_cmd(
 
     Output: the Envelope JSON on stdout.
     """
-    _guard_sql_execution(sql, profile, allow_write=allow_write)
+    stripped_sql, set_hints = _split_or_emit(sql)
+    _guard_sql_execution(stripped_sql, profile, allow_write=allow_write)
 
     client = None
     try:
-        client, schema = _client_and_schema_for_sql(project, profile, schema, sql)
+        client, schema = _client_and_schema_for_sql(project, profile, schema, stripped_sql)
         envelope = client.execute_sql(
-            sql,
+            stripped_sql,
             schema=schema,
+            hints=set_hints or None,
             assume_yes=assume_yes,
             max_rows=max_rows,
             result_offset=result_offset,
@@ -523,14 +555,16 @@ def submit_cmd(
     sql: str,
 ) -> None:
     """Submit SQL asynchronously and return the MaxCompute instance ID."""
-    _guard_sql_execution(sql, profile, allow_write=allow_write)
+    stripped_sql, set_hints = _split_or_emit(sql)
+    _guard_sql_execution(stripped_sql, profile, allow_write=allow_write)
 
     client = None
     try:
-        client, schema = _client_and_schema_for_sql(project, profile, schema, sql)
+        client, schema = _client_and_schema_for_sql(project, profile, schema, stripped_sql)
         instance_id = client.run_sql_async(
-            sql,
+            stripped_sql,
             schema=schema,
+            hints=set_hints or None,
             assume_yes=assume_yes,
             allow_write=allow_write,
         )
