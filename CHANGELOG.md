@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-06-24
+
+### Added
+
+- **`mcs sql` verbs extract `SET key=val` into pyodps hints before the write
+  guard, cost gate, and submission**, so `SET k=v; SELECT ...` scripts run
+  transparently (classified as the remaining statement — `read`, no
+  `--allow-write` required) instead of being rejected as a write or blocked
+  by the cost gate's `execute_sql_cost` (which, unlike `run_sql`, does not
+  strip `SET` to hints). New `split_set_hints` helper (MaxCompute sqlglot
+  tokenizer-based, string/comment-aware, verbatim-preserving — non-SET SQL
+  is never AST-regenerated). `classify_sql` is unchanged, so non-`key=val`
+  SETs (`SET LABEL`, `SETPROJECT`) stay gated as `write`/unparseable. A
+  standalone `SET k=v` with no query is rejected with a clear "no query"
+  message. Affects `execute` / `submit` / `cost` / `explain` / `review`.
+
+### Changed
+
+- Dropped the OSS install/update channel from `update_check` /
+  `update` / `doctor` (+ tests).
+- CI: moved `mypy` out of the `ci.yml` test matrix (it ran 3×, once per
+  Python — version-independent) into a single `mypy-blocking` job in
+  `lint.yml`; `mypy` is now also included in the `lint-diff` PR-comment
+  report (new/resolved type errors alongside ruff/ty, codecov-style) and
+  `.lint-reports/` is uploaded as an artifact. Parallelised pytest with
+  `pytest-xdist` (`-n auto --dist loadscope`); test jobs are ~50% faster.
+
 ## [0.17.3] — 2026-06-22
 
 ### Fixed
