@@ -1,7 +1,7 @@
 # Copyright (c) 2024-2026, Alibaba Cloud and its affiliates.
 # SPDX-License-Identifier: Apache-2.0
 
-"""``mcs update`` — pull the latest wheel from OSS and reinstall in place.
+"""``mcs update`` — resolve the latest PyPI version and reinstall in place.
 
 The command picks the right installer based on how mcs is currently
 installed:
@@ -9,19 +9,17 @@ installed:
   * **uv tool install** (``uv tool install maxcompute-semantic``)
     — the bin shim and the tool venv live under
     ``~/.local/share/uv/tools/<package>/``. Upgrade command:
-    ``uv tool install --reinstall <wheel-url>``. uv parses the wheel
-    filename to identify the package, so the package name is
-    baked into the URL — we don't need to spell it out separately.
+    ``uv tool install --reinstall <install-target>``.
   * **pipx install** (``pipx install maxcompute-semantic``) — venvs
     under ``~/.local/pipx/venvs/<package>/``. Upgrade command:
-    ``pipx install --force <wheel-url>``.
+    ``pipx install --force <install-target>``.
   * **pip --user** (``pip install --user maxcompute-semantic``) — the
     console_script lands in ``site.getuserbase() + '/bin/'`` and
     ``sys.executable`` is the system Python. Upgrade command:
-    ``<sys.executable> -m pip install --user --upgrade <wheel-url>``.
+    ``<sys.executable> -m pip install --user --upgrade <install-target>``.
   * **pip into a venv or system Python** — everything else that has
     a known Python interpreter. Upgrade command:
-    ``<sys.executable> -m pip install --upgrade <wheel-url>``.
+    ``<sys.executable> -m pip install --upgrade <install-target>``.
   * **UNKNOWN** — the install layout doesn't match any of the above
     patterns. The command prints a manual-remediation hint and exits
     non-zero rather than guessing.
@@ -65,7 +63,6 @@ from maxcompute_semantic import __version__
 from maxcompute_semantic._internal.update_check import (
     CacheEntry,
     LatestMetadata,
-    _base_url,
     fetch_latest_metadata,
     write_cache,
 )
@@ -189,23 +186,18 @@ def detect_install_mode() -> InstallMode:
     return InstallMode.UNKNOWN
 
 
-def build_upgrade_argv(mode: InstallMode, *, wheel_url: str) -> list[str] | None:
+def build_upgrade_argv(mode: InstallMode, *, install_target: str) -> list[str] | None:
     """Return the argv list for the installer subprocess, or ``None``
     when the mode is ``UNKNOWN`` (the caller is expected to print
     a manual remediation line and exit non-zero in that case).
 
-    The wheel URL is positional and the same for every mode — both
-    ``uv tool install`` and ``pip install --upgrade`` accept a wheel
-    URL directly as the requirement specifier, and parse the wheel
-    filename for the package name (PEP 427). That means the URL
-    encodes the version, which is how the ``mcs update
-    --version <pinned>`` flag works: the caller rewrites the URL
-    path to point at the older wheel filename, hands the result
-    here, and the installer pulls the pinned wheel.
+    The install target is positional and the same for every mode. It
+    is a PyPI requirement specifier (``maxcompute-semantic==N``).
+    Keeping the target as a package requirement lets uv/pipx/pip apply
+    their configured indexes, mirrors, and resolver settings.
 
     The argv is the list form for ``subprocess.run(..., shell=False)``
-    so URL characters that would otherwise need shell-quoting (the
-    ``+`` in PEP 440 local version segments, for instance) are passed
+    so characters that would otherwise need shell-quoting are passed
     through unmangled. The ``--reinstall`` (uv) / ``--force`` (pipx)
     flags handle the "already-installed at the same version" case so
     a ``mcs update --version <current>`` no-op still re-runs the
@@ -230,20 +222,18 @@ def build_upgrade_argv(mode: InstallMode, *, wheel_url: str) -> list[str] | None
     """
     py = sys.executable or "python3"
     if mode is InstallMode.UV_TOOL:
-        # `uv tool install <url>` parses the wheel filename for the
-        # package name, registers the tool by that name (so subsequent
-        # `uv tool list` etc. find it), and replaces the venv contents
-        # in place. `--reinstall` makes the operation idempotent
-        # against a same-version no-op. See uv docs:
+        # `uv tool install <target>` accepts a package requirement,
+        # registers the tool by package name, and replaces the venv
+        # contents in place. `--reinstall` makes the operation
+        # idempotent against a same-version no-op. See uv docs:
         # https://docs.astral.sh/uv/concepts/tools/#installing-tools.
-        return ["uv", "tool", "install", "--reinstall", wheel_url]
+        return ["uv", "tool", "install", "--reinstall", install_target]
     if mode is InstallMode.PIPX:
-        # pipx's analogous flag is `--force`. The package name is
-        # parsed from the wheel filename the same way uv does it.
-        return ["pipx", "install", "--force", wheel_url]
+        # pipx's analogous flag is `--force`.
+        return ["pipx", "install", "--force", install_target]
     if mode is InstallMode.PIP_USER:
-        # `<python> -m pip install --user --upgrade <url>` matches the
-        # invocation the user typed at install time. `--upgrade`
+        # `<python> -m pip install --user --upgrade <requirement>` matches
+        # the invocation the user typed at install time. `--upgrade`
         # forces a same-version reinstall via pip's resolver. The
         # user-site bin dir already contains the `mcs` console_script
         # symlink/wrapper from the original install; pip rewrites it
@@ -256,49 +246,40 @@ def build_upgrade_argv(mode: InstallMode, *, wheel_url: str) -> list[str] | None
             "install",
             "--user",
             "--upgrade",
-            wheel_url,
+            install_target,
         ]
     if mode is InstallMode.PIP:
         # The fall-through pip case — system pip or a venv. The
         # interpreter is the same one that imported this module, so
         # `pip` resolves to the same prefix the original install used.
-        return [py, "-m", "pip", "install", "--upgrade", wheel_url]
+        return [py, "-m", "pip", "install", "--upgrade", install_target]
     # UNKNOWN: the caller prints the manual hint.
     assert mode is InstallMode.UNKNOWN, f"unhandled InstallMode {mode!r}"
     return None
 
 
-def manual_upgrade_hint(wheel_url: str) -> str:
+def manual_upgrade_hint(install_target: str) -> str:
     """Multi-line text the caller prints when ``detect_install_mode``
     came back ``UNKNOWN``. Lists the four canonical commands so the
     user can pick the one that matches their install method. The
-    URL is interpolated into each command. Returns a string ending
+    target is interpolated into each command. Returns a string ending
     without a trailing newline."""
     py = shlex.quote(sys.executable or "python3")
-    url = shlex.quote(wheel_url)
+    target = shlex.quote(install_target)
     lines = [
         "Could not detect how mcs was installed — please pick one of:",
-        f"  uv tool install --reinstall {url}",
-        f"  pipx install --force {url}",
-        f"  {py} -m pip install --upgrade {url}",
-        f"  {py} -m pip install --user --upgrade {url}",
+        f"  uv tool install --reinstall {target}",
+        f"  pipx install --force {target}",
+        f"  {py} -m pip install --upgrade {target}",
+        f"  {py} -m pip install --user --upgrade {target}",
         "Then run `mcs --version` to confirm.",
     ]
     return "\n".join(lines)
 
 
-def _wheel_url_for_version(version: str) -> str:
-    """Construct the canonical wheel URL for a pinned version.
-
-    The publisher uploads wheels under ``<base>/wheels/<filename>``
-    where the filename is the PEP 427-normalized form
-    ``maxcompute_semantic-<version>-py3-none-any.whl`` (hyphens in
-    the package name become underscores). The ``--version`` CLI flag
-    on ``mcs update`` accepts a PEP 440 version string verbatim and
-    feeds it through here. No validation is done up front — if the
-    version doesn't exist on OSS the install subprocess will fail
-    with a 404 and the user sees the installer's stderr."""
-    return f"{_base_url()}/wheels/maxcompute_semantic-{version}-py3-none-any.whl"
+def _install_target_for_version(version: str) -> str:
+    """Return the installer target for an explicit ``--version`` pin."""
+    return f"maxcompute-semantic=={version}"
 
 
 def _resolve_target_metadata(pinned: str | None) -> LatestMetadata | str | None:
@@ -308,20 +289,18 @@ def _resolve_target_metadata(pinned: str | None) -> LatestMetadata | str | None:
 
       * ``LatestMetadata`` — the publisher's metadata when no
         ``--version`` was supplied. The caller uses
-        ``metadata.wheel_url`` (which may differ from the
-        constructed URL if the publisher relocated wheels — e.g.
-        moved to PyPI). And ``metadata.disabled`` /
-        ``metadata.min_supported`` are consulted for the
-        "running version is itself disabled" edge case.
+        ``metadata.latest_version`` to build a package requirement,
+        letting the installer resolve the actual wheel from its
+        configured package indexes.
       * A bare ``str`` — the user's ``--version <pinned>`` value.
-        The wheel URL is built locally; the publisher's metadata is
-        bypassed entirely, so the version-pin path also works when
-        ``latest.json`` is unreachable. The disabled/min_supported
+        The install target is built locally; the publisher's metadata
+        is bypassed entirely, so the version-pin path also works when
+        update metadata is unreachable. The disabled/min_supported
         guard doesn't apply (the user is explicitly asking for a
         specific version, presumably to *escape* a bad latest).
       * ``None`` — the fetch failed and no pin was given.
         ``cmd_update`` prints the canonical "could not fetch
-        ``latest.json``" message and exits non-zero.
+        update metadata" message and exits non-zero.
     """
     if pinned is not None:
         return pinned
@@ -412,22 +391,18 @@ def _final_verify_exec_unix(argv0: str) -> None:
     metavar="VERSION",
     help=(
         "Pin a specific PEP 440 version (e.g. 0.4.0a40). "
-        "When set, the publisher's latest.json is bypassed and the "
-        "wheel URL is constructed locally — useful for downgrades or "
+        "When set, the publisher metadata fetch is bypassed and the "
+        "install target is constructed locally — useful for downgrades or "
         "for installing a release the publisher hasn't yet announced."
     ),
 )
 def cmd_update(check: bool, target_version: str | None) -> None:
-    """Pull the latest mcs wheel and reinstall in place.
+    """Resolve the target mcs version and reinstall in place.
 
     The installer is picked from how the running mcs was originally
     installed — ``uv tool install``, ``pipx install``, or
-    ``pip install --user`` / plain ``pip install``. The wheel URL
-    comes from ``MCS_UPDATE_BASE_URL/wheels/maxcompute_semantic-
-    <version>-py3-none-any.whl`` (default base
-    ``https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com``), so
-    the same command works for a PyPI move later by flipping the
-    base URL via env var.
+    ``pip install --user`` / plain ``pip install``. The default
+    publisher metadata comes from PyPI.
 
     After the install, the skill bundle is re-linked in every agent
     slot (``mcs skill update --all``) so Claude Code / Codex /
@@ -456,10 +431,8 @@ def cmd_update(check: bool, target_version: str | None) -> None:
 
     Environment variables consumed:
 
-      * ``MCS_UPDATE_BASE_URL`` — overrides the OSS base URL. The
-        same variable is read by the metadata fetcher; the wheel URL
-        construction here uses the same base so a custom mirror
-        works end-to-end.
+      * ``MCS_UPDATE_BASE_URL`` — overrides the PyPI project metadata
+        base URL. Only ``pypi.org`` project JSON endpoints are trusted.
     """
     current = __version__
     click.echo(f"Current mcs version: {current}", err=True)
@@ -467,9 +440,9 @@ def cmd_update(check: bool, target_version: str | None) -> None:
     target = _resolve_target_metadata(target_version)
     if target is None:
         raise click.ClickException(
-            "Could not fetch latest.json metadata and no --version pin "
+            "Could not fetch PyPI update metadata and no --version pin "
             "was given. Check network connectivity to the publisher "
-            "base URL (MCS_UPDATE_BASE_URL or the default OSS host); "
+            "base URL (MCS_UPDATE_BASE_URL or the default PyPI endpoint); "
             "see `mcs doctor` for the channel-reachable probe."
         )
 
@@ -486,37 +459,19 @@ def cmd_update(check: bool, target_version: str | None) -> None:
                 f"re-run `mcs update` when a new version lands."
             )
 
-        # The publisher's wheel URL is the authority — could differ
-        # from the locally-constructed URL if wheels live somewhere
-        # else (the PyPI migration seam). For the OSS host, the URL
-        # in the metadata equals the constructed URL.
+        # PyPI project JSON is the authority for latest_version. The
+        # installer still gets a package requirement instead of the
+        # artifact URL, so mirrors and installer index settings are
+        # respected for the actual download.
         target_version_str = target.latest_version
-        wheel_url = target.wheel_url
-        sha256_expected = target.sha256
-        # Validate the URL starts with the trusted base URL and contains
-        # the version string — not just a substring check.
-        from maxcompute_semantic._internal.update_check import _base_url
-
-        expected_prefix = _base_url() + "/wheels/"
-        expected_wheel_url = _wheel_url_for_version(target_version_str)
-        if not wheel_url.startswith(expected_prefix):
-            raise click.ClickException(
-                f"latest.json wheel_url={wheel_url!r} does not start with "
-                f"trusted base URL {expected_prefix!r}; refusing to install."
-            )
-        if wheel_url != expected_wheel_url:
-            raise click.ClickException(
-                f"latest.json wheel_url={wheel_url!r} does not match the "
-                f"canonical wheel URL {expected_wheel_url!r}; refusing to install."
-            )
+        install_target = _install_target_for_version(target_version_str)
         # Refresh the cache so the next foreground mcs sees the same
         # state and the soft banner reflects "we just learned of N+1".
         _stamp_cache_after_fetch(target)
     else:
         assert isinstance(target, str)
         target_version_str = target
-        wheel_url = _wheel_url_for_version(target_version_str)
-        sha256_expected = ""
+        install_target = _install_target_for_version(target_version_str)
 
     if target_version_str == current:
         click.echo(f"Already on the latest version of mcs ({current}).", err=True)
@@ -524,59 +479,26 @@ def cmd_update(check: bool, target_version: str | None) -> None:
 
     mode = detect_install_mode()
     if mode is InstallMode.UNKNOWN:
-        click.echo(manual_upgrade_hint(wheel_url), err=True)
+        click.echo(manual_upgrade_hint(install_target), err=True)
         sys.exit(1)
 
-    argv = build_upgrade_argv(mode, wheel_url=wheel_url)
+    argv = build_upgrade_argv(mode, install_target=install_target)
     assert argv is not None  # UNKNOWN already handled above.
 
     click.echo(
         f"Upgrading mcs from {current} → {target_version_str} via {mode.value}.",
         err=True,
     )
-    click.echo(f"  Wheel: {wheel_url}", err=True)
+    click.echo(f"  Source: {install_target}", err=True)
     click.echo(f"  Command: {' '.join(shlex.quote(a) for a in argv)}", err=True)
 
     if check:
         click.confirm("Proceed with upgrade?", default=False, abort=True, err=True)
 
-    # SHA256 verification: if the publisher included a hash in
-    # latest.json, download the wheel to a temp file, verify the
-    # digest, then replace the remote URL in argv with the local path.
-    if sha256_expected:
-        import hashlib
-        import tempfile
-        import urllib.request
-
-        click.echo("  Verifying SHA256 digest...", err=True)
-        with tempfile.NamedTemporaryFile(suffix=".whl", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            urllib.request.urlretrieve(wheel_url, tmp_path)
-            with open(tmp_path, "rb") as f:
-                actual = hashlib.sha256(f.read()).hexdigest()
-            if actual != sha256_expected:
-                os.unlink(tmp_path)
-                raise click.ClickException(
-                    f"SHA256 mismatch: expected {sha256_expected}, got {actual}. "
-                    f"The wheel at {wheel_url} may have been tampered with; "
-                    f"refusing to install."
-                )
-            click.echo(f"  SHA256 OK: {actual}", err=True)
-            argv = [a if a != wheel_url else tmp_path for a in argv]
-        except urllib.error.URLError as e:
-            os.unlink(tmp_path)
-            raise click.ClickException(
-                f"Failed to download wheel for SHA256 verification: {e}"
-            ) from e
-
-    # Run the installer. ``capture_output=True`` keeps the user's
-    # terminal clean and lets us prefix the installer's stderr with
-    # context on failure. ``check=False`` so we control the exit
+    # Run the installer. ``capture_output=False`` keeps pip/uv/pipx
+    # progress visible. ``check=False`` lets us control the exit
     # behavior instead of subprocess raising CalledProcessError.
     result = subprocess.run(argv, capture_output=False, check=False)
-    if sha256_expected and os.path.exists(tmp_path):
-        os.unlink(tmp_path)
     if result.returncode != 0:
         raise click.ClickException(
             f"Installer ``{argv[0]}`` exited {result.returncode}. "

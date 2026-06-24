@@ -85,6 +85,7 @@ from maxcompute_semantic.mc_client.sql_guard import (
 from maxcompute_semantic.mc_client.sql_guard import (
     last_parse_error as _last_parse_error,
 )
+from maxcompute_semantic.mc_client.sql_preprocess import split_set_hints
 from maxcompute_semantic.mc_client.tier import get_tier
 
 if TYPE_CHECKING:
@@ -322,6 +323,35 @@ def _guard_sql_execution(sql: str, profile: str | None, *, allow_write: bool) ->
     _emit_mcs_error(sql, profile_obj, exc)
 
 
+def _split_or_emit(sql: str) -> tuple[str, dict[str, str]]:
+    """Extract SET→hints; emit+exit if the SQL is only SETs (no query).
+
+    Shared by every ``mcs sql`` verb (execute / submit / cost / explain /
+    review) so the write guard, project routing, cost gate, and pyodps
+    submission all see the SET-free SQL and the extracted hints. A
+    standalone ``SET k=v`` (no query) is rejected with
+    ``WriteOpRejectedError`` because there is nothing to execute. If the SQL
+    cannot be tokenized, ``split_set_hints`` returns it unchanged and the
+    downstream write guard classifies it as ``unparseable`` (friendly
+    parse-error remediation, e.g. the doubled-quote hint).
+    """
+    stripped_sql, set_hints = split_set_hints(sql)
+    if not stripped_sql.strip():
+        _emit_mcs_error(
+            sql,
+            None,
+            WriteOpRejectedError(
+                "SQL contained only SET statements with no query; nothing to execute",
+                remediation=(
+                    "add a SELECT/INSERT/... statement after the SET, or remove "
+                    "the SET if you only meant to set a session property"
+                ),
+                sql=sql,
+            ),
+        )
+    return stripped_sql, set_hints
+
+
 def _client_and_schema_for_sql(
     project: str | None,
     profile: str | None,
@@ -434,14 +464,16 @@ def execute_cmd(
 
     Output: the Envelope JSON on stdout.
     """
-    _guard_sql_execution(sql, profile, allow_write=allow_write)
+    stripped_sql, set_hints = _split_or_emit(sql)
+    _guard_sql_execution(stripped_sql, profile, allow_write=allow_write)
 
     client = None
     try:
-        client, schema = _client_and_schema_for_sql(project, profile, schema, sql)
+        client, schema = _client_and_schema_for_sql(project, profile, schema, stripped_sql)
         envelope = client.execute_sql(
-            sql,
+            stripped_sql,
             schema=schema,
+            hints=set_hints or None,
             assume_yes=assume_yes,
             max_rows=max_rows,
             result_offset=result_offset,
@@ -454,7 +486,7 @@ def execute_cmd(
         # (sql wait / sql result) instead of resubmitting the query.
         instance_id = str(e.context.get("instance_id") or "")
         if client is None or not instance_id:
-            _emit_mcs_error(sql, client.profile if client is not None else None, e)
+            _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
             return  # _emit_mcs_error is NoReturn (sys.exit); this is for readers + linters
         try:
             status = client.get_instance_status(instance_id)
@@ -478,7 +510,8 @@ def execute_cmd(
         emit_status(status)
         return
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
+
 
     # Emit the envelope dict as JSON on stdout.
     print(json.dumps(envelope.to_dict(), ensure_ascii=False))
@@ -523,14 +556,16 @@ def submit_cmd(
     sql: str,
 ) -> None:
     """Submit SQL asynchronously and return the MaxCompute instance ID."""
-    _guard_sql_execution(sql, profile, allow_write=allow_write)
+    stripped_sql, set_hints = _split_or_emit(sql)
+    _guard_sql_execution(stripped_sql, profile, allow_write=allow_write)
 
     client = None
     try:
-        client, schema = _client_and_schema_for_sql(project, profile, schema, sql)
+        client, schema = _client_and_schema_for_sql(project, profile, schema, stripped_sql)
         instance_id = client.run_sql_async(
-            sql,
+            stripped_sql,
             schema=schema,
+            hints=set_hints or None,
             assume_yes=assume_yes,
             allow_write=allow_write,
         )
@@ -543,7 +578,7 @@ def submit_cmd(
                 "status_probe_error": status_error.to_envelope()["error"],
             }
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
 
     emit_status(result)
 
@@ -693,15 +728,16 @@ def cost_cmd(pctx: ProfileContext, sql: str) -> None:
     the JSON payload). On error, exits with the classified exit_code
     (4 for auth failures, 5 for permission/not-found).
     """
+    stripped_sql, set_hints = _split_or_emit(sql)
     client = None
     try:
-        target_project = _route_project(pctx.project_override, pctx.profile.name, sql)
+        target_project = _route_project(pctx.project_override, pctx.profile.name, stripped_sql)
         client = make_client_for_project(target_project, profile_name=pctx.profile.name)
         tier = get_tier(client.profile, client.profile.compute_project, client=client)
         schema = resolve_schema_for_tier(tier, pctx.schema_override, profile=client.profile)
-        result = client.cost_estimate(sql, schema=schema)
+        result = client.cost_estimate(stripped_sql, schema=schema, hints=set_hints or None)
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else pctx.profile, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else pctx.profile, e)
 
     emit_status(result)
 
@@ -733,15 +769,16 @@ def explain_cmd(
     Runs EXPLAIN <sql> and returns the plan text.
     Tier resolution is automatic (3-level projects get namespace/schema hints).
     """
+    stripped_sql, set_hints = _split_or_emit(sql)
     client = None
     try:
-        target_project = _route_project(project, profile, sql)
+        target_project = _route_project(project, profile, stripped_sql)
         client = make_client_for_project(target_project, profile_name=profile)
         tier = get_tier(client.profile, client.profile.compute_project, client=client)
         schema = resolve_schema_for_tier(tier, schema, profile=client.profile)
-        result = client.explain(sql, timeout=timeout, schema=schema)
+        result = client.explain(stripped_sql, timeout=timeout, schema=schema, hints=set_hints or None)
     except McsError as e:
-        _emit_mcs_error(sql, client.profile if client is not None else None, e)
+        _emit_mcs_error(stripped_sql, client.profile if client is not None else None, e)
 
     emit_status(result)
 
@@ -778,6 +815,7 @@ def review_cmd(
     )
     from maxcompute_semantic.mc_client.envelope import Envelope
 
+    stripped_sql, _set_hints = _split_or_emit(sql)
     profile_obj: Profile | None = None
     try:
         profile_obj = resolve_profile_for_project(project, profile_name=profile)
@@ -787,9 +825,9 @@ def review_cmd(
         # ``profile_obj`` is consumed downstream by ``build_review_envelope``,
         # ``get_tier``, and ``_emit_mcs_error``; the duplicate resolution
         # inside ``_route_project`` is the trade-off siblings already accept.
-        target_project = _route_project(project, profile, sql)
+        target_project = _route_project(project, profile, stripped_sql)
     except McsError as e:
-        _emit_mcs_error(sql, profile_obj, e)
+        _emit_mcs_error(stripped_sql, profile_obj, e)
     assert profile_obj is not None
 
     # Refuse writes / unparseable. The dispatcher would happily run rules
@@ -798,10 +836,10 @@ def review_cmd(
     # spec §5.4 refusal contract for the CLI seam folds both into one
     # MCS_REVIEW_UNSUPPORTED envelope so the agent can branch on
     # ``classification`` rather than parsing per-rule emit lists.
-    verdict = _classify_sql(sql)
+    verdict = _classify_sql(stripped_sql)
     if verdict != "read":
         _emit_mcs_error(
-            sql,
+            stripped_sql,
             profile_obj,
             ReviewUnsupportedError(
                 f"mcs sql review is read-only; got SQL classified as {verdict!r}",
@@ -831,7 +869,7 @@ def review_cmd(
     tier = get_tier(profile_obj, tier_project, allow_live_probe=False)
 
     data = build_review_envelope(
-        sql=sql,
+        sql=stripped_sql,
         profile=profile_obj,
         project=target_project,
         schema_name=schema,

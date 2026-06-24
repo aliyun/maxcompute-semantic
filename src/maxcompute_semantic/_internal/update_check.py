@@ -5,11 +5,9 @@
 
 The module's job is the *passive* version-awareness layer of mcs:
 
-- ``fetch_latest_metadata`` synchronously pulls
-  ``MCS_UPDATE_BASE_URL/latest.json`` (default
-  ``https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com``) with a
-  short timeout. Returns ``None`` on any failure so callers don't need
-  exception handling.
+- ``fetch_latest_metadata`` synchronously pulls PyPI project metadata
+  (default ``https://pypi.org/pypi/maxcompute-semantic/json``) with a
+  short timeout.
 - ``read_cache`` / ``write_cache`` / ``should_check`` manage a
   per-user JSON cache at ``cache_dir()/update_check.json`` so the
   network probe is amortized across mcs invocations (default TTL 6 h).
@@ -30,9 +28,7 @@ The cache schema lives at module top so the producer (the daemon
 probe) and the consumer (``cli.py`` finally block, ``commands/doctor.py``)
 agree.
 
-For the publish-side companion (``latest.json`` schema, the OSS upload
-order, the disabled-versions CSV input), see the spec's
-"Release pipeline" section.
+PyPI is the only publisher for the update channel.
 """
 
 from __future__ import annotations
@@ -49,54 +45,41 @@ from typing import Any
 
 from maxcompute_semantic._internal.paths import cache_dir
 
-DEFAULT_BASE_URL = "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com"
+DEFAULT_BASE_URL = "https://pypi.org/pypi/maxcompute-semantic"
 """Hardcoded fallback. Override via ``MCS_UPDATE_BASE_URL`` env var.
 
-The forward-compat seam: when mcs moves to PyPI, the env var points
-``https://pypi.org`` and ``fetch_latest_metadata`` switches the
-envelope adapter to the PyPI JSON shape (``{"info": {"version": ...},
-"urls": [{"url": ...}]}``). The cache, banner, and install-mode
-detection don't change — they all consume the normalized
-``LatestMetadata``."""
+The default is a PyPI project URL without the trailing ``/json`` so the
+same helper can accept ``https://pypi.org`` or the full project path and
+normalize it via ``_metadata_url``. The cache, banner, and install-mode
+detection consume normalized ``LatestMetadata``."""
+
+_PYPI_HOST = "pypi.org"
+_PYPI_PROJECT_PATH = "/pypi/maxcompute-semantic"
 
 _ALLOWED_HOSTS: frozenset[str] = frozenset(
     {
-        "maxcompute-semantic.oss-cn-beijing.aliyuncs.com",
+        _PYPI_HOST,
     }
 )
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 _SCHEMA_VERSION = 1
-"""The only ``latest.json`` schema_version this client understands.
+"""Internal normalized metadata schema version used for cache wrappers."""
 
-The spec says: bump on incompatible changes. The consumer falls
-through to ``None`` if it sees a higher schema_version so an old
-client gracefully ignores a future publisher."""
+_PYPI_USER_AGENT = "mcs/{version} maxcompute-semantic/{version}"
+"""PyPI asks API clients to identify themselves via User-Agent."""
 
 
 class UpdateCheckError(Exception):
     """Base class for the two specific error types below."""
 
 
-class UnsupportedSchemaError(UpdateCheckError):
-    """``schema_version`` in the fetched JSON exceeds what this client
-    understands. The caller treats this as "no metadata available."""
-
-    def __init__(self, got: int, supported: int) -> None:
-        super().__init__(
-            f"latest.json schema_version={got} > supported={supported}; "
-            f"ignoring metadata (please upgrade mcs)"
-        )
-        self.got = got
-        self.supported = supported
-
-
 class MalformedMetadataError(UpdateCheckError):
     """A required field is missing or wrong-typed."""
 
     def __init__(self, message: str) -> None:
-        super().__init__(f"malformed latest.json: {message}")
+        super().__init__(f"malformed PyPI metadata: {message}")
 
 
 def _require_str(d: dict[str, Any], key: str) -> str:
@@ -108,31 +91,6 @@ def _require_str(d: dict[str, Any], key: str) -> str:
     if not isinstance(val, str):
         raise MalformedMetadataError(f"field '{key}' must be a string, got {type(val).__name__}")
     return val
-
-
-def _require_int(d: dict[str, Any], key: str) -> int:
-    if key not in d:
-        raise MalformedMetadataError(f"missing required field '{key}'")
-    val = d[key]
-    if not isinstance(val, int) or isinstance(val, bool):
-        raise MalformedMetadataError(f"field '{key}' must be an integer, got {type(val).__name__}")
-    return val
-
-
-def _require_str_list(d: dict[str, Any], key: str) -> tuple[str, ...]:
-    if key not in d:
-        raise MalformedMetadataError(f"missing required field '{key}'")
-    val = d[key]
-    if not isinstance(val, list):
-        raise MalformedMetadataError(f"field '{key}' must be a list, got {type(val).__name__}")
-    out: list[str] = []
-    for i, x in enumerate(val):
-        if not isinstance(x, str):
-            raise MalformedMetadataError(
-                f"field '{key}[{i}]' must be a string, got {type(x).__name__}"
-            )
-        out.append(x)
-    return tuple(out)
 
 
 def _optional_str(d: dict[str, Any], key: str, default: str = "") -> str:
@@ -149,13 +107,9 @@ def _require_sha256(d: dict[str, Any], key: str) -> str:
     return val.lower()
 
 
-def _truthy_env(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 @dataclasses.dataclass(frozen=True)
 class LatestMetadata:
-    """Parsed ``latest.json`` body. Frozen so caches can't accidentally
+    """Parsed PyPI update metadata. Frozen so caches can't accidentally
     mutate shared instances."""
 
     schema_version: int
@@ -168,28 +122,57 @@ class LatestMetadata:
     sha256: str
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> LatestMetadata:
-        """Validating constructor. Raises ``UnsupportedSchemaError`` if
-        the publisher emitted a newer schema than we know, or
-        ``MalformedMetadataError`` if a required field is missing or
-        the wrong type. ``notice`` defaults to empty if absent."""
-        sv = _require_int(d, "schema_version")
-        if sv != _SCHEMA_VERSION:
-            # The spec carves out forward-compatibility: an old client
-            # that sees a newer schema must ignore the metadata
-            # entirely. We treat lower schema_versions the same way
-            # (the publisher is broken if it sends 0, but the client
-            # is the wrong place to fix that).
-            raise UnsupportedSchemaError(got=sv, supported=_SCHEMA_VERSION)
+    def from_pypi_dict(cls, d: dict[str, Any]) -> LatestMetadata:
+        """Normalize PyPI's project JSON shape into ``LatestMetadata``.
+
+        PyPI publishes the latest version under ``info.version`` and the
+        concrete artifacts under ``urls[]``. mcs is a universal wheel, so
+        the update channel chooses the non-yanked ``bdist_wheel`` whose
+        filename matches the published version, carries PyPI's SHA256
+        digest forward, and leaves the legacy hard-block fields empty.
+        """
+        info = d.get("info")
+        if not isinstance(info, dict):
+            raise MalformedMetadataError("missing PyPI info object")
+        latest_version = info.get("version")
+        if not isinstance(latest_version, str) or not latest_version:
+            raise MalformedMetadataError("PyPI info.version must be a non-empty string")
+
+        urls = d.get("urls")
+        if not isinstance(urls, list):
+            raise MalformedMetadataError("PyPI urls must be a list")
+
+        expected_filename = f"maxcompute_semantic-{latest_version}-py3-none-any.whl"
+        wheel: dict[str, Any] | None = None
+        for item in urls:
+            if not isinstance(item, dict):
+                raise MalformedMetadataError("PyPI urls entries must be objects")
+            if item.get("packagetype") != "bdist_wheel":
+                continue
+            if item.get("yanked") is True:
+                continue
+            if item.get("filename") != expected_filename:
+                continue
+            wheel = item
+            break
+        if wheel is None:
+            raise MalformedMetadataError(
+                f"PyPI payload has no non-yanked wheel named {expected_filename!r}"
+            )
+
+        digests = wheel.get("digests")
+        if not isinstance(digests, dict):
+            raise MalformedMetadataError("PyPI wheel digests must be an object")
+
         return cls(
-            schema_version=sv,
-            latest_version=_require_str(d, "latest_version"),
-            released_at=_require_str(d, "released_at"),
-            wheel_url=_require_str(d, "wheel_url"),
-            min_supported=_require_str(d, "min_supported"),
-            disabled=_require_str_list(d, "disabled"),
-            notice=_optional_str(d, "notice", ""),
-            sha256=_require_sha256(d, "sha256"),
+            schema_version=_SCHEMA_VERSION,
+            latest_version=latest_version,
+            released_at=_optional_str(wheel, "upload_time_iso_8601", ""),
+            wheel_url=_require_str(wheel, "url"),
+            min_supported="0",
+            disabled=(),
+            notice="",
+            sha256=_require_sha256(digests, "sha256"),
         )
 
     def to_json(self) -> str:
@@ -209,9 +192,9 @@ class LatestMetadata:
 
 def _base_url() -> str:
     """Return the metadata base URL, env-overridable. Trailing slash is
-    stripped so callers can do ``base + '/latest.json'`` uniformly.
+    stripped so callers can derive the metadata document uniformly.
 
-    Validates scheme (must be https) and host (must be in allowlist).
+    Validates scheme (must be https) and host (must be PyPI).
     Raises ValueError if the URL is not trusted.
     """
     raw = os.environ.get("MCS_UPDATE_BASE_URL", DEFAULT_BASE_URL)
@@ -224,19 +207,40 @@ def _base_url() -> str:
             f"MCS_UPDATE_BASE_URL must use https (got {parsed.scheme}://); "
             f"refusing to fetch metadata over insecure transport"
         )
-    if parsed.hostname not in _ALLOWED_HOSTS and not _truthy_env(
-        "MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL"
-    ):
+    if parsed.hostname not in _ALLOWED_HOSTS:
         raise ValueError(
             f"MCS_UPDATE_BASE_URL host {parsed.hostname!r} is not in the "
-            f"trusted allowlist {sorted(_ALLOWED_HOSTS)}; unset it to use the default "
-            f"or set MCS_ALLOW_UNTRUSTED_UPDATE_BASE_URL=1 for a deliberate HTTPS mirror"
+            f"trusted allowlist {sorted(_ALLOWED_HOSTS)}; unset it to use PyPI"
         )
     return url
 
 
+def _metadata_url() -> str:
+    """Return the concrete metadata document URL.
+
+    The default PyPI publisher uses ``/pypi/maxcompute-semantic/json``.
+    ``MCS_UPDATE_BASE_URL`` may point at ``https://pypi.org`` or that
+    exact project path, with or without the trailing ``/json``.
+    """
+    from urllib.parse import urlparse
+
+    base = _base_url()
+    parsed = urlparse(base)
+    path = parsed.path.rstrip("/")
+    if not path:
+        return f"https://{_PYPI_HOST}{_PYPI_PROJECT_PATH}/json"
+    if path == _PYPI_PROJECT_PATH:
+        return f"{base}/json"
+    if path == f"{_PYPI_PROJECT_PATH}/json":
+        return base
+    raise ValueError(
+        "MCS_UPDATE_BASE_URL must point at the PyPI project JSON base "
+        f"for maxcompute-semantic (got {base!r})"
+    )
+
+
 def fetch_latest_metadata(timeout_s: float = 5.0) -> LatestMetadata | None:
-    """Synchronously fetch and parse ``<base>/latest.json``.
+    """Synchronously fetch and parse the publisher metadata document.
 
     Returns the parsed ``LatestMetadata`` on success, or ``None`` on
     any failure: DNS resolution, connection refused, non-2xx HTTP
@@ -252,8 +256,8 @@ def fetch_latest_metadata(timeout_s: float = 5.0) -> LatestMetadata | None:
     timeout because urllib's timeout applies to the whole connection
     lifecycle once the request starts.
 
-    The base URL comes from ``MCS_UPDATE_BASE_URL`` (default
-    ``DEFAULT_BASE_URL``); see ``_base_url``. We intentionally don't
+    The metadata URL comes from ``MCS_UPDATE_BASE_URL`` (default
+    ``DEFAULT_BASE_URL``); see ``_metadata_url``. We intentionally don't
     use ``requests`` here — stdlib ``urllib.request`` is one less
     dependency in the wheel, and the surface is one GET with no auth.
 
@@ -267,17 +271,26 @@ def fetch_latest_metadata(timeout_s: float = 5.0) -> LatestMetadata | None:
     import urllib.request
 
     try:
-        url = f"{_base_url()}/latest.json"
+        url = _metadata_url()
+        from maxcompute_semantic import __version__
+
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": _PYPI_USER_AGENT.format(version=__version__),
+            },
+        )
         # urlopen's ``timeout`` argument covers both connect and read.
         # The default global socket timeout is None (block forever) on
         # Python, so this argument is the only thing standing between
-        # mcs and an unbounded hang if OSS becomes unreachable mid-TCP.
-        with urllib.request.urlopen(url, timeout=timeout_s) as resp:
+        # mcs and an unbounded hang if PyPI becomes unreachable mid-TCP.
+        with urllib.request.urlopen(request, timeout=timeout_s) as resp:
             # urlopen raises HTTPError for >=400, so by here status is
             # 2xx. We still defensively read up to a sane cap so a
-            # misconfigured OSS object serving a multi-GB file can't
-            # OOM us. 64 KiB is comfortably larger than any plausible
-            # latest.json (~250 bytes).
+            # A bad endpoint serving a multi-GB file can't OOM us.
+            # 64 KiB is comfortably larger than PyPI's project JSON
+            # for this package.
             raw = resp.read(64 * 1024)
     except (urllib.error.URLError, OSError, TimeoutError, ValueError):
         # URLError covers DNS, connection refused, TLS handshake fail,
@@ -301,14 +314,13 @@ def fetch_latest_metadata(timeout_s: float = 5.0) -> LatestMetadata | None:
         return None
 
     try:
-        return LatestMetadata.from_dict(parsed)
+        return LatestMetadata.from_pypi_dict(parsed)
     except UpdateCheckError:
-        # Covers both UnsupportedSchemaError and MalformedMetadataError —
-        # the daemon thread should not crash because the publisher
-        # rolled out a bad latest.json. The doctor checks below
-        # distinguish "no metadata" (network) from "bad metadata"
-        # (publisher) by re-issuing the fetch and inspecting the
-        # exception path. Banner stays silent in both cases.
+        # The daemon thread should not crash because PyPI returned a
+        # shape we cannot normalize. The doctor checks below
+        # distinguish "no metadata" (network) from "bad metadata" by
+        # re-issuing the fetch and inspecting the exception path.
+        # Banner stays silent in both cases.
         return None
 
 
@@ -863,8 +875,8 @@ def format_banner(cache: CacheEntry | None, *, current: str) -> str | None:
       * The soft form (one-line "new release available: cur → new.
         Run mcs update to upgrade.") otherwise.
 
-    A non-empty ``notice`` field from the publisher's ``latest.json``
-    is prepended to the line, separated by ``" — "``, so a
+    A non-empty normalized ``notice`` field is prepended to the line,
+    separated by ``" — "``, so a
     publisher-side announcement ("CVE patched in 0.4.0a40") rides
     the same channel as the version arrow. The notice can be the
     whole message in cases where there's no version delta (the

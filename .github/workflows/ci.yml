@@ -57,13 +57,15 @@ jobs:
           )
           if [ -n "$missing" ]; then echo "Missing SPDX header in:"; echo "$missing"; exit 1; fi
 
-      - name: Type check
-        run: uv run mypy src/
-
       - name: Test
+        # xdist: parallelise across cores. --dist loadscope keeps each test
+        # module on one worker (safer for module-scoped state / file locks).
+        # -x is replaced with --maxfail=1 (xdist-compatible stop-on-first-fail).
+        # mypy moved to .github/workflows/lint.yml (mypy-blocking job).
         run: |
           if [ "${{ matrix.python-version }}" = "3.10" ]; then
-            uv run pytest tests/ -m 'not live' -x -q \
+            uv run pytest tests/ -m 'not live' \
+              -n auto --dist loadscope --maxfail=1 -q \
               --junitxml=junit-${{ matrix.python-version }}.xml \
               --cov=maxcompute_semantic \
               --cov-report=xml \
@@ -71,7 +73,8 @@ jobs:
               --cov-report=term-missing:skip-covered \
               --cov-fail-under=90
           else
-            uv run pytest tests/ -m 'not live' -x -q \
+            uv run pytest tests/ -m 'not live' \
+              -n auto --dist loadscope --maxfail=1 -q \
               --junitxml=junit-${{ matrix.python-version }}.xml
           fi
 

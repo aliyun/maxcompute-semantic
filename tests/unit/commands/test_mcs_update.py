@@ -119,7 +119,7 @@ class TestInstallMode:
 
 
 class TestBuildUpgradeArgv:
-    _URL = "https://maxcompute-semantic.oss-cn-beijing.aliyuncs.com/wheels/maxcompute_semantic-0.4.0a99-py3-none-any.whl"
+    _TARGET = "maxcompute-semantic==0.17.3"
 
     def test_uv_tool(self) -> None:
         from maxcompute_semantic.commands.update import (
@@ -127,8 +127,8 @@ class TestBuildUpgradeArgv:
             build_upgrade_argv,
         )
 
-        argv = build_upgrade_argv(InstallMode.UV_TOOL, wheel_url=self._URL)
-        assert argv == ["uv", "tool", "install", "--reinstall", self._URL]
+        argv = build_upgrade_argv(InstallMode.UV_TOOL, install_target=self._TARGET)
+        assert argv == ["uv", "tool", "install", "--reinstall", self._TARGET]
 
     def test_pipx(self) -> None:
         from maxcompute_semantic.commands.update import (
@@ -136,11 +136,11 @@ class TestBuildUpgradeArgv:
             build_upgrade_argv,
         )
 
-        assert build_upgrade_argv(InstallMode.PIPX, wheel_url=self._URL) == [
+        assert build_upgrade_argv(InstallMode.PIPX, install_target=self._TARGET) == [
             "pipx",
             "install",
             "--force",
-            self._URL,
+            self._TARGET,
         ]
 
     def test_pip_user_uses_current_python(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,14 +150,14 @@ class TestBuildUpgradeArgv:
             build_upgrade_argv,
         )
 
-        assert build_upgrade_argv(InstallMode.PIP_USER, wheel_url=self._URL) == [
+        assert build_upgrade_argv(InstallMode.PIP_USER, install_target=self._TARGET) == [
             "/usr/bin/python3.11",
             "-m",
             "pip",
             "install",
             "--user",
             "--upgrade",
-            self._URL,
+            self._TARGET,
         ]
 
     def test_pip(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -167,13 +167,13 @@ class TestBuildUpgradeArgv:
             build_upgrade_argv,
         )
 
-        assert build_upgrade_argv(InstallMode.PIP, wheel_url=self._URL) == [
+        assert build_upgrade_argv(InstallMode.PIP, install_target=self._TARGET) == [
             "/Users/a/work/.venv/bin/python",
             "-m",
             "pip",
             "install",
             "--upgrade",
-            self._URL,
+            self._TARGET,
         ]
 
     def test_unknown_returns_none(self) -> None:
@@ -182,41 +182,39 @@ class TestBuildUpgradeArgv:
             build_upgrade_argv,
         )
 
-        assert build_upgrade_argv(InstallMode.UNKNOWN, wheel_url=self._URL) is None
+        assert build_upgrade_argv(InstallMode.UNKNOWN, install_target=self._TARGET) is None
 
-    def test_target_version_pin_overrides_wheel_url(self) -> None:
+    def test_install_target_passes_through_verbatim(self) -> None:
         """The ``--version 0.4.0a50`` flag on ``mcs update`` rewrites
-        the wheel URL to that pinned version. The argv builder
-        takes the URL as input so the rewriting happens upstream;
-        we just confirm the builder is URL-shaped (i.e., passes the
-        URL through verbatim, no escape behavior)."""
+        the install target upstream. The argv builder just passes the
+        target through verbatim, with no shell escaping behavior."""
         from maxcompute_semantic.commands.update import (
             InstallMode,
             build_upgrade_argv,
         )
 
-        url_with_spaces = "https://example.test/wheels/x with space.whl"
-        argv = build_upgrade_argv(InstallMode.PIP, wheel_url=url_with_spaces)
+        target_with_spaces = "/tmp/maxcompute semantic/local wheel.whl"
+        argv = build_upgrade_argv(InstallMode.PIP, install_target=target_with_spaces)
         assert argv is not None
-        # The URL is the last positional. No shell quoting because we
+        # The target is the last positional. No shell quoting because we
         # don't run through a shell (subprocess.run with a list argv).
-        assert argv[-1] == url_with_spaces
+        assert argv[-1] == target_with_spaces
 
 
 class TestManualHint:
     def test_includes_all_four_installers(self) -> None:
         from maxcompute_semantic.commands.update import manual_upgrade_hint
 
-        hint = manual_upgrade_hint("https://example.test/wheels/x.whl")
+        hint = manual_upgrade_hint("maxcompute-semantic==0.17.3")
         assert "uv tool install" in hint
         assert "pipx install" in hint
         assert "-m pip install --upgrade" in hint
         assert "-m pip install --user --upgrade" in hint
-        # The URL is shell-quoted (single quotes around it because the
-        # default URL doesn't contain quote chars; this assertion is
-        # tolerant of the unquoted form for very plain URLs since
+        # The target is shell-quoted (single quotes around it because the
+        # default target doesn't contain quote chars; this assertion is
+        # tolerant of the unquoted form for very plain targets since
         # shlex.quote elides quotes when there's nothing to escape).
-        assert "x.whl" in hint
+        assert "maxcompute-semantic==0.17.3" in hint
 
 
 class TestCmdUpdate:
@@ -224,9 +222,9 @@ class TestCmdUpdate:
     and ``os.execvp`` are monkeypatched so no real process spawn
     occurs.
 
-    The fixtures from ``conftest.py`` (``latest_json_server``,
-    ``isolated_config``) carry the env-var plumbing — the test sets
-    a payload on the stub server and the command's fetcher hits it.
+    The fixtures from ``conftest.py`` (``pypi_json_server``,
+    ``isolated_config``) carry the PyPI JSON stub — the test sets a
+    payload on the stub server and the command's fetcher hits it.
     """
 
     from click.testing import CliRunner
@@ -276,40 +274,35 @@ class TestCmdUpdate:
         monkeypatch.setattr(upd, "detect_install_mode", lambda: upd.InstallMode.UV_TOOL)
 
     @pytest.fixture
-    def _ver_payload(self, latest_json_server, monkeypatch: pytest.MonkeyPatch):
-        """The standard latest.json shape pointing at a higher version
+    def _ver_payload(
+        self, pypi_project_payload, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The standard PyPI JSON shape pointing at a higher version
         than what the running mcs is at, so the command takes the
         upgrade path. The current mcs version is read at runtime
         via the version_for_test fixture below."""
-        import hashlib
         import urllib.request
 
-        base_url, _ = latest_json_server
-        wheel_sha256 = hashlib.sha256(b"").hexdigest()
+        class _PayloadFactory:
+            def __init__(self) -> None:
+                self.retrieved_urls: list[str] = []
+
+            def __call__(self, version: str = "0.4.0a99") -> dict:
+                return pypi_project_payload(version)
+
+        factory = _PayloadFactory()
 
         def fake_urlretrieve(url: str, filename: str):  # type: ignore[no-untyped-def]
-            Path(filename).write_bytes(b"")
-            return filename, None
+            factory.retrieved_urls.append(url)
+            raise AssertionError("mcs update should let the installer resolve package artifacts")
 
         monkeypatch.setattr(urllib.request, "urlretrieve", fake_urlretrieve)
-
-        def factory(version: str = "0.4.0a99") -> dict:
-            return {
-                "schema_version": 1,
-                "latest_version": version,
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": (f"{base_url}/wheels/maxcompute_semantic-{version}-py3-none-any.whl"),
-                "sha256": wheel_sha256,
-                "min_supported": "0.4.0",
-                "disabled": [],
-                "notice": "",
-            }
 
         return factory
 
     def test_already_on_latest_no_subprocess(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _ver_payload,
@@ -320,7 +313,7 @@ class TestCmdUpdate:
         from maxcompute_semantic import __version__
         from maxcompute_semantic.commands.update import cmd_update
 
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         # Publisher's "latest" is exactly our version.
         setter(_ver_payload(__version__))
 
@@ -334,7 +327,7 @@ class TestCmdUpdate:
 
     def test_happy_path_uv_tool(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
@@ -343,7 +336,7 @@ class TestCmdUpdate:
         """End-to-end: fetch metadata, build the uv argv, "run" the
         install subprocess, "run" the skill-update subprocess,
         "exec" the verification step."""
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))  # well ahead of the running version.
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -359,9 +352,9 @@ class TestCmdUpdate:
         assert len(_no_real_subprocess) == 2
         installer_argv = _no_real_subprocess[0]
         assert installer_argv[:4] == ["uv", "tool", "install", "--reinstall"]
-        assert installer_argv[-1].endswith(".whl")
-        assert "/wheels/maxcompute_semantic-9.9.9-py3-none-any.whl" not in installer_argv[-1]
-        assert "SHA256 OK" in result.output
+        assert installer_argv[-1] == "maxcompute-semantic==9.9.9"
+        assert _ver_payload.retrieved_urls == []
+        assert "SHA256 OK" not in result.output
 
         skill_argv = _no_real_subprocess[1]
         # The skill-update call uses the script path that started us
@@ -378,7 +371,7 @@ class TestCmdUpdate:
 
     def test_post_install_prints_refresh_hint(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
@@ -390,7 +383,7 @@ class TestCmdUpdate:
         it offline. The line lands on stderr (via ``err=True``) so it
         doesn't pollute scripted callers reading stdout, but the
         ``CliRunner`` collapses both streams into ``result.output``."""
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -404,7 +397,7 @@ class TestCmdUpdate:
 
     def test_check_prompt_no_aborts(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
@@ -413,7 +406,7 @@ class TestCmdUpdate:
         """Without ``--no-check`` (i.e., with the default ``--check``),
         the command prompts for confirmation. Answering "n" aborts
         before any subprocess fires."""
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -431,13 +424,13 @@ class TestCmdUpdate:
 
     def test_check_prompt_yes_runs(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
         _ver_payload,
     ) -> None:
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -450,16 +443,16 @@ class TestCmdUpdate:
 
     def test_version_pin_overrides_latest(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
         _ver_payload,
     ) -> None:
         """``--version 0.4.0a50`` makes the installer pull that
-        specific wheel even though latest.json says something else."""
-        _, setter = latest_json_server
-        setter(_ver_payload("0.4.0a99"))
+        specific PyPI version spec even when the metadata endpoint is down."""
+        _, setter = pypi_json_server
+        setter(503)
 
         from maxcompute_semantic.commands.update import cmd_update
 
@@ -468,23 +461,46 @@ class TestCmdUpdate:
         assert result.exit_code == 0, result.output
         assert len(_no_real_subprocess) >= 1
         installer_argv = _no_real_subprocess[0]
-        url = installer_argv[-1]
-        # The URL path segment encodes the pinned version.
-        assert "0.4.0a50" in url
-        # And the "latest" 0.4.0a99 from the server isn't the install
-        # target.
-        assert "0.4.0a99" not in url
+        assert installer_argv[-1] == "maxcompute-semantic==0.4.0a50"
+
+    def test_version_pin_uses_pypi_package_spec_by_default(
+        self,
+        _no_real_subprocess: list[list[str]],
+        _no_real_exec: list[list[str]],
+        _force_uv_tool_mode: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The default publisher is PyPI, so an explicit version pin
+        should install a package requirement."""
+        monkeypatch.delenv("MCS_UPDATE_BASE_URL", raising=False)
+
+        from maxcompute_semantic.commands.update import cmd_update
+
+        runner = self.CliRunner()
+        result = runner.invoke(cmd_update, ["--no-check", "--version", "0.17.2"])
+
+        assert result.exit_code == 0, result.output
+        assert len(_no_real_subprocess) >= 1
+        installer_argv = _no_real_subprocess[0]
+        assert installer_argv == [
+            "uv",
+            "tool",
+            "install",
+            "--reinstall",
+            "maxcompute-semantic==0.17.2",
+        ]
+        assert _no_real_exec
 
     def test_metadata_fetch_failure_exits_one(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
     ) -> None:
         """If the publisher's metadata endpoint is unreachable and the
         user didn't pin ``--version``, the command bails before
         spawning anything."""
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(503)
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -497,22 +513,28 @@ class TestCmdUpdate:
         assert (
             "could not fetch" in out_lower
             or "unreachable" in out_lower
-            or "latest.json" in out_lower
+            or "pypi" in out_lower
         )
         assert _no_real_subprocess == []
         assert _no_real_exec == []
 
-    def test_latest_metadata_wheel_url_must_match_canonical_version_path(
+    def test_latest_update_lets_installer_resolve_distribution_source(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _no_real_exec: list[list[str]],
         _force_uv_tool_mode: None,
         _ver_payload,
     ) -> None:
-        base_url, setter = latest_json_server
+        """The no-pin path uses PyPI metadata only to learn the latest
+        version. The installer receives a package requirement, not the
+        PyPI artifact URL, so pip/uv/pipx index configuration and
+        mirrors remain in control of the actual distribution source."""
+        _, setter = pypi_json_server
         payload = _ver_payload("9.9.9")
-        payload["wheel_url"] = f"{base_url}/wheels/attacker-9.9.9-py3-none-any.whl"
+        wheel = payload["urls"][1]
+        assert isinstance(wheel, dict)
+        wheel["url"] = "https://example.test/packages/maxcompute_semantic-9.9.9-py3-none-any.whl"
         setter(payload)
 
         from maxcompute_semantic.commands.update import cmd_update
@@ -520,14 +542,14 @@ class TestCmdUpdate:
         runner = self.CliRunner()
         result = runner.invoke(cmd_update, ["--no-check"])
 
-        assert result.exit_code != 0
-        assert "canonical" in result.output.lower() or "refusing" in result.output.lower()
-        assert _no_real_subprocess == []
-        assert _no_real_exec == []
+        assert result.exit_code == 0, result.output
+        assert _no_real_subprocess[0][-1] == "maxcompute-semantic==9.9.9"
+        assert _ver_payload.retrieved_urls == []
+        assert _no_real_exec
 
     def test_installer_failure_exits_one_and_skips_skill_update_and_exec(
         self,
-        latest_json_server,
+        pypi_json_server,
         _force_uv_tool_mode: None,
         _ver_payload,
         monkeypatch: pytest.MonkeyPatch,
@@ -536,7 +558,7 @@ class TestCmdUpdate:
         prints the stderr and exits 1. The post-install
         ``skill update --all`` and the verifying ``--version`` exec
         do NOT run."""
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         import subprocess
@@ -577,11 +599,11 @@ class TestCmdUpdate:
 
     def test_unknown_install_mode_prints_manual_hint(
         self,
-        latest_json_server,
+        pypi_json_server,
         _ver_payload,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         from maxcompute_semantic.commands import update as upd
@@ -618,63 +640,13 @@ class TestCmdUpdate:
         assert "-m pip install --user --upgrade" in out
         assert run_calls == []
 
-    def test_disabled_version_blocks_update_at_the_same_version(
-        self,
-        latest_json_server,
-        _no_real_subprocess: list[list[str]],
-        _no_real_exec: list[list[str]],
-        _force_uv_tool_mode: None,
-    ) -> None:
-        """If the publisher pushed the *current* mcs version into the
-        ``disabled`` list (so the running version is disabled) AND
-        the published ``latest_version`` is what the user is running
-        right now, the command escalates the message: "running
-        version is disabled; the publisher has no replacement
-        wheel yet." Exit code is non-zero so a calling script
-        doesn't proceed.
-
-        This is an edge case from the spec's "Open questions / banner
-        cache GC" discussion of "latest is itself disabled."
-        """
-        from maxcompute_semantic import __version__
-        from maxcompute_semantic.commands.update import cmd_update
-
-        base_url, setter = latest_json_server
-        # latest_version == running version, and that version is on
-        # the disabled list.
-        setter(
-            {
-                "schema_version": 1,
-                "latest_version": __version__,
-                "released_at": "2026-05-22T00:00:00Z",
-                "wheel_url": (
-                    f"{base_url}/wheels/maxcompute_semantic-{__version__}-py3-none-any.whl"
-                ),
-                "sha256": "0" * 64,
-                "min_supported": "0.4.0",
-                "disabled": [__version__],
-                "notice": "the active latest wheel was withdrawn",
-            }
-        )
-
-        runner = self.CliRunner()
-        result = runner.invoke(cmd_update, ["--no-check"])
-        assert result.exit_code != 0
-        out = result.output.lower()
-        # Wording references the publisher state. The "no replacement
-        # available" hint is informative — the user can't upgrade
-        # past a withdrawn-latest just by re-running.
-        assert "disabled" in out or "withdrawn" in out or "no upgrade" in out
-        assert _no_real_subprocess == []
-        assert _no_real_exec == []
-
     @pytest.mark.skipif(
         sys.platform != "win32",
         reason="Windows-specific self-replace fallback",
     )
     def test_windows_skips_execvp_and_prints_restart_hint(
         self,
-        latest_json_server,
+        pypi_json_server,
         _no_real_subprocess: list[list[str]],
         _force_uv_tool_mode: None,
         _ver_payload,
@@ -691,7 +663,7 @@ class TestCmdUpdate:
         the manual smoke checklist in the spec's "Open questions /
         install.ps1 testing."
         """
-        _, setter = latest_json_server
+        _, setter = pypi_json_server
         setter(_ver_payload("9.9.9"))
 
         from maxcompute_semantic.commands import update as upd

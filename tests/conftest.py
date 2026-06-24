@@ -178,10 +178,50 @@ def fixtures_dir() -> Path:
 
 
 @pytest.fixture
-def latest_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def pypi_project_payload():
+    """Factory for the PyPI project JSON shape returned by
+    ``https://pypi.org/pypi/maxcompute-semantic/json``."""
+
+    def factory(
+        version: str = "9.9.9",
+        *,
+        sha256: str = "a" * 64,
+        wheel_url: str | None = None,
+        upload_time: str = "2026-06-22T15:45:27.936944Z",
+        yanked: bool = False,
+    ) -> dict[str, object]:
+        wheel_filename = f"maxcompute_semantic-{version}-py3-none-any.whl"
+        return {
+            "info": {"version": version},
+            "urls": [
+                {
+                    "filename": f"maxcompute_semantic-{version}.tar.gz",
+                    "packagetype": "sdist",
+                    "url": f"https://files.pythonhosted.org/packages/source/{version}.tar.gz",
+                    "digests": {"sha256": "b" * 64},
+                    "upload_time_iso_8601": upload_time,
+                    "yanked": False,
+                },
+                {
+                    "filename": wheel_filename,
+                    "packagetype": "bdist_wheel",
+                    "url": wheel_url
+                    or f"https://files.pythonhosted.org/packages/py3/{wheel_filename}",
+                    "digests": {"sha256": sha256},
+                    "upload_time_iso_8601": upload_time,
+                    "yanked": yanked,
+                },
+            ],
+        }
+
+    return factory
+
+
+@pytest.fixture
+def pypi_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Stand up a stdlib HTTP server on a random port that serves a
-    settable ``/latest.json`` payload, point
-    ``MCS_UPDATE_BASE_URL`` at it, and yield a control handle.
+    settable PyPI project JSON payload, patch the update metadata URL
+    to point at it, and yield a control handle.
 
     Also redirects ``MCS_CACHE_DIR`` to a per-test tmpdir so any test
     that triggers ``start_background_probe`` (e.g. ``mcs doctor``,
@@ -208,8 +248,7 @@ def latest_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     The fixture is intentionally stdlib-only (no ``pytest-httpserver``
     dependency) — the test surface is one endpoint with no header /
-    content-negotiation requirements. See spec
-    §"Testing strategy / Stub server for tests"."""
+    content-negotiation requirements."""
     import socketserver
     from http.server import BaseHTTPRequestHandler
     from threading import Thread
@@ -222,7 +261,7 @@ def latest_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             return
 
         def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler interface)
-            if self.path != "/latest.json":
+            if self.path != "/pypi/maxcompute-semantic/json":
                 self.send_error(404, "not found")
                 return
             payload = state["payload"]
@@ -262,26 +301,18 @@ def latest_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     thread.start()
 
     base_url = f"http://{host}:{port}"
-    monkeypatch.setenv("MCS_UPDATE_BASE_URL", base_url)
-    # Relax _base_url() validation for the test-local HTTP server:
-    # allow http scheme and the 127.0.0.1 host.
+    metadata_url = f"{base_url}/pypi/maxcompute-semantic/json"
+
     import maxcompute_semantic._internal.update_check as _uc
 
-    monkeypatch.setattr(_uc, "_ALLOWED_HOSTS", frozenset({*_uc._ALLOWED_HOSTS, str(host)}))
+    def _test_metadata_url() -> str:
+        return metadata_url
 
-    def _test_base_url() -> str:
-        import os as _os
-
-        raw = _os.environ.get("MCS_UPDATE_BASE_URL", _uc.DEFAULT_BASE_URL).rstrip("/")
-        return raw
-
-    monkeypatch.setattr(_uc, "_base_url", _test_base_url)
-    # Also patch modules that import _base_url by name at the top level.
+    monkeypatch.setattr(_uc, "_metadata_url", _test_metadata_url)
+    # Also patch modules that import _metadata_url by name at the top level.
     import maxcompute_semantic.commands.doctor as _doc
-    import maxcompute_semantic.commands.update as _upd
 
-    monkeypatch.setattr(_doc, "_base_url", _test_base_url)
-    monkeypatch.setattr(_upd, "_base_url", _test_base_url)
+    monkeypatch.setattr(_doc, "_metadata_url", _test_metadata_url)
     # Also sandbox the on-disk update-check cache. ``mcs doctor`` and
     # ``mcs update`` both fire ``start_background_probe(force=True)``
     # which calls ``write_cache(...)`` regardless of the test's

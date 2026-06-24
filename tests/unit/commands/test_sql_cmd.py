@@ -543,7 +543,7 @@ class TestSqlAsync:
         assert output["data"]["instance_id"] == "inst_123"
         assert output["data"]["status"] == "Running"
         mock_client.run_sql_async.assert_called_once_with(
-            "SELECT 1", schema="default", assume_yes=True, allow_write=False
+            "SELECT 1", schema="default", hints=None, assume_yes=True, allow_write=False
         )
         mock_client.execute_sql.assert_not_called()
 
@@ -877,6 +877,39 @@ class TestSqlCost:
         assert result.exit_code == 0
         output = json.loads(result.output)
         assert output["data"]["verdict"] == "blocked"
+
+    def test_cost_strips_set_and_passes_hints(self, isolated_config: Path) -> None:
+        """SET key=val is extracted to a hint; cost_estimate gets the stripped
+        SELECT + the SET as hints (so execute_sql_cost never sees the SET)."""
+        mock_profile = _mock_profile()
+        mock_client = _mock_client(mock_profile)
+        mock_client.cost_estimate.return_value = {
+            "estimated_input_bytes": 0,
+            "estimated_cost_cny": 0.0,
+            "verdict": "ok",
+            "thresholds": {"confirm_cny": 10.0, "blocked_cny": 100.0},
+        }
+
+        with patch.multiple(
+            "maxcompute_semantic.commands.sql",
+            make_client_for_project=MagicMock(return_value=mock_client),
+            get_tier=MagicMock(return_value="2"),
+        ):
+            result = _invoke(
+                [
+                    "cost",
+                    "--project",
+                    "my_proj",
+                    "--schema",
+                    "default",
+                    "SET odps.sql.mapper.split.size = 4096; SELECT * FROM t",
+                ]
+            )
+
+        assert result.exit_code == 0, result.output
+        call = mock_client.cost_estimate.call_args
+        assert call.args[0] == "SELECT * FROM t"
+        assert call.kwargs.get("hints") == {"odps.sql.mapper.split.size": "4096"}
 
     def test_3level_cost_applies_hints(self, isolated_config: Path) -> None:
         """3-level project cost must forward ``schema=`` so the client
@@ -2628,7 +2661,16 @@ class TestClassifySql:
         assert _classify_sql("USE my_db") == "read"
 
     def test_set_is_write(self) -> None:
-        """SET mutates session state — requires --allow-write."""
+        """SET mutates session state — requires --allow-write.
+
+        This stays 'write' on purpose: classify_sql is NOT modified by
+        the SET-extraction feature (see
+        docs/superpowers/specs/2026-06-23-set-statement-extraction-design.md).
+        Extraction happens in the verbs before classification, so
+        extractable SETs never reach classify_sql; non-extractable SETs
+        (SET LABEL, SETPROJECT) still do and must stay gated as write.
+        Do not remove this assertion.
+        """
         from maxcompute_semantic.commands.sql import _classify_sql
 
         assert _classify_sql("SET odps.sql.allow.fullscan=true") == "write"
@@ -2823,6 +2865,37 @@ class TestSqlExecuteWriteGuard:
         )
         assert result.exit_code == 0
         assert mock_client.execute_sql.called
+
+    def test_set_then_select_runs_without_allow_write(self, isolated_config: Path) -> None:
+        # SET key=val is extracted to a hint; the remaining SELECT is a read,
+        # so --allow-write is NOT required.
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET odps.sql.mapper.split.size = 4096; SELECT 1"]
+        )
+        assert result.exit_code == 0, result.output
+        assert mock_client.execute_sql.called
+        call = mock_client.execute_sql.call_args
+        assert call.args[0] == "SELECT 1"
+        assert call.kwargs["hints"] == {"odps.sql.mapper.split.size": "4096"}
+
+    def test_set_label_still_requires_allow_write(self, isolated_config: Path) -> None:
+        # SET LABEL is not key=val -> not extracted -> stays -> rejected.
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET LABEL tbl TO user; SELECT 1"]
+        )
+        assert result.exit_code == 2
+        assert not mock_client.execute_sql.called
+
+    def test_standalone_set_is_rejected(self, isolated_config: Path) -> None:
+        result, mock_client = self._run(
+            ["execute", "--project", "p", "--schema", "default",
+             "SET odps.sql.mapper.split.size = 4096"]
+        )
+        assert result.exit_code == 2
+        assert not mock_client.execute_sql.called
+        assert "no query" in result.output
 
     def test_insert_default_rejected(self, isolated_config: Path) -> None:
         result, mock_client = self._run(

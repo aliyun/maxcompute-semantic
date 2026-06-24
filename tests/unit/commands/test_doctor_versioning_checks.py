@@ -610,7 +610,7 @@ def test_inference_logic_check_ignores_unopenable_package_db(
 
 
 def test_update_channel_and_version_render_failure_and_skip() -> None:
-    fetch_result = (None, "HTTP 500 from https://example.test/latest.json")
+    fetch_result = (None, "HTTP 500 from https://pypi.org/pypi/maxcompute-semantic/json")
 
     channel = _check_update_channel_reachable(fetch_result)
     version = _check_update_version_current(fetch_result)
@@ -623,6 +623,20 @@ def test_update_channel_and_version_render_failure_and_skip() -> None:
         "skip",
         "skipped: update_channel check failed (see line above)",
     )
+
+
+def test_update_channel_failure_handles_invalid_metadata_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MCS_UPDATE_BASE_URL", "https://pypi.org/simple")
+
+    channel = _check_update_channel_reachable(
+        (None, "MCS_UPDATE_BASE_URL must point at the PyPI project JSON base")
+    )
+
+    assert channel[0] == "update_channel"
+    assert channel[1] == "fail"
+    assert "PyPI project JSON" in (channel[2] or "")
 
 
 def test_update_version_pass_and_upgrade_available(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -664,7 +678,7 @@ def test_run_update_check_fetch_classifies_http_error(monkeypatch: pytest.Monkey
 
     def fake_urlopen(*args, **kwargs):
         raise urllib.error.HTTPError(
-            url="https://example.test/latest.json",
+            url="https://pypi.org/pypi/maxcompute-semantic/json",
             code=503,
             msg="unavailable",
             hdrs=None,
