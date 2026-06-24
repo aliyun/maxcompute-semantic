@@ -1,4 +1,4 @@
-name: Lint (ruff + ty)
+name: Lint (ruff + ty + mypy)
 
 on:
   push:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   lint-diff:
-    name: ruff + ty diff
+    name: ruff + ty + mypy diff
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -38,11 +38,17 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install ruff + ty
         run: |
           uv tool install ruff
           uv tool install ty
+
+      - name: Install project deps (for mypy)
+        run: uv sync --extra dev
 
       - name: Determine base ref
         id: base
@@ -60,7 +66,7 @@ jobs:
             echo "ref=HEAD~1" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run ruff + ty on HEAD
+      - name: Run ruff + ty + mypy on HEAD
         run: |
           mkdir -p .lint-reports/head
           ruff check src/ tests/ \
@@ -69,8 +75,10 @@ jobs:
           ty check src/ tests/ \
             --output-format gitlab --exit-zero \
             > .lint-reports/head/ty.json || true
+          uv run mypy src/ --show-error-codes --no-pretty --no-error-summary \
+            > .lint-reports/head/mypy.txt || true
 
-      - name: Run ruff + ty on base (via git worktree)
+      - name: Run ruff + ty + mypy on base (via git worktree)
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
         run: |
@@ -80,16 +88,20 @@ jobs:
             echo "Base SHA == HEAD SHA, skipping base scan."
             echo '[]' > .lint-reports/base/ruff.json
             echo '[]' > .lint-reports/base/ty.json
+            : > .lint-reports/base/mypy.txt
           else
             git worktree add --detach /tmp/lint-base "$BASE_SHA"
             (
               cd /tmp/lint-base
+              uv sync --extra dev
               ruff check src/ tests/ \
                 --output-format json --exit-zero \
                 > "$GITHUB_WORKSPACE/.lint-reports/base/ruff.json" || true
               ty check src/ tests/ \
                 --output-format gitlab --exit-zero \
                 > "$GITHUB_WORKSPACE/.lint-reports/base/ty.json" || true
+              uv run mypy src/ --show-error-codes --no-pretty --no-error-summary \
+                > "$GITHUB_WORKSPACE/.lint-reports/base/mypy.txt" || true
             )
             git worktree remove --force /tmp/lint-base
           fi
@@ -111,6 +123,8 @@ jobs:
             --head-ruff .lint-reports/head/ruff.json \
             --base-ty   .lint-reports/base/ty.json \
             --head-ty   .lint-reports/head/ty.json \
+            --base-mypy .lint-reports/base/mypy.txt \
+            --head-mypy .lint-reports/head/mypy.txt \
             --base-dir  /tmp/lint-base \
             --base-ref  "$BASE_REF" \
             --head-ref  "$HEAD_REF" \
@@ -150,6 +164,15 @@ jobs:
               });
             }
 
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lint-reports
+          path: .lint-reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
   ruff-blocking:
     name: ruff enforcement (blocking)
     runs-on: ubuntu-latest
@@ -168,3 +191,27 @@ jobs:
 
       - name: ruff check
         run: ruff check src/ tests/
+
+  mypy-blocking:
+    name: mypy enforcement (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: mypy
+        # Relocated from ci.yml's test matrix (ran 3x, once per Python).
+        # mypy results are Python-version-independent; one run suffices.
+        run: uv run mypy src/

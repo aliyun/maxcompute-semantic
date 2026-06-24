@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -68,6 +69,36 @@ def _normalize_ty(entries: list[dict]) -> list[dict]:
                 "path": loc.get("path", ""),
                 "line": begin.get("line", 0),
                 "message": e.get("description", ""),
+            }
+        )
+    return out
+
+
+# mypy plain-text line:  src/pkg/foo.py:123: error: <msg>  [code]
+# (column optional; ``[code]`` present with --show-error-codes; notes ignored.)
+_MYPY_LINE = re.compile(
+    r"^(?P<path>[^:\s][^:]*):(?P<line>\d+)(?::\d+)?:\s*"
+    r"(?P<severity>error|warning):\s*(?P<message>.*?)"
+    r"(?:\s{2}\[(?P<rule>[^\]]+)\])?\s*$"
+)
+
+
+def _load_mypy_text(path: Path | None) -> list[dict]:
+    """Parse mypy plain-text output (``--show-error-codes --no-pretty``)."""
+    if path is None or not path.exists() or path.stat().st_size == 0:
+        return []
+    out: list[dict] = []
+    for line in path.read_text(errors="replace").splitlines():
+        m = _MYPY_LINE.match(line)
+        if not m:
+            continue
+        out.append(
+            {
+                "tool": "mypy",
+                "rule": m.group("rule") or m.group("severity"),
+                "path": m.group("path"),
+                "line": int(m.group("line")),
+                "message": m.group("message"),
             }
         )
     return out
@@ -168,6 +199,10 @@ def main() -> int:
     ap.add_argument("--head-ruff", type=Path, required=True)
     ap.add_argument("--base-ty", type=Path, required=True)
     ap.add_argument("--head-ty", type=Path, required=True)
+    ap.add_argument("--base-mypy", type=Path, default=None,
+                    help="mypy plain-text report on base (optional)")
+    ap.add_argument("--head-mypy", type=Path, default=None,
+                    help="mypy plain-text report on HEAD (optional)")
     ap.add_argument("--base-dir", type=Path, default=None,
                     help="Base worktree directory for ruff path normalization")
     ap.add_argument("--base-ref", default="base")
@@ -186,14 +221,22 @@ def main() -> int:
     head_ruff = _normalize_ruff(head_ruff_raw)
     base_ty = _normalize_ty(base_ty_raw)
     head_ty = _normalize_ty(head_ty_raw)
+    base_mypy = _load_mypy_text(args.base_mypy)
+    head_mypy = _load_mypy_text(args.head_mypy)
 
     base_ruff_avail = args.base_ruff.exists() and args.base_ruff.stat().st_size > 0
     base_ty_avail = args.base_ty.exists() and args.base_ty.stat().st_size > 0
+    base_mypy_avail = (
+        args.base_mypy is not None
+        and args.base_mypy.exists()
+        and args.base_mypy.stat().st_size > 0
+    )
 
     buf: list[str] = []
     buf.append(f"# \U0001f50e Lint report: `{args.head_ref}` vs `{args.base_ref}`\n")
     buf.append(_tool_report("ruff", base_ruff, head_ruff, base_ruff_avail))
     buf.append(_tool_report("ty (type checker)", base_ty, head_ty, base_ty_avail))
+    buf.append(_tool_report("mypy (type checker)", base_mypy, head_mypy, base_mypy_avail))
     buf.append(
         "_Diagnostics are surfaced as warnings — this check never fails the build._\n"
     )
