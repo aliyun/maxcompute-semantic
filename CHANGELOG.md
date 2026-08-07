@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`mcs sql run` / `mcs sql result` crashed with
+  `'CsvRecordReader' object has no attribute 'schema'` (code `Unknown`)
+  whenever the instance tunnel is unavailable** (e.g. sandboxed networks
+  where the tunnel endpoint is unreachable). pyodps then silently falls
+  back to the REST result reader (`CsvRecordReader`), which has no public
+  `.schema`. `_read_instance_rows` now detects the fallback: it uses the
+  typed schema pyodps stashes on `_schema` when the service provides a
+  result descriptor, otherwise derives string-typed columns from the CSV
+  header, and tolerates an empty result body (pyodps itself raises
+  `TypeError` there). A WARNING is logged on every fallback, and result
+  metadata gains `fetch_path` (`instance_tunnel` / `rest_fallback`) so
+  callers can tell the server may cap REST results (typically 10000 rows).
+
+### Changed
+
+- **CLI startup no longer imports pyodps** (and its pandas / numpy /
+  pyarrow import tail). `mc_client/client.py` and `mc_client/tier.py` now
+  import `odps` lazily inside the methods that talk to MaxCompute, so
+  local-only commands (`mcs profile list`, `mcs link`, `mcs doctor`,
+  `mcs --help`) skip the multi-second pyodps import chain entirely.
+  Profiled trigger: on one sandbox environment `import odps` accounted for
+  3.56s of a 4.62s `mcs profile list` run (~77%), with pyodps's eager
+  pandas import alone taking ~1.8s. A startup-import guard test keeps the
+  CLI free of `odps` / `pandas` / `numpy` / `pyarrow` imports.
+
 ## [0.18.0] — 2026-06-24
 
 ### Added

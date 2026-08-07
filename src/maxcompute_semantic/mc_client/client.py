@@ -10,14 +10,12 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
-from odps import ODPS  # type: ignore[import-untyped]
-from odps import errors as odps_errors
-from odps.accounts import StsAccount  # type: ignore[import-untyped]
-
-try:
-    from odps.rest import default_user_agent as _pyodps_ua  # type: ignore[import-untyped]
-except ImportError:
-    _pyodps_ua = None
+# pyodps is imported lazily (inside the methods that need it): importing
+# ``odps`` eagerly pulls pandas/numpy/pyarrow into every CLI startup, and
+# local-only commands (profile list, link, doctor) would pay that cost
+# without ever touching MaxCompute.
+if TYPE_CHECKING:
+    from odps import ODPS  # type: ignore[import-untyped, unused-ignore]
 
 from maxcompute_semantic import __version__ as _mcs_version
 from maxcompute_semantic.auth.credential import resolve_credentials
@@ -27,13 +25,24 @@ from maxcompute_semantic.mc_client.cost_gate import enforce_cost_gate
 from maxcompute_semantic.mc_client.sql_guard import ensure_sql_write_allowed
 
 _MCS_UA_SUFFIX = f"maxcompute-semantic/{_mcs_version}"
-if _pyodps_ua is not None:
+
+
+def _mcs_user_agent() -> str:
+    """Compose the pyodps ``user_agent`` rest-client kwarg lazily.
+
+    Reading pyodps's default user agent requires importing ``odps.rest``,
+    which would defeat the lazy-import design above.
+    """
     try:
-        _MCS_USER_AGENT = f"{_pyodps_ua()} {_MCS_UA_SUFFIX}"
+        from odps.rest import (  # type: ignore[import-untyped, unused-ignore]
+            default_user_agent as _pyodps_ua,
+        )
+    except ImportError:
+        return _MCS_UA_SUFFIX
+    try:
+        return f"{_pyodps_ua()} {_MCS_UA_SUFFIX}"
     except Exception:
-        _MCS_USER_AGENT = _MCS_UA_SUFFIX
-else:
-    _MCS_USER_AGENT = _MCS_UA_SUFFIX
+        return _MCS_UA_SUFFIX
 
 if TYPE_CHECKING:
     from maxcompute_semantic.mc_client.envelope import Envelope
@@ -151,6 +160,9 @@ class MaxComputeClient:
         """Return cached ODPS instance, refreshing if creds expired."""
         if self._odps is not None and self._creds_still_valid():
             return self._odps
+        from odps import ODPS  # type: ignore[import-untyped, unused-ignore]
+        from odps.accounts import StsAccount  # type: ignore[import-untyped, unused-ignore]
+
         creds = resolve_credentials(self._profile.auth)
         if creds.security_token:
             # pyodps doesn't accept security_token as a standalone kwarg;
@@ -171,7 +183,7 @@ class MaxComputeClient:
                 access_id=account,
                 project=self._profile.compute_project,
                 endpoint=self._profile.endpoint,
-                rest_client_kwargs={"user_agent": _MCS_USER_AGENT},
+                rest_client_kwargs={"user_agent": _mcs_user_agent()},
             )
         else:
             self._odps = ODPS(
@@ -179,7 +191,7 @@ class MaxComputeClient:
                 secret_access_key=creds.access_key_secret,
                 project=self._profile.compute_project,
                 endpoint=self._profile.endpoint,
-                rest_client_kwargs={"user_agent": _MCS_USER_AGENT},
+                rest_client_kwargs={"user_agent": _mcs_user_agent()},
             )
         self._creds_expiration = creds.expiration
         return self._odps
@@ -828,6 +840,8 @@ class MaxComputeClient:
         self, keyword: str, *, schema: str | None = None, project: str | None = None
     ) -> list[dict[str, Any]]:
         """Client-side table search — iterates all tables, substring match."""
+        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
         tokens = [t.lower() for t in keyword.split() if t.strip()] or [keyword.lower()]
@@ -909,6 +923,8 @@ class MaxComputeClient:
             Sorted list of dicts with keys: table_name, column_name, type,
             comment, score.
         """
+        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
         tokens = [t.lower() for t in keyword.split() if t.strip()] or [keyword.lower()]
@@ -1507,6 +1523,8 @@ class MaxComputeClient:
         Returns dict with keys: plan (str), logview_url (str), elapsed_ms (int).
         """
         import time
+
+        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
 
         from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
         from maxcompute_semantic.mc_client.hints import build_hints

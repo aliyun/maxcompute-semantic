@@ -65,7 +65,7 @@ def test_ensure_odps_creates_once_and_caches() -> None:
         patch(
             "maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds
         ) as resolve_mock,
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance),
+        patch("odps.ODPS", return_value=odps_instance),
     ):
         result1 = c._ensure_odps()
         assert resolve_mock.call_count == 1
@@ -83,7 +83,7 @@ def test_ak_always_valid() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance),
+        patch("odps.ODPS", return_value=odps_instance),
     ):
         c._ensure_odps()
         assert c._creds_still_valid() is True
@@ -129,7 +129,7 @@ def test_expired_creds_trigger_refetch() -> None:
         patch(
             "maxcompute_semantic.mc_client.client.resolve_credentials", return_value=new_creds
         ) as resolve_mock,
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=new_odps),
+        patch("odps.ODPS", return_value=new_odps),
     ):
         result = c._ensure_odps()
         assert resolve_mock.call_count == 1
@@ -150,8 +150,8 @@ def test_security_token_passed_to_odps() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance) as odps_cls,
-        patch("maxcompute_semantic.mc_client.client.StsAccount") as sts_cls,
+        patch("odps.ODPS", return_value=odps_instance) as odps_cls,
+        patch("odps.accounts.StsAccount") as sts_cls,
     ):
         c._ensure_odps()
         # StsAccount should be called with the three STS fields
@@ -1242,7 +1242,7 @@ def test_ensure_odps_no_security_token() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance) as odps_cls,
+        patch("odps.ODPS", return_value=odps_instance) as odps_cls,
     ):
         c._ensure_odps()
         call_kwargs = odps_cls.call_args[1]
