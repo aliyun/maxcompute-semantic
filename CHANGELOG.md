@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-08-07
+
 ### Fixed
 
 - **`mcs sql run` / `mcs sql result` crashed with

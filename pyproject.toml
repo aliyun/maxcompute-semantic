@@ -1,6 +1,6 @@
 [project]
 name = "maxcompute-semantic"
-version = "0.18.0"
+version = "0.18.1"
 description = "MaxCompute semantic-layer-aware CLI: multi-profile auth + pyodps-backed query + structured memory + FTS5 + vector retrieval + UDF."
 readme = "README.md"
 license = { text = "Apache-2.0" }
