@@ -40,7 +40,10 @@ def _get_jieba() -> Any:
     return _JIEBA_MODULE
 
 
-_CJK_RANGE = re.compile(r"[一-鿿㐀-䶿豈-﫿⺀-⻿　-〿]")
+# Unified + Extension A + Compatibility Ideographs + Radicals + CJK
+# symbols/Kana. Written as escapes: the Compatibility range must start at
+# U+F900 (the literal lookalike at U+8C48 overlapped the Unified range).
+_CJK_RANGE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u2e80-\u2eff\u3000-\u30ff]")
 _LATIN_TOKEN = re.compile(r"[a-z0-9_]+")
 
 
