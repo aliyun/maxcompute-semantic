@@ -16,7 +16,7 @@ This module mirrors the verb-group conventions used by
 from __future__ import annotations
 
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -32,13 +32,12 @@ from maxcompute_semantic.errors.build import (
     MetricValidationError,
 )
 from maxcompute_semantic.mc_client.errors import McsError
-from maxcompute_semantic.metric_validator import (
-    ValidationResult,
-    validate_metric_expression,
-)
 from maxcompute_semantic.versioning import (
     ACTION_METRIC_PREFIX,
 )
+
+if TYPE_CHECKING:
+    from maxcompute_semantic.metric_validator import ValidationResult
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
@@ -117,6 +116,10 @@ def metric_add_cmd(
     ai_context: str | None,
 ) -> None:
     """Add a new top-level metric. Profile-global UNIQUE(name)."""
+    # Lazy: the validator pulls sqlglot + the dialect package, which must
+    # stay off the CLI startup chain.
+    from maxcompute_semantic.metric_validator import validate_metric_expression
+
     db = pctx.open_db()
     try:
         lint = validate_metric_expression(expression, db)
@@ -161,6 +164,8 @@ def metric_list_cmd(pctx: ProfileContext) -> None:
 @click.argument("name")
 def metric_show_cmd(pctx: ProfileContext, name: str) -> None:
     """Show one metric's full payload, re-running the validator."""
+    from maxcompute_semantic.metric_validator import validate_metric_expression
+
     p = pctx.profile
     db = _open_existing_db(p)
     if db is None:
@@ -198,6 +203,8 @@ def metric_edit_cmd(
     ai_context: str | None,
 ) -> None:
     """Partial-update a metric. Only the supplied fields are written."""
+    from maxcompute_semantic.metric_validator import validate_metric_expression
+
     p = pctx.profile
     db = _open_existing_db(p)
     if db is None:

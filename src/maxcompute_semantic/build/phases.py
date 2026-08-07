@@ -40,7 +40,6 @@ from maxcompute_semantic.mc_client.errors import (
 )
 from maxcompute_semantic.mc_client.hints import namespace_schema_hints
 from maxcompute_semantic.mc_client.tier import get_tier
-from maxcompute_semantic.memory.sql_pattern import analyze_sql_pattern
 
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import DataSource, Profile
@@ -735,6 +734,10 @@ def phase_mine_history(
         # to the regex (MaxCompute has non-standard syntax sqlglot
         # occasionally rejects — losing those SQLs entirely would
         # silently shrink mining coverage).
+        # Lazy: sql_pattern pulls sqlglot + the dialect package, which
+        # must stay off the CLI startup chain.
+        from maxcompute_semantic.memory.sql_pattern import analyze_sql_pattern
+
         pattern = analyze_sql_pattern(operation_text)
         if pattern.parse_error:
             matched_tables = list(set(table_re.findall(operation_text)))

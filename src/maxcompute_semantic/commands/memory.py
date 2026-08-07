@@ -22,7 +22,6 @@ from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.commands._profile_command import profile_command
 from maxcompute_semantic.memory.errors import MemoryNotFoundError
 from maxcompute_semantic.memory.hybrid import HybridSearcher
-from maxcompute_semantic.memory.sql_pattern import redact_projection_columns
 from maxcompute_semantic.versioning import ACTION_MEMORY_PREFIX
 
 
@@ -46,6 +45,10 @@ def _redact_sample_sql_payload(payload: dict) -> dict:
     ``mcs memory recall`` and ``mcs memory show`` consistent so the
     agent can never trip the same wire from a different verb.
     """
+    # Lazy: sql_pattern pulls sqlglot + the dialect package, which must
+    # stay off the CLI startup chain.
+    from maxcompute_semantic.memory.sql_pattern import redact_projection_columns
+
     confidence = payload.get("confidence", "mined_low")
     if confidence == "user_verified":
         return payload

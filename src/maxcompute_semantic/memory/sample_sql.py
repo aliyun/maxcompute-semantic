@@ -20,9 +20,10 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from maxcompute_semantic.memory.sql_pattern import SqlPattern, analyze_sql_pattern
+if TYPE_CHECKING:
+    from maxcompute_semantic.memory.sql_pattern import SqlPattern
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,10 @@ def persist_sample_sqls(
     source_key: str,
 ) -> PersistSampleSqlResult:
     """Persist mined SQL as grouped, source-scoped sample_sql patterns."""
+    # Lazy: sql_pattern pulls sqlglot + the dialect package, which must
+    # stay off the CLI startup chain.
+    from maxcompute_semantic.memory.sql_pattern import analyze_sql_pattern
+
     old_tables = db.sample_sql_table_names_for_source(source_key)
     db.clear_sample_sqls_for_source(source_key)
     verified_counts = db.verified_shape_counts_for_source(source_key)

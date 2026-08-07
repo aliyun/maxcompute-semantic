@@ -47,12 +47,12 @@ from maxcompute_semantic.build.phases import (
     phase_list_tables,
     phase_mine_history,
 )
-from maxcompute_semantic.build.workload import WorkloadSummary, aggregate_workload_evidence
 from maxcompute_semantic.memory.sample_sql import persist_sample_sqls
 
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import DataSource, Profile
     from maxcompute_semantic.build.storage import PackageDB
+    from maxcompute_semantic.build.workload import WorkloadSummary
     from maxcompute_semantic.mc_client.client import MaxComputeClient
 
 
@@ -392,6 +392,13 @@ class BuildPipeline:
         """
         import json
 
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import (
+            WorkloadSummary,
+            aggregate_workload_evidence,
+        )
+
         total = WorkloadSummary()
         for source in sources:
             sk = source.source_key()
@@ -574,6 +581,13 @@ class BuildPipeline:
 
     def _run_full(self, sources: list[DataSource]) -> BuildSummary:
         """Execute the full build pipeline (no incremental diff)."""
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import (
+            WorkloadSummary,
+            aggregate_workload_evidence,
+        )
+
         t0 = time.monotonic()
         self._prime_client_for_parallel()
         # Phase 1: resolve + tier already done by caller
@@ -1075,6 +1089,10 @@ class BuildPipeline:
         recovery flow after a ``mcs update`` that changed the
         inference layer.
         """
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import aggregate_workload_evidence
+
         t0 = time.monotonic()
         n_sources = len(sources)
         history_skipped = self._opts.no_history

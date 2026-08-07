@@ -67,7 +67,6 @@ import sys
 from typing import TYPE_CHECKING, NoReturn
 
 import click
-import sqlglot
 
 from maxcompute_semantic._lib.status import emit_status
 from maxcompute_semantic.auth.context import (
@@ -89,6 +88,8 @@ from maxcompute_semantic.mc_client.sql_preprocess import split_set_hints
 from maxcompute_semantic.mc_client.tier import get_tier
 
 if TYPE_CHECKING:
+    import sqlglot
+
     from maxcompute_semantic.auth.schema import Profile
     from maxcompute_semantic.build.storage import PackageDB
     from maxcompute_semantic.mc_client.client import MaxComputeClient
@@ -96,6 +97,9 @@ if TYPE_CHECKING:
 
 def _parse_tables(sql: str) -> list[sqlglot.exp.Table]:
     """Flat list of ``Table`` references in *sql*; ``[]`` on parse failure."""
+    # Lazy: sqlglot + the dialect package must stay off the CLI startup chain.
+    import sqlglot
+
     try:
         from maxcompute_semantic.dialect import parse_mc
 

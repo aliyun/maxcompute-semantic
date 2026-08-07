@@ -23,6 +23,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **CLI startup no longer imports sqlglot either**, and the pyodps
+  dependency floor is raised to `>=0.13`. sqlglot (and the MaxCompute
+  dialect package built on it) now loads only inside the commands that
+  parse SQL (write guard / cost gate / review / build mining / metric
+  validation), removing the remaining startup hotspot (~26ms local,
+  ~0.3s on slow sandboxes). pyodps 0.13 imports pandas lazily, so the
+  query path never pays the pandas import cost older pyodps forced
+  (the ~1.8s `PandasRedirection` block seen in profiles of pre-0.13
+  environments). The startup-import guard test now also covers
+  `sqlglot`.
+
 - **CLI startup no longer imports pyodps** (and its pandas / numpy /
   pyarrow import tail). `mc_client/client.py` and `mc_client/tier.py` now
   import `odps` lazily inside the methods that talk to MaxCompute, so

@@ -12,12 +12,6 @@ strip SET to hints).
 
 from __future__ import annotations
 
-import sqlglot
-from sqlglot import exp
-from sqlglot.tokens import TokenType
-
-from maxcompute_semantic.dialect import MaxCompute, parse_mc
-
 
 def split_set_hints(sql: str) -> tuple[str, dict[str, str]]:
     """Extract ``SET key=val`` statements into hints.
@@ -41,6 +35,13 @@ def split_set_hints(sql: str) -> tuple[str, dict[str, str]]:
     ``TRUE``/``FALSE`` (MaxCompute is case-insensitive on these) while
     other literal forms round-trip.
     """
+    # Lazy: sqlglot + the dialect package sit on the CLI startup chain.
+    import sqlglot
+    from sqlglot import exp
+    from sqlglot.tokens import TokenType
+
+    from maxcompute_semantic.dialect import MaxCompute, parse_mc
+
     hints: list[tuple[str, str]] = []
     kept: list[str] = []
     try:
