@@ -800,3 +800,96 @@ def test_instance_not_found_error_classified() -> None:
     err = InstanceNotFoundError("instance not found", remediation="check ID")
     assert err.code == "InstanceNotFound"
     assert err.exit_code == 5
+
+
+# ─── REST result-reader fallback (instance tunnel unavailable) ───
+
+
+def _fake_instance_with_reader(reader: object) -> MagicMock:
+    instance = MagicMock()
+    instance.open_reader.return_value = reader
+    instance.get_logview_address.return_value = "http://logview"
+    return instance
+
+
+def test_execute_sql_reads_schemaless_rest_fallback_reader() -> None:
+    """pyodps falls back to CsvRecordReader (no public ``.schema``) when the
+    instance tunnel is unavailable; rows must still parse instead of
+    crashing with AttributeError (regression for the reported
+    ``'CsvRecordReader' object has no attribute 'schema'``)."""
+    from odps.readers import CsvRecordReader
+
+    c = _make_client()
+    c._tier = "3"
+    instance = _fake_instance_with_reader(CsvRecordReader(None, "id,name\n1,x\n2,y\n"))
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = instance
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    result = c.execute_sql("SELECT * FROM t")
+    assert result.status == "success"
+    assert result.data["rows"] == [{"id": "1", "name": "x"}, {"id": "2", "name": "y"}]
+    assert result.data["schema"] == [
+        {"name": "id", "type": "STRING"},
+        {"name": "name", "type": "STRING"},
+    ]
+    assert result.data["fetch_path"] == "rest_fallback"
+
+
+def test_execute_sql_reads_rest_fallback_reader_with_descriptor_schema() -> None:
+    """When the service provides a result descriptor, the fallback reader
+    carries a typed schema on ``_schema`` and values keep their types."""
+    from odps import types as odps_types
+    from odps.readers import CsvRecordReader
+
+    c = _make_client()
+    c._tier = "3"
+    schema = odps_types.OdpsSchema(columns=[odps_types.Column(name="id", typo="bigint")])
+    instance = _fake_instance_with_reader(CsvRecordReader(schema, "id\n7\n"))
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = instance
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    result = c.execute_sql("SELECT 7 AS id")
+    assert result.status == "success"
+    assert result.data["rows"] == [{"id": 7}]
+    assert result.data["schema"] == [{"name": "id", "type": "BIGINT"}]
+    assert result.data["fetch_path"] == "rest_fallback"
+
+
+def test_execute_sql_rest_fallback_reader_empty_result_body() -> None:
+    """An empty REST result body must yield an empty result, not raise."""
+    from odps.readers import CsvRecordReader
+
+    c = _make_client()
+    c._tier = "3"
+    instance = _fake_instance_with_reader(CsvRecordReader(None, ""))
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = instance
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    result = c.execute_sql("SELECT * FROM t WHERE 1 = 0")
+    assert result.status == "success"
+    assert result.data["rows"] == []
+    assert result.data["schema"] == []
+    assert result.data["fetch_path"] == "rest_fallback"
+
+
+def test_execute_sql_tunnel_reader_reports_instance_tunnel_fetch_path() -> None:
+    c = _make_client()
+    c._tier = "3"
+    fake_inst = _fake_instance()
+
+    odps_mock = MagicMock()
+    odps_mock.run_sql.return_value = fake_inst
+    c._odps = odps_mock
+    c._creds_expiration = None
+
+    result = c.execute_sql("SELECT * FROM t")
+    assert result.data["fetch_path"] == "instance_tunnel"

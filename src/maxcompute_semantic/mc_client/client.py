@@ -345,18 +345,46 @@ class MaxComputeClient:
         effective_max_rows = _resolve_result_max_rows(max_rows)
         effective_offset = _resolve_result_offset(result_offset)
         with instance.open_reader() as reader:
-            col_names = [c.name for c in reader.schema.columns]
-            schema = [{"name": c.name, "type": str(c.type)} for c in reader.schema.columns]
+            # Tunnel readers expose a public ``schema``; the REST result
+            # reader pyodps falls back to (CsvRecordReader) does not — its
+            # schema, when the service provides one, lives on ``_schema``.
+            reader_schema = getattr(reader, "schema", None)
+            tunnel_reader = reader_schema is not None
+            if reader_schema is None:
+                reader_schema = getattr(reader, "_schema", None)
+            if not tunnel_reader:
+                logger.warning(
+                    "instance tunnel unavailable; pyodps fell back to the "
+                    "limited REST result reader (the server may cap results, "
+                    "typically at 10000 rows); column types %s",
+                    "not provided by the server (reported as string)"
+                    if reader_schema is None
+                    else "taken from the result descriptor",
+                )
             total_row_count = _reader_total_count(reader)
-            rows: list[dict[str, Any]] = []
-            has_more = False
             read_count = effective_max_rows + 1 if effective_max_rows is not None else None
-            records = self._read_record_window(reader, offset=effective_offset, count=read_count)
-            for record in records:
-                if effective_max_rows is not None and len(rows) == effective_max_rows:
-                    has_more = True
-                    break
-                rows.append({col_names[i]: record[i] for i in range(len(col_names))})
+            if reader_schema is not None:
+                col_names = [c.name for c in reader_schema.columns]
+                schema = [
+                    {"name": c.name, "type": str(c.type)} for c in reader_schema.columns
+                ]
+                rows: list[dict[str, Any]] = []
+                has_more = False
+                records = self._read_record_window(
+                    reader, offset=effective_offset, count=read_count
+                )
+                for record in records:
+                    if effective_max_rows is not None and len(rows) == effective_max_rows:
+                        has_more = True
+                        break
+                    rows.append({col_names[i]: record[i] for i in range(len(col_names))})
+            else:
+                rows, schema, has_more = self._read_schemaless_rows(
+                    reader,
+                    offset=effective_offset,
+                    count=read_count,
+                    max_rows=effective_max_rows,
+                )
 
         if (
             not has_more
@@ -371,10 +399,61 @@ class MaxComputeClient:
             "next_offset": effective_offset + len(rows) if has_more else None,
             "truncated": has_more,
             "has_more": has_more,
+            "fetch_path": "instance_tunnel" if tunnel_reader else "rest_fallback",
         }
         if total_row_count is not None:
             meta["total_row_count"] = total_row_count
         return rows, schema, meta
+
+    @staticmethod
+    def _read_schemaless_rows(
+        reader: Any,
+        *,
+        offset: int,
+        count: int | None,
+        max_rows: int | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, str]], bool]:
+        """Read rows from a reader that exposes no typed schema.
+
+        pyodps returns such a reader (``CsvRecordReader``) when the instance
+        tunnel is unavailable and the service provides no result descriptor:
+        column names come from the CSV header row and every value is a
+        string. Column metadata only exists after the header has been
+        consumed, so the window is materialized first.
+        """
+        try:
+            records = list(
+                MaxComputeClient._read_record_window(reader, offset=offset, count=count)
+            )
+        except TypeError:
+            # pyodps's CsvRecordReader raises TypeError on an empty result
+            # body (its header parse iterates a None row).
+            logger.debug("REST result reader produced no parseable body", exc_info=True)
+            records = []
+        has_more = max_rows is not None and len(records) > max_rows
+        if has_more:
+            records = records[:max_rows]
+        columns = (
+            getattr(reader, "_columns", None)
+            or getattr(reader, "_csv_columns", None)
+            or (getattr(records[0], "_columns", None) if records else None)
+        )
+        if columns:
+            col_names = [str(c.name) for c in columns]
+            schema = [{"name": str(c.name), "type": str(c.type)} for c in columns]
+        elif records:
+            col_names = [f"col_{i}" for i in range(len(records[0]))]
+            schema = [{"name": name, "type": "string"} for name in col_names]
+            logger.warning(
+                "REST result reader exposes no column names; using positional names"
+            )
+        else:
+            col_names = []
+            schema = []
+        rows = [
+            {col_names[i]: record[i] for i in range(len(col_names))} for record in records
+        ]
+        return rows, schema, has_more
 
     @staticmethod
     def _read_record_window(reader: Any, *, offset: int, count: int | None) -> Any:
