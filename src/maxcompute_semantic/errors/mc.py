@@ -281,7 +281,7 @@ def map_pyodps_exception(
         from odps import errors as _odps_errors  # type: ignore[import-untyped]
 
         _is_odps = isinstance(exc, _odps_errors.ODPSError)
-    except Exception:
+    except Exception:  # noqa: BLE001 — the classifier itself must never raise
         _is_odps = False
     if _is_odps:
         return UnknownError(msg, remediation="see logview URL for raw MaxCompute error", sql=sql)

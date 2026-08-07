@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.credential import (
     _looks_like_identity_not_authorized,
     _looks_like_login_required,

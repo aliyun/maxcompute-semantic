@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic._internal.paths import (
     config_dir,
     data_dir,

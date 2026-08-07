@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.metric_validator import (
     validate_metric_expression,

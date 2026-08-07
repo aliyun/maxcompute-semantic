@@ -32,6 +32,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import get as get_profile
 from maxcompute_semantic.auth.schema import Profile
 from maxcompute_semantic.commands.profile import profile_group

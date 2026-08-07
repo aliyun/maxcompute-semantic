@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.link_store import set_link
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile

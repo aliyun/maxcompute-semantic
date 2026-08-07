@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pytest
+from typing_extensions import Self
 
 
 class TestLatestMetadata:
@@ -195,7 +196,7 @@ class TestFetchLatestMetadata:
         called_urls: list[str] = []
 
         class _Resp:
-            def __enter__(self) -> "_Resp":
+            def __enter__(self) -> Self:
                 return self
 
             def __exit__(self, *_args: object) -> None:
@@ -234,7 +235,7 @@ class TestFetchLatestMetadata:
         called_headers: list[dict[str, str]] = []
 
         class _Resp:
-            def __enter__(self) -> "_Resp":
+            def __enter__(self) -> Self:
                 return self
 
             def __exit__(self, *_args: object) -> None:
@@ -264,7 +265,10 @@ class TestFetchLatestMetadata:
 
 class TestBaseUrlValidation:
     def test_default_base_url_is_trusted(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from maxcompute_semantic._internal.update_check import DEFAULT_BASE_URL, _base_url
+        from maxcompute_semantic._internal.update_check import (
+            DEFAULT_BASE_URL,
+            _base_url,
+        )
 
         monkeypatch.delenv("MCS_UPDATE_BASE_URL", raising=False)
 
@@ -588,16 +592,16 @@ class TestFormatBanner:
     def _entry(self, **overrides: str) -> object:
         from maxcompute_semantic._internal.update_check import CacheEntry
 
-        base = dict(
-            checked_at="2026-05-22T09:55:00Z",
-            current_at_check="0.4.0a38",
-            latest_version="0.4.0a40",
-            wheel_url="https://files.pythonhosted.org/packages/py3/x.whl",
-            min_supported="0.4.0a30",
-            disabled=(),
-            notice="",
-            fetch_error="",
-        )
+        base = {
+            "checked_at": "2026-05-22T09:55:00Z",
+            "current_at_check": "0.4.0a38",
+            "latest_version": "0.4.0a40",
+            "wheel_url": "https://files.pythonhosted.org/packages/py3/x.whl",
+            "min_supported": "0.4.0a30",
+            "disabled": (),
+            "notice": "",
+            "fetch_error": "",
+        }
         base.update(overrides)
         return CacheEntry(**base)  # type: ignore[arg-type]
 

@@ -66,6 +66,7 @@ from types import TracebackType
 
 from filelock import BaseFileLock, FileLock
 from filelock import Timeout as FileLockTimeout
+from typing_extensions import Self
 
 from maxcompute_semantic.versioning.errors import (
     LockedByOtherProcessError,
@@ -203,7 +204,7 @@ class WriteLock:
     the per-profile lock anchor. See module docstring for the full
     contract."""
 
-    __slots__ = ("_body_path", "_anchor_path", "_timeout", "_poll_interval_secs", "_anchor_key")
+    __slots__ = ("_anchor_key", "_anchor_path", "_body_path", "_poll_interval_secs", "_timeout")
 
     def __init__(
         self,
@@ -229,7 +230,7 @@ class WriteLock:
             # creates the parent and the next call resolves cleanly.
             self._anchor_key = str(self._anchor_path.absolute())
 
-    def __enter__(self) -> WriteLock:
+    def __enter__(self) -> Self:
         # Create parent directory if missing (so the test-fixture
         # pattern of pointing the lock at a sub-path of a fresh
         # tempdir works without the test having to mkdir first).

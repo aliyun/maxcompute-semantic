@@ -103,9 +103,7 @@ def check_string_date_compare(ctx: ReviewContext) -> list[Issue]:
                 continue
             col_type = (col_row.get("type") or "").upper()
             if (
-                col_type.startswith("STRING")
-                or col_type.startswith("VARCHAR")
-                or col_type.startswith("CHAR")
+                col_type.startswith(("STRING", "VARCHAR", "CHAR"))
             ):
                 op_sql = _OP_TO_SQL.get(cmp.key, "=")
                 issues.append(

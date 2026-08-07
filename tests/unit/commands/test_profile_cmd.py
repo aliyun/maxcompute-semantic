@@ -19,6 +19,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import load_all, upsert
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, ProcessAuth, Profile
 from maxcompute_semantic.commands._import_creds import (
@@ -1009,7 +1010,7 @@ class TestListNcsIdentities:
         data = _envelope(result)
         assert data["available"] is False
         assert data["identities"] == []
-        assert "reason" in data and data["reason"]
+        assert data.get("reason")
         assert data["reason"] == "ncs binary not found on PATH"
 
     def test_unavailable_when_zero_identities(self, isolated_config: Path) -> None:

@@ -20,6 +20,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import get, upsert
 from maxcompute_semantic.auth.schema import (
     AkAuth,

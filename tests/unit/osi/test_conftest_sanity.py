@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Sanity check that the small_package_db fixture builds without errors."""
+import functools
+import operator
 
 
 def test_small_package_db_has_two_tables(small_package_db):
@@ -25,7 +27,7 @@ def test_small_package_db_customers_id_is_identifier_primary(small_package_db):
     cols = small_package_db.get_columns_bulk(
         [t["id"] for t in small_package_db.list_tables() if t["name"] == "customers"]
     )
-    all_cols = sum(cols.values(), [])
+    all_cols = functools.reduce(operator.iadd, cols.values(), [])
     id_col = next(c for c in all_cols if c["name"] == "id")
     assert id_col["semantic_role"] == "identifier"
     assert id_col["id_type"] == "primary"

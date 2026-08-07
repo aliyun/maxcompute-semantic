@@ -5,8 +5,9 @@
 
 from pathlib import Path
 
-from maxcompute_semantic.osi import dump_yaml, to_osi_dict
 from ruamel.yaml import YAML
+
+from maxcompute_semantic.osi import dump_yaml, to_osi_dict
 
 
 def _yaml() -> YAML:

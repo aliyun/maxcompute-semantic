@@ -14,6 +14,7 @@ each test module.
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic.build.storage import PackageDB
 
 

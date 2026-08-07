@@ -30,7 +30,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from maxcompute_semantic._lib.acl_filter import should_drop_sql_for_acl
-from maxcompute_semantic.build.info_schema import build_history_sql, detect_info_schema_source
+from maxcompute_semantic.build.info_schema import (
+    build_history_sql,
+    detect_info_schema_source,
+)
 from maxcompute_semantic.build.join_candidates import _apply_join_shape_adjustment
 from maxcompute_semantic.build.schema_hash import schema_hash
 from maxcompute_semantic.mc_client.errors import (
@@ -176,7 +179,7 @@ def phase_discover_udfs(
             warnings=[f"UDF discovery failed: {exc.message}"],
             errors=[{"phase": "udf", "code": exc.code, "message": exc.message}],
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — soft-fail phase: any error degrades to partial
         return PhaseResult(
             status="partial_failure",
             warnings=[f"UDF discovery failed unexpectedly: {exc!r}"],
@@ -387,7 +390,7 @@ def phase_column_sampling(
                         where_parts.append(f"{col} = '{val}'")
                 if where_parts:
                     where_clause = "WHERE " + " AND ".join(where_parts)
-        except Exception:
+        except Exception:  # noqa: BLE001 — best-effort; unmapped pyodps/network errors too
             # Can't determine partition filter; try without filter.
             where_clause = ""
 
@@ -410,7 +413,7 @@ def phase_column_sampling(
             warnings=[f"Sampling failed for {table_name}: {exc.message}"],
             errors=[{"table": table_name, "code": exc.code, "message": exc.message}],
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — soft-fail phase: any error degrades to partial
         return PhaseResult(
             status="partial_failure",
             warnings=[f"Sampling failed for {table_name}: {exc}"],
@@ -432,7 +435,7 @@ def phase_column_sampling(
         values = [row.get(col_name) for row in rows]
         non_null = [v for v in values if v is not None]
         null_ratio = (total_rows - len(non_null)) / total_rows
-        distinct_vals = set(str(v) for v in non_null)
+        distinct_vals = {str(v) for v in non_null}
         distinct_count = len(distinct_vals)
         max_len = max((len(str(v)) for v in non_null), default=0)
         # All-NULL columns have distinct_count=0; without an observed value
@@ -563,7 +566,8 @@ def phase_column_profiling(
                         where_parts.append(f"{col} = '{val}'")
                 if where_parts:
                     where_clause = "WHERE " + " AND ".join(where_parts)
-        except Exception:
+        except Exception:  # noqa: BLE001 — best-effort; unmapped pyodps/network errors too
+            # Can't determine partition filter; try without filter.
             where_clause = ""
 
     column_types = {c["name"]: c.get("type", "") for c in columns}
@@ -659,7 +663,7 @@ def phase_mine_history(
 
     try:
         info_source = detect_info_schema_source(profile, client, cache_dir)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — soft-fail phase: any error degrades to partial
         return PhaseResult(
             status="partial_failure",
             warnings=[f"Info-schema detection failed: {exc}"],
@@ -1393,7 +1397,7 @@ def phase_infer_joins_heuristic(
         if right_id_col is not None:
             return "id", right_id_col
         table_lower = right_table_name.lower()
-        singular = table_lower[:-1] if table_lower.endswith("s") else table_lower
+        singular = table_lower.removesuffix("s")
         pk_candidates = {
             f"{table_lower}id",
             f"{table_lower}_id",
@@ -1422,7 +1426,7 @@ def phase_infer_joins_heuristic(
         if n == "id":
             return True
         t = table_name.lower()
-        s = t[:-1] if t.endswith("s") else t
+        s = t.removesuffix("s")
         return n in {f"{t}id", f"{t}_id", f"{s}id", f"{s}_id"}
 
     def _try_link_match(
@@ -1576,7 +1580,7 @@ def phase_infer_joins_heuristic(
                 # on the resulting singular length, not the original
                 # plural, so 3-char plurals collapsing to 2 chars
                 # ("ids") still skip the reverse branch.
-                singular = tn_lower[:-1] if tn_lower.endswith("s") else tn_lower
+                singular = tn_lower.removesuffix("s")
                 reverse = len(singular) >= 3 and singular in base_lower
                 if not (forward or reverse):
                     continue

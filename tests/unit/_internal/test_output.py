@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 
 import pytest
+
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic.mc_client.errors import McsError
 

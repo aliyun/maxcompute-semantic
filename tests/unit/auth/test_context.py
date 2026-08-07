@@ -17,6 +17,7 @@ from io import StringIO
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic.auth.context import ProfileContext
 from maxcompute_semantic.auth.errors import InvalidProfileError, ProfileNotFoundError

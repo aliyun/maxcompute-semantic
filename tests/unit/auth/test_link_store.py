@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from maxcompute_semantic.auth.errors import ConfigPermissionError, ConfigWriteError
 from maxcompute_semantic.auth.link_store import (
     get_link,

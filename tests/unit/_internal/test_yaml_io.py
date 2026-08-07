@@ -10,9 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from ruamel.yaml import YAMLError
+
 from maxcompute_semantic._internal.yaml_io import dump_yaml, load_yaml
 from maxcompute_semantic.auth.errors import ConfigPermissionError, ConfigWriteError
-from ruamel.yaml import YAMLError
 
 
 def test_dump_then_load_roundtrip(tmp_path: Path) -> None:

@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 import click
 import questionary
 from questionary import Style
+from typing_extensions import Self
 
 from maxcompute_semantic.auth.schema import DataSource, TableSpec
 from maxcompute_semantic.mc_client.errors import McsError
@@ -159,7 +160,7 @@ class _Spinner:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
-    def __enter__(self) -> _Spinner:
+    def __enter__(self) -> Self:
         self._stop.clear()
         self._thread = threading.Thread(target=self._spin, daemon=True)
         self._thread.start()
@@ -200,7 +201,7 @@ def last_fzf_query() -> str:
 # ── Unified pickers ───────────────────────────────────────────────────
 
 
-__all__ = ["pick_source", "_pick_choice", "_pick_one", "_pick_many", "_Spinner", "last_fzf_query"]
+__all__ = ["_Spinner", "_pick_choice", "_pick_many", "_pick_one", "last_fzf_query", "pick_source"]
 
 
 def _format_echo_value(value: object) -> str:
@@ -628,7 +629,7 @@ def _pick_project(
                 err=True,
             )
             return _prompt_project_name(suggested)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — wizard falls back to manual entry, never crashes
             click.echo(
                 f"⚠ Could not list projects ({type(e).__name__}: {e}).\n"
                 f"  Falling back to manual entry — your AK can still read from\n"
@@ -750,7 +751,7 @@ def _pick_schema(
             err=True,
         )
         return _prompt_schema_name(existing.schema if existing else "default")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — wizard falls back to manual entry, never crashes
         msg = str(e)
         if "not 3-tier" in msg or "not a 3-tier" in msg or "is not 3-tier" in msg:
             click.secho(

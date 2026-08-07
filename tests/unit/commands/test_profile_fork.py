@@ -23,6 +23,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import data_root, profile_data_dir
 from maxcompute_semantic.auth.profile_store import get as get_profile
 from maxcompute_semantic.auth.profile_store import upsert as upsert_profile

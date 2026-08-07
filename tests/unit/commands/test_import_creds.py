@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import profiles_yaml_path
 from maxcompute_semantic._internal.yaml_io import dump_yaml
 from maxcompute_semantic.auth.profile_store import get, load_all, upsert
@@ -26,8 +27,8 @@ from maxcompute_semantic.commands._import_creds import (
     _default_locations,
     _maxc_default_config_path,
     _odpscmd_default_config_path,
-    discover_mcs_profiles,
     discover_creds,
+    discover_mcs_profiles,
     is_canonical_ncs_process_auth,
     parse_creds_at,
     parse_maxc_config,

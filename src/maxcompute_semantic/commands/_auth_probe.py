@@ -69,7 +69,7 @@ def _run_auth_test(profile: Profile, r: Renderer, *, emit_summary: bool = True) 
     # the grep-on-result.output assertions in tests still match.
     ok = click.style("✓", fg="green", bold=True)
     fail = click.style("✗", fg="red", bold=True)
-    step = lambda n: click.style(f"[{n}/3]", dim=True)  # noqa: E731
+    step = lambda n: click.style(f"[{n}/3]", dim=True)
 
     if not is_envelope:
         click.echo(click.style(f"🔐 Validating profile '{profile.name}'", bold=True))

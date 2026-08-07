@@ -29,12 +29,12 @@ import pytest
 def _all_mcs_error_subclasses() -> Iterator[type]:
     """Yield every concrete McsError subclass reachable from the package."""
     # Force import of every errors submodule so subclasses are registered.
-    import maxcompute_semantic.errors  # noqa: F401
-    import maxcompute_semantic.errors.annotate  # noqa: F401
-    import maxcompute_semantic.errors.auth  # noqa: F401
-    import maxcompute_semantic.errors.build  # noqa: F401
-    import maxcompute_semantic.errors.mc  # noqa: F401
-    import maxcompute_semantic.errors.memory  # noqa: F401
+    import maxcompute_semantic.errors
+    import maxcompute_semantic.errors.annotate
+    import maxcompute_semantic.errors.auth
+    import maxcompute_semantic.errors.build
+    import maxcompute_semantic.errors.mc
+    import maxcompute_semantic.errors.memory
     import maxcompute_semantic.errors.versioning  # noqa: F401
     from maxcompute_semantic.errors.base import McsError
 
@@ -124,11 +124,12 @@ def test_old_import_paths_still_resolve(old_path, new_path, names):
 def test_maps_pyodps_errors_decorator_translates_table_not_found():
     """``ODPSError`` with ``code=NoSuchObject`` becomes ``TableNotFoundError``,
     ``__cause__`` preserves the original, and the SQL kwarg flows through."""
+    from odps import errors as odps_errors
+
     from maxcompute_semantic.errors import (
         TableNotFoundError,
         maps_pyodps_errors,
     )
-    from odps import errors as odps_errors
 
     @maps_pyodps_errors(sql_arg="sql")
     def fake_call(self, sql: str) -> None:

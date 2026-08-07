@@ -29,6 +29,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
+
 from maxcompute_semantic.commands.sql import sql_group
 
 
@@ -248,8 +249,8 @@ class TestSqlReviewCmd:
             result = _invoke(
                 [
                     "review",
-                    "SELECT a.id, b.name FROM proj_a.default.orders a "
-                    "JOIN proj_b.default.customers b ON a.id = b.id",
+                    ("SELECT a.id, b.name FROM proj_a.default.orders a "
+                    "JOIN proj_b.default.customers b ON a.id = b.id"),
                 ]
             )
         assert result.exit_code == 0, result.output

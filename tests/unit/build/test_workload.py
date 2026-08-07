@@ -101,9 +101,9 @@ class TestAggregateWorkloadEvidence:
         though ``cards`` was not in its selection.
         """
         sqls = [
-            "SELECT l.format FROM legalities l "
+            ("SELECT l.format FROM legalities l "
             "JOIN cards c ON c.uuid = l.uuid "
-            "WHERE c.power = 'X' AND l.format = 'commander'",
+            "WHERE c.power = 'X' AND l.format = 'commander'"),
         ]
         summary = aggregate_workload_evidence(sqls, allowed_tables={"legalities"})
 
@@ -122,9 +122,9 @@ class TestAggregateWorkloadEvidence:
         because the multi-equality string had 3 ``=`` parts.
         """
         sqls = [
-            "SELECT s.name FROM sets s "
+            ("SELECT s.name FROM sets s "
             "JOIN set_translations st ON s.code = st.setcode "
-            "AND st.language = 'en'",
+            "AND st.language = 'en'"),
         ]
         summary = aggregate_workload_evidence(sqls, allowed_tables={"sets", "set_translations"})
 

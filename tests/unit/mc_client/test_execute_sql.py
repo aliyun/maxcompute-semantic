@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
 from maxcompute_semantic.mc_client.client import MaxComputeClient
 from maxcompute_semantic.mc_client.envelope import Envelope

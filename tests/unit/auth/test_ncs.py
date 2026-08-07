@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.ncs import (
     NcsAuth,
     _extract_field,

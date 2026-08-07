@@ -86,9 +86,9 @@ def list_odps_authorizations() -> list[NcsAuth]:
                 "authorizations",
                 "odpsuser",
                 "-o",
-                "custom-columns=BUC_USER_ID:.extension.bucUserId,"
+                ("custom-columns=BUC_USER_ID:.extension.bucUserId,"
                 "BUC_USER_TYPE:.extension.bucUserType,"
-                "BUC_ACCOUNT_NAME:.extension.bucDomainAccount",
+                "BUC_ACCOUNT_NAME:.extension.bucDomainAccount"),
             ],
             capture_output=True,
             text=True,
@@ -111,7 +111,7 @@ def _parse_authorizations(output: str) -> list[NcsAuth]:
         line = line.strip()
         if not line:
             continue
-        if line.startswith("BUC_USER_ID") or line.startswith("-"):
+        if line.startswith(("BUC_USER_ID", "-")):
             continue
         parts = line.split()
         if len(parts) < 3:

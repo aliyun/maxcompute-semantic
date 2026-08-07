@@ -9,6 +9,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.build.storage import (
     _SCHEMA_VERSION,
     PackageDB,

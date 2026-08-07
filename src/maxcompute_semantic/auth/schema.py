@@ -752,7 +752,7 @@ __all__ = [
     "CostThresholds",
     "DataSource",
     "InvalidProfileError",
-    "Profile",
     "ProcessAuth",
+    "Profile",
     "TableSpec",
 ]

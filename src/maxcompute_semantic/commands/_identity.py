@@ -142,7 +142,7 @@ def resolve_principal(client: MaxComputeClient) -> str | None:
         result = odps.execute_security_query("whoami")
     except McsError:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001 — unclassified errors fold into None (see docstring)
         return None
     if isinstance(result, dict):
         for key in _WHOAMI_PRINCIPAL_KEYS:
@@ -197,7 +197,7 @@ def live_identity(profile: Profile) -> str | None:
             client = MaxComputeClient(profile)
         except McsError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — unclassified errors fold into None (see docstring)
             return None
         return resolve_principal(client)
     if isinstance(profile.auth, ProcessAuth):
@@ -207,7 +207,7 @@ def live_identity(profile: Profile) -> str | None:
             info = ncs_mod.whoami()
         except McsError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 — unclassified errors fold into None (see docstring)
             return None
         if info is None:
             return None

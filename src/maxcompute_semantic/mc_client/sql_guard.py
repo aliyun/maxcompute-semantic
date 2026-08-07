@@ -85,7 +85,7 @@ def classify_sql(sql: str) -> str:
     _last_parse_error.error = ""
     try:
         statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — arbitrary user SQL must not crash the classifier
         _last_parse_error.error = str(exc)
         return "unparseable"
     if not statements or any(s is None for s in statements):

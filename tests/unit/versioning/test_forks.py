@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic._internal.paths import profile_data_dir
 from maxcompute_semantic.auth.errors import ProfileNotFoundError
 from maxcompute_semantic.auth.profile_store import get as get_profile

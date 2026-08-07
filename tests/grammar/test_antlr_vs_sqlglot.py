@@ -27,7 +27,11 @@ _GRAMMAR_DIR = Path(__file__).resolve().parent.parent.parent / "grammar" / "gene
 sys.path.insert(0, str(_GRAMMAR_DIR))
 
 try:
-    from antlr4 import CommonTokenStream, InputStream, ParseTreeWalker  # type: ignore[import-untyped]
+    from antlr4 import (  # type: ignore[import-untyped]
+        CommonTokenStream,
+        InputStream,
+        ParseTreeWalker,
+    )
     from OdpsLexer import OdpsLexer  # type: ignore[import-not-found]
     from OdpsParser import OdpsParser  # type: ignore[import-not-found]
     from OdpsParserListener import OdpsParserListener  # type: ignore[import-not-found]
@@ -91,7 +95,7 @@ def _antlr_parse(sql: str) -> tuple[bool, list[str], set[str]]:
 
 # ── SQLGlot parser setup ─────────────────────────────────────────────
 
-from maxcompute_semantic.dialect import parse_mc  # noqa: E402
+from maxcompute_semantic.dialect import parse_mc
 
 
 @dataclass
@@ -111,7 +115,7 @@ def _sqlglot_parse(sql: str) -> tuple[bool, bool]:
 
     try:
         stmts = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
-    except Exception:
+    except Exception:  # noqa: BLE001 — corpus parse failures are data, not test crashes
         return (False, False)
     if not stmts or all(s is None for s in stmts):
         return (False, False)

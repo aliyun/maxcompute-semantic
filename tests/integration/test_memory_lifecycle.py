@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.storage import PackageDB

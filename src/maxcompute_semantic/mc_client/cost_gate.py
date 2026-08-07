@@ -52,7 +52,7 @@ def _parse_single_statement(sql: str) -> sqlglot.exp.Expression | None:
 
     try:
         statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
-    except Exception:
+    except Exception:  # noqa: BLE001 — arbitrary user SQL must not crash the cost gate
         return None
     if len(statements) != 1 or not isinstance(statements[0], sqlglot.exp.Expression):
         return None

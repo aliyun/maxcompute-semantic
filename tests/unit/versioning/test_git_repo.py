@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.mc_client.errors import McsError
 from maxcompute_semantic.versioning.errors import GitNotAvailable
 from maxcompute_semantic.versioning.git_repo import GitRepo

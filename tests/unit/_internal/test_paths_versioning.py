@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic._internal.paths import (
     profile_data_dir,
     profile_git_dir,

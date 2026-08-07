@@ -40,6 +40,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import (
     profile_data_dir,
     profile_git_dir,

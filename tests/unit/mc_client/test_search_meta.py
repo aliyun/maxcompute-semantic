@@ -38,7 +38,7 @@ def _make_client_with_mock_odps() -> tuple[MaxComputeClient, MagicMock]:
 
 def test_search_tables_catalog_available() -> None:
     """When Catalog API returns results, those are used directly."""
-    client, odps_mock = _make_client_with_mock_odps()
+    client, _odps_mock = _make_client_with_mock_odps()
 
     # Mock catalog_search_tables returning results.
     with patch(

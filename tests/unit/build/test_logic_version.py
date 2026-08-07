@@ -27,6 +27,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build._logic_version import INFERENCE_LOGIC_VERSION
 from maxcompute_semantic.build.phases import PhaseResult
@@ -188,7 +189,7 @@ class TestRefreshWithStaleVersionTriggersRederive:
                 BuildPipeline,
                 "_reconstruct_workload_from_db",
                 autospec=True,
-                return_value=MagicMock(to_jsonable=lambda: {}),
+                return_value=MagicMock(to_jsonable=dict),
             ),
         ):
             mock_list.return_value = _success(table_names=["unchanged_table"])
@@ -240,7 +241,7 @@ class TestRederiveFailurePreservesStamp:
                 BuildPipeline,
                 "_reconstruct_workload_from_db",
                 autospec=True,
-                return_value=MagicMock(to_jsonable=lambda: {}),
+                return_value=MagicMock(to_jsonable=dict),
             ),
         ):
             mock_list.return_value = _success(table_names=["unchanged_table"])
@@ -290,7 +291,7 @@ class TestMissingStampTreatedAsZero:
                 BuildPipeline,
                 "_reconstruct_workload_from_db",
                 autospec=True,
-                return_value=MagicMock(to_jsonable=lambda: {}),
+                return_value=MagicMock(to_jsonable=dict),
             ),
         ):
             mock_list.return_value = _success(table_names=["t"])

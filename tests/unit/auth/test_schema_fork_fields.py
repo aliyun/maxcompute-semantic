@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.errors import InvalidProfileError
 from maxcompute_semantic.auth.profile_store import _profile_from_dict, _profile_to_dict
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile

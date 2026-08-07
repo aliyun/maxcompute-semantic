@@ -41,7 +41,7 @@ def _mcs_user_agent() -> str:
         return _MCS_UA_SUFFIX
     try:
         return f"{_pyodps_ua()} {_MCS_UA_SUFFIX}"
-    except Exception:
+    except Exception:  # noqa: BLE001 — cosmetic UA suffix; fall back silently
         return _MCS_UA_SUFFIX
 
 if TYPE_CHECKING:
@@ -161,7 +161,9 @@ class MaxComputeClient:
         if self._odps is not None and self._creds_still_valid():
             return self._odps
         from odps import ODPS  # type: ignore[import-untyped, unused-ignore]
-        from odps.accounts import StsAccount  # type: ignore[import-untyped, unused-ignore]
+        from odps.accounts import (  # type: ignore[import-untyped, unused-ignore]
+            StsAccount,
+        )
 
         creds = resolve_credentials(self._profile.auth)
         if creds.security_token:
@@ -277,7 +279,7 @@ class MaxComputeClient:
                 instance_id = str(getattr(instance, "id", "") or "")
                 try:
                     logview = instance.get_logview_address()
-                except Exception:
+                except Exception:  # noqa: BLE001 — best-effort; the timeout error must still raise
                     logview = ""
                 raise McsTimeoutError(
                     f"SQL execution exceeded the synchronous {timeout}s wait; "
@@ -511,7 +513,9 @@ class MaxComputeClient:
         query to any project the AK has Describe-level cross-project
         access to.
         """
-        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
 
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
@@ -840,7 +844,9 @@ class MaxComputeClient:
         self, keyword: str, *, schema: str | None = None, project: str | None = None
     ) -> list[dict[str, Any]]:
         """Client-side table search — iterates all tables, substring match."""
-        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
 
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
@@ -923,7 +929,9 @@ class MaxComputeClient:
             Sorted list of dicts with keys: table_name, column_name, type,
             comment, score.
         """
-        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
 
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
@@ -1050,8 +1058,8 @@ class MaxComputeClient:
                         break
                 except TypeError:
                     continue
-                except Exception:
-                    pass
+                except Exception:  # best-effort probe; fall back below
+                    logger.debug("get_max_partition probe failed; falling back", exc_info=True)
         if latest_partition is None and partitions:
             latest_partition = partitions[-1]
 
@@ -1124,8 +1132,8 @@ class MaxComputeClient:
                         break
                 except TypeError:
                     continue
-                except Exception:
-                    pass
+                except Exception:  # best-effort probe; fall back below
+                    logger.debug("get_max_partition probe failed; falling back", exc_info=True)
 
         # If no get_max_partition, use last partition from iteration.
         if latest_partition is None:
@@ -1251,7 +1259,7 @@ class MaxComputeClient:
                 values = [row[col_name] for row in rows]
                 null_count = sum(1 for v in values if v is None)
                 non_null = [v for v in values if v is not None]
-                distinct_count = len(set(str(v) for v in non_null))
+                distinct_count = len({str(v) for v in non_null})
 
                 col_stat: dict[str, Any] = {
                     "column_name": col_name,
@@ -1524,7 +1532,9 @@ class MaxComputeClient:
         """
         import time
 
-        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
 
         from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
         from maxcompute_semantic.mc_client.hints import build_hints
@@ -1559,7 +1569,7 @@ class MaxComputeClient:
             results = instance.get_task_results()
             if results:
                 # get_task_results returns a dict of task_name -> result_text
-                for _task_name, result in results.items():
+                for result in results.values():
                     plan_text += result
         except odps_errors.ODPSError:
             logger.debug("get_task_results failed, falling back to open_reader", exc_info=True)
@@ -1589,7 +1599,7 @@ def _safe_function_attr(function: Any, attr: str) -> str | None:
     """
     try:
         value = getattr(function, attr)
-    except Exception:
+    except Exception:  # noqa: BLE001 — pyodps lazy-load may raise; see docstring
         return None
     if value is None:
         return None

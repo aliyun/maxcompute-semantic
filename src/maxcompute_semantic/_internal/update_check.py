@@ -33,6 +33,7 @@ PyPI is the only publisher for the update channel.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import datetime as _dt
 import json
@@ -631,16 +632,15 @@ def write_cache(entry: CacheEntry) -> None:
         finally:
             fd.close()
         os.replace(fd.name, target)
-    except Exception:
+    except Exception:  # noqa: BLE001 — best-effort daemon-thread write; see docstring
         # Best-effort. The probe writes silently fail rather than
         # tripping the main process. Clean up the temp file if it's
-        # still hanging around.
-        try:
+        # still hanging around. ``NameError`` covers the case where
+        # ``NamedTemporaryFile`` itself failed and ``fd`` never bound.
+        with contextlib.suppress(NameError, OSError):
             tmp_path = Path(fd.name)
             if tmp_path.exists() and tmp_path != target:
                 tmp_path.unlink()
-        except Exception:
-            pass
 
 
 def should_check(cache: CacheEntry | None, ttl_s: float = _CACHE_DEFAULT_TTL_S) -> bool:
@@ -988,7 +988,7 @@ def _run_probe(*, current_version: str) -> None:
         # something to print on the next interactive run.
         try:
             prior = read_cache()
-        except Exception:
+        except Exception:  # noqa: BLE001 — defensive; read_cache is documented never to raise
             prior = None
         try:
             entry = CacheEntry.from_error(
@@ -997,7 +997,7 @@ def _run_probe(*, current_version: str) -> None:
                 error_str=f"{type(exc).__name__}: {exc}",
             )
             write_cache(entry)
-        except Exception:
+        except Exception:  # noqa: BLE001 — last-ditch; daemon thread must not raise
             # Cache write also failed — log to the daemon thread's
             # stderr and give up. There's nowhere else to put this.
             # Use ``warnings.warn`` so the user sees it on the *next*

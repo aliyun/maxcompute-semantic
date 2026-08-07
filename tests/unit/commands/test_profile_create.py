@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import load_all
 from maxcompute_semantic.auth.schema import ProcessAuth
 from maxcompute_semantic.commands.profile import profile_group

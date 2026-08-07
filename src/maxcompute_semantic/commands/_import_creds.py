@@ -68,7 +68,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
 from maxcompute_semantic.auth.profile_store import load_all
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, ProcessAuth
@@ -165,7 +165,7 @@ def parse_maxc_config(path: Path) -> ImportedCreds | None:
         return None
     try:
         raw = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, YAMLError):
         return None
     if not isinstance(raw, dict):
         return None
@@ -240,7 +240,7 @@ def parse_odpscmd_config(path: Path) -> ImportedCreds | None:
         text = "[DEFAULT]\n" + path.read_text(encoding="utf-8")
         parser = configparser.ConfigParser(strict=False)
         parser.read_string(text)
-    except Exception:
+    except (OSError, ValueError, configparser.Error):
         return None
     section = parser["DEFAULT"]
     project = section.get("project_name")

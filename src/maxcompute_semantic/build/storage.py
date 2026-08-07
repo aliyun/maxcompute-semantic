@@ -1042,7 +1042,10 @@ class PackageDB:
         # for hybrid FTS5 + vector retrieval. This is optional — if
         # sqlite-vec is not installed or extension loading fails, we
         # proceed without vector search capability.
-        from maxcompute_semantic.memory.vec_ext import create_vec_table, load_vec_extension
+        from maxcompute_semantic.memory.vec_ext import (
+            create_vec_table,
+            load_vec_extension,
+        )
 
         if load_vec_extension(self._conn):
             create_vec_table(self._conn)
@@ -1303,7 +1306,7 @@ class PackageDB:
             if stale:
                 placeholders = ",".join("?" * len(stale))
                 self._conn.execute(
-                    f"DELETE FROM columns WHERE table_id=? AND name IN ({placeholders})",  # noqa: S608
+                    f"DELETE FROM columns WHERE table_id=? AND name IN ({placeholders})",
                     (table_id, *stale),
                 )
 
@@ -1332,7 +1335,7 @@ class PackageDB:
                 placeholders = ", ".join("?" for _ in insert_vals)
                 update_sql = ", ".join(update_parts)
                 self._conn.execute(
-                    f"INSERT INTO columns ({cols_sql}) VALUES ({placeholders}) "  # noqa: S608
+                    f"INSERT INTO columns ({cols_sql}) VALUES ({placeholders}) "
                     f"ON CONFLICT(table_id, name) DO UPDATE SET {update_sql}",
                     insert_vals,
                 )
@@ -1358,7 +1361,7 @@ class PackageDB:
                 return {}
             placeholders = ",".join("?" * len(table_ids))
             rows = self._conn.execute(
-                f"SELECT * FROM columns WHERE table_id IN ({placeholders})",  # noqa: S608
+                f"SELECT * FROM columns WHERE table_id IN ({placeholders})",
                 table_ids,
             ).fetchall()
             by_tid: dict[int, list[dict]] = {tid: [] for tid in table_ids}

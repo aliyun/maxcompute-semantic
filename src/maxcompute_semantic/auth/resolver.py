@@ -53,7 +53,10 @@ from __future__ import annotations
 import logging
 import os
 
-from maxcompute_semantic.auth.errors import NoProfilesConfiguredError, ProfileNotFoundError
+from maxcompute_semantic.auth.errors import (
+    NoProfilesConfiguredError,
+    ProfileNotFoundError,
+)
 from maxcompute_semantic.auth.link_store import get_link
 from maxcompute_semantic.auth.profile_store import get, load_all
 

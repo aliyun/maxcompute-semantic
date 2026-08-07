@@ -14,6 +14,7 @@ whitelist / blacklist.
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic.auth.errors import InvalidProfileError
 from maxcompute_semantic.auth.schema import (
     AkAuth,

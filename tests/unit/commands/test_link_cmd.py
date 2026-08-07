@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.schema import DataSource, ProcessAuth, Profile
 from maxcompute_semantic.commands.link import link_group

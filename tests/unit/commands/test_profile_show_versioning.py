@@ -22,6 +22,7 @@ import shutil
 from pathlib import Path
 
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import profile_data_dir
 from maxcompute_semantic.auth.profile_store import get as get_profile
 from maxcompute_semantic.auth.profile_store import load_all as load_all_profiles

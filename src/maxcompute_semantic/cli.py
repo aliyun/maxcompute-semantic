@@ -13,6 +13,7 @@ Global flags:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 import traceback
@@ -186,11 +187,10 @@ def _cli_main() -> None:
     sys.argv = [sys.argv[0]] + _hoist_global_flags(sys.argv[1:])
 
     # ---- pre-dispatch: daemon probe ----
-    try:
+    # The banner is best-effort opt-out; spawn errors are swallowed.
+    with contextlib.suppress(Exception):
         if not banner_suppressed(sys.argv):
             start_background_probe(current_version=__version__)
-    except Exception:  # noqa: BLE001 — banner is best-effort
-        pass
 
     inner_exit_code: int | None = None
     try:
@@ -207,7 +207,7 @@ def _cli_main() -> None:
             inner_exit_code = (
                 int(e.code) if isinstance(e.code, int) else (0 if e.code is None else 1)
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — global shield: map anything, never crash
             from maxcompute_semantic.errors import (
                 McsError,
                 map_pyodps_exception,
@@ -219,7 +219,7 @@ def _cli_main() -> None:
             else:
                 try:
                     mcs_exc = map_pyodps_exception(exc)
-                except Exception:
+                except Exception:  # noqa: BLE001 — the error path itself must not raise
                     mcs_exc = None
 
             if mcs_exc is not None:
@@ -235,7 +235,8 @@ def _cli_main() -> None:
                 inner_exit_code = 1
     finally:
         # ---- post-dispatch: banner render ----
-        try:
+        # The banner is best-effort; render errors are swallowed.
+        with contextlib.suppress(Exception):
             cache = read_cache()
             hard = is_hard_block(cache, current=__version__)
             if not banner_suppressed(sys.argv, hard_block=hard):
@@ -248,8 +249,6 @@ def _cli_main() -> None:
                 and not banner_suppressed(sys.argv, hard_block=True)
             ):
                 inner_exit_code = 2
-        except Exception:  # noqa: BLE001 — banner is best-effort
-            pass
 
     if inner_exit_code is None:
         inner_exit_code = 0

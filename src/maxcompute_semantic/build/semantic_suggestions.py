@@ -280,11 +280,7 @@ def _classify_column(
     # STRING column that joins to another table still gets surfaced.
     col_lower_for_uniq = col_name.lower()
     uniq_name_supports_id = (
-        ID_NAME_RE.search(col_name) is not None
-        or col_lower_for_uniq.endswith("id")
-        or col_lower_for_uniq.endswith("uuid")
-        or col_lower_for_uniq.endswith("key")
-        or col_lower_for_uniq.endswith("code")
+        ID_NAME_RE.search(col_name) is not None or col_lower_for_uniq.endswith(("id", "uuid", "key", "code"))
     )
     uniq_type_supports_id = "BIGINT" in col_type or "INT" in col_type
     if (
@@ -341,11 +337,7 @@ def _classify_column(
     # not a coincidental name match.
     col_lower_for_jc = col_name.lower()
     name_shaped_like_id = (
-        ID_NAME_RE.search(col_name) is not None
-        or col_lower_for_jc.endswith("id")
-        or col_lower_for_jc.endswith("uuid")
-        or col_lower_for_jc.endswith("key")
-        or col_lower_for_jc.endswith("code")
+        ID_NAME_RE.search(col_name) is not None or col_lower_for_jc.endswith(("id", "uuid", "key", "code"))
     )
     type_is_integer = "BIGINT" in col_type or "INT" in col_type
     jc_boost_suppressed_by_same_name = (
@@ -425,10 +417,7 @@ def _classify_column(
     # ``identifier/unique``.
     col_lower_for_metric = col_name.lower()
     name_looks_like_identifier = (
-        col_lower_for_metric.endswith("id")
-        or col_lower_for_metric.endswith("uuid")
-        or col_lower_for_metric.endswith("key")
-        or col_lower_for_metric.endswith("code")
+        col_lower_for_metric.endswith(("id", "uuid", "key", "code"))
     )
     if (
         METRIC_NAME_RE.search(col_name)

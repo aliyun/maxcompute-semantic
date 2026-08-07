@@ -7,7 +7,7 @@ import pytest
 
 
 def test_osi_module_importable():
-    import maxcompute_semantic.osi as osi
+    from maxcompute_semantic import osi
 
     assert hasattr(osi, "OSI_SCHEMA_VERSION")
     assert hasattr(osi, "to_osi_dict")

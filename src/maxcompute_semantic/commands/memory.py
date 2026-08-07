@@ -72,21 +72,21 @@ GENERATED_MEMORY_KINDS = {"package_doc", "sample_sql"}
 
 # Error classification patterns for failed-query memory entries.
 _ERROR_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("TABLE_NOT_FOUND", re.compile(r"table\s+.*not\s+found", re.I)),
-    ("TABLE_NOT_FOUND", re.compile(r"ODPS-0420111", re.I)),
-    ("COLUMN_NOT_FOUND", re.compile(r"column\s+.*not\s+found", re.I)),
-    ("COLUMN_NOT_FOUND", re.compile(r"cannot\s+resolve\s+column", re.I)),
-    ("SYNTAX_ERROR", re.compile(r"syntax\s+error", re.I)),
-    ("SYNTAX_ERROR", re.compile(r"ODPS-0130161", re.I)),
-    ("PARTITION_NOT_FOUND", re.compile(r"partition\s+not\s+found", re.I)),
-    ("PARTITION_NOT_FOUND", re.compile(r"ODPS-0420061", re.I)),
-    ("TYPE_MISMATCH", re.compile(r"type\s+mismatch", re.I)),
-    ("TYPE_MISMATCH", re.compile(r"cannot\s+(?:implicitly\s+)?cast", re.I)),
-    ("PERMISSION_DENIED", re.compile(r"permission\s+denied", re.I)),
-    ("PERMISSION_DENIED", re.compile(r"ODPS-0420095", re.I)),
-    ("FULL_SCAN_BLOCKED", re.compile(r"full\s+scan\s+not\s+allowed", re.I)),
-    ("FULL_SCAN_BLOCKED", re.compile(r"ODPS-0421065", re.I)),
-    ("CROSS_JOIN_ERROR", re.compile(r"cross\s+join\s+.*not\s+supported", re.I)),
+    ("TABLE_NOT_FOUND", re.compile(r"table\s+.*not\s+found", re.IGNORECASE)),
+    ("TABLE_NOT_FOUND", re.compile(r"ODPS-0420111", re.IGNORECASE)),
+    ("COLUMN_NOT_FOUND", re.compile(r"column\s+.*not\s+found", re.IGNORECASE)),
+    ("COLUMN_NOT_FOUND", re.compile(r"cannot\s+resolve\s+column", re.IGNORECASE)),
+    ("SYNTAX_ERROR", re.compile(r"syntax\s+error", re.IGNORECASE)),
+    ("SYNTAX_ERROR", re.compile(r"ODPS-0130161", re.IGNORECASE)),
+    ("PARTITION_NOT_FOUND", re.compile(r"partition\s+not\s+found", re.IGNORECASE)),
+    ("PARTITION_NOT_FOUND", re.compile(r"ODPS-0420061", re.IGNORECASE)),
+    ("TYPE_MISMATCH", re.compile(r"type\s+mismatch", re.IGNORECASE)),
+    ("TYPE_MISMATCH", re.compile(r"cannot\s+(?:implicitly\s+)?cast", re.IGNORECASE)),
+    ("PERMISSION_DENIED", re.compile(r"permission\s+denied", re.IGNORECASE)),
+    ("PERMISSION_DENIED", re.compile(r"ODPS-0420095", re.IGNORECASE)),
+    ("FULL_SCAN_BLOCKED", re.compile(r"full\s+scan\s+not\s+allowed", re.IGNORECASE)),
+    ("FULL_SCAN_BLOCKED", re.compile(r"ODPS-0421065", re.IGNORECASE)),
+    ("CROSS_JOIN_ERROR", re.compile(r"cross\s+join\s+.*not\s+supported", re.IGNORECASE)),
 ]
 
 

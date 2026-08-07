@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 import click
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.context import ProfileContext
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile

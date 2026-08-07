@@ -27,6 +27,7 @@ from unittest.mock import MagicMock, patch
 import click
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic.auth.context import ProfileContext
 from maxcompute_semantic.commands.udf import udf_group
@@ -63,7 +64,12 @@ def _invoke(args: list[str], obj: dict | None = None) -> object:
 
 def _mock_profile(name: str = "my_proj", project: str = "my_proj"):
     """Create a mock Profile."""
-    from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
+    from maxcompute_semantic.auth.schema import (
+        AkAuth,
+        CostThresholds,
+        DataSource,
+        Profile,
+    )
 
     return Profile(
         name=name,

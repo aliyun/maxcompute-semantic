@@ -237,7 +237,9 @@ def _probe(client: MaxComputeClient, project: str) -> str:
     # for workspace-root mypy (the root ``pyproject.toml`` carries an
     # ``ignore_missing_imports = true`` override for ``odps.*``, which
     # pre-silences the import and makes the first code redundant).
-    from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+    from odps import (  # type: ignore[import-untyped, unused-ignore]
+        errors as odps_errors,
+    )
 
     odps = client._ensure_odps()
     try:

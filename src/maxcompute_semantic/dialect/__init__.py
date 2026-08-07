@@ -22,7 +22,9 @@ from typing import Any
 import sqlglot
 from sqlglot import exp
 
-from maxcompute_semantic.dialect._dialect import MaxCompute  # noqa: F401 — triggers registration
+from maxcompute_semantic.dialect._dialect import (
+    MaxCompute,  # noqa: F401 — triggers registration
+)
 
 _DIALECT = "maxcompute"
 

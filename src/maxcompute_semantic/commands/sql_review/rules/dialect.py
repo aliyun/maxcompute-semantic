@@ -11,6 +11,7 @@ which keeps each rule fixable without touching the others.
 from __future__ import annotations
 
 from sqlglot import exp
+from sqlglot.errors import TokenError
 from sqlglot.tokens import Tokenizer, TokenType
 
 from maxcompute_semantic.commands.sql_review.rules._common import parse_statements
@@ -42,7 +43,7 @@ def _count_iif_calls(sql: str) -> int:
     """
     try:
         tokens = Tokenizer().tokenize(sql)
-    except Exception:
+    except TokenError:
         return 0
     count = 0
     for i, tok in enumerate(tokens):

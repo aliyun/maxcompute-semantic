@@ -284,7 +284,7 @@ def import_profile(
                     tar.extractall(staging_path, filter="data")
                 else:
                     _validate_archive_members(tar, staging_path)
-                    tar.extractall(staging_path)  # noqa: S202
+                    tar.extractall(staging_path)
         except (tarfile.TarError, OSError) as exc:
             raise McsError(
                 f"failed to extract archive {archive_path}: {exc}",

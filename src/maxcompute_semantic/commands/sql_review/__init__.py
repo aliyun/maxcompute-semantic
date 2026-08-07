@@ -14,7 +14,10 @@ from maxcompute_semantic.build.workload import extract_sql_evidence
 from maxcompute_semantic.commands.sql import _classify_sql
 from maxcompute_semantic.commands.sql_review.coverage import compute_model_coverage
 from maxcompute_semantic.commands.sql_review.hints import ALL_HINTS
-from maxcompute_semantic.commands.sql_review.rules import ALL_RULES, PACKAGE_INDEPENDENT_RULES
+from maxcompute_semantic.commands.sql_review.rules import (
+    ALL_RULES,
+    PACKAGE_INDEPENDENT_RULES,
+)
 from maxcompute_semantic.commands.sql_review.types import ReviewContext
 
 

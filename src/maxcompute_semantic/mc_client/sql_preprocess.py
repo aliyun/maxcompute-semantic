@@ -60,7 +60,7 @@ def split_set_hints(sql: str) -> tuple[str, dict[str, str]]:
             continue
         try:
             stmts = parse_mc(segment, error_level=sqlglot.ErrorLevel.IGNORE)
-        except Exception:
+        except Exception:  # noqa: BLE001 — keeps this function total for every caller
             stmts = []
         stmt = stmts[0] if stmts else None
         if (
