@@ -846,7 +846,7 @@ def test_execute_sql_reads_rest_fallback_reader_with_descriptor_schema() -> None
 
     c = _make_client()
     c._tier = "3"
-    schema = odps_types.OdpsSchema(columns=[odps_types.Column(name="id", typo="bigint")])
+    schema = odps_types.OdpsSchema(columns=[odps_types.Column(name="id", type="bigint")])
     instance = _fake_instance_with_reader(CsvRecordReader(schema, "id\n7\n"))
 
     odps_mock = MagicMock()
