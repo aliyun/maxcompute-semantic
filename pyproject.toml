@@ -105,6 +105,12 @@ exclude_also = [
     "pragma: no cover",
 ]
 
+[tool.ruff.lint]
+# ruff 0.16 expanded its default rule set (I, BLE, S, FURB, ...), which
+# turned the blocking CI gate red overnight. Pin the families this repo
+# actually enforces; adopt new families deliberately, not by accident.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.mypy]
 files = ["src/maxcompute_semantic"]
 python_version = "3.10"
