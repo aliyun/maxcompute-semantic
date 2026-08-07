@@ -4,6 +4,7 @@
 import logging
 
 import pytest
+
 from maxcompute_semantic.versioning import env as env_mod
 from maxcompute_semantic.versioning.env import (
     is_git_available,

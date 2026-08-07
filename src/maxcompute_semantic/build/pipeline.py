@@ -47,12 +47,12 @@ from maxcompute_semantic.build.phases import (
     phase_list_tables,
     phase_mine_history,
 )
-from maxcompute_semantic.build.workload import WorkloadSummary, aggregate_workload_evidence
 from maxcompute_semantic.memory.sample_sql import persist_sample_sqls
 
 if TYPE_CHECKING:
     from maxcompute_semantic.auth.schema import DataSource, Profile
     from maxcompute_semantic.build.storage import PackageDB
+    from maxcompute_semantic.build.workload import WorkloadSummary
     from maxcompute_semantic.mc_client.client import MaxComputeClient
 
 
@@ -329,7 +329,9 @@ class BuildPipeline:
         from collections import defaultdict
 
         from maxcompute_semantic.build.markdown import _date_format_hint
-        from maxcompute_semantic.build.semantic_suggestions import suggest_column_semantics
+        from maxcompute_semantic.build.semantic_suggestions import (
+            suggest_column_semantics,
+        )
 
         cands_by_table: dict[str, list[dict]] = defaultdict(list)
         for cand in self._db.list_join_candidates():
@@ -391,6 +393,13 @@ class BuildPipeline:
         suggestions remain consistent.
         """
         import json
+
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import (
+            WorkloadSummary,
+            aggregate_workload_evidence,
+        )
 
         total = WorkloadSummary()
         for source in sources:
@@ -456,7 +465,7 @@ class BuildPipeline:
                     status="hard_error",
                     errors=[{"table": table, "code": exc.code, "message": exc.message}],
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — one bad table must not abort the batch
                 sample_result = PhaseResult(
                     status="hard_error",
                     errors=[{"table": table, "code": "UnknownError", "message": str(exc)}],
@@ -478,7 +487,7 @@ class BuildPipeline:
                     status="hard_error",
                     errors=[{"table": table, "code": exc.code, "message": exc.message}],
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — one bad table must not abort the batch
                 profile_result = PhaseResult(
                     status="hard_error",
                     errors=[{"table": table, "code": "UnknownError", "message": str(exc)}],
@@ -574,6 +583,13 @@ class BuildPipeline:
 
     def _run_full(self, sources: list[DataSource]) -> BuildSummary:
         """Execute the full build pipeline (no incremental diff)."""
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import (
+            WorkloadSummary,
+            aggregate_workload_evidence,
+        )
+
         t0 = time.monotonic()
         self._prime_client_for_parallel()
         # Phase 1: resolve + tier already done by caller
@@ -921,7 +937,9 @@ class BuildPipeline:
         # compute coverage_ratio; promotes to "confirmed" at ≥0.95.
         if self._opts.profile_level == "deep" and not self._opts.no_joins:
             self._progress("[6b-deep/7] validating top join candidates (deep)...")
-            from maxcompute_semantic.build.join_candidates import build_overlap_validation_sql
+            from maxcompute_semantic.build.join_candidates import (
+                build_overlap_validation_sql,
+            )
             from maxcompute_semantic.mc_client.errors import McsError as _DeepMcsError
 
             budget = self._opts.profile_budget_cny
@@ -1075,6 +1093,10 @@ class BuildPipeline:
         recovery flow after a ``mcs update`` that changed the
         inference layer.
         """
+        # Lazy: workload pulls sqlglot + the dialect package, which must
+        # stay off the CLI startup chain.
+        from maxcompute_semantic.build.workload import aggregate_workload_evidence
+
         t0 = time.monotonic()
         n_sources = len(sources)
         history_skipped = self._opts.no_history

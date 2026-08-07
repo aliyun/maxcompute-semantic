@@ -21,7 +21,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
-import sqlglot
 
 from maxcompute_semantic.errors.auth import AuthFailedError, IdentityNotAuthorizedError
 from maxcompute_semantic.mc_client.errors import (
@@ -35,6 +34,9 @@ from maxcompute_semantic.mc_client.errors import (
 )
 from maxcompute_semantic.mc_client.sql_guard import classify_sql
 
+if TYPE_CHECKING:
+    import sqlglot
+
 logger = logging.getLogger("maxcompute_semantic")
 
 
@@ -43,11 +45,14 @@ def _normalized_sql(sql: str) -> str:
 
 
 def _parse_single_statement(sql: str) -> sqlglot.exp.Expression | None:
+    # Lazy: sqlglot + the dialect package sit on the CLI startup chain.
+    import sqlglot
+
     from maxcompute_semantic.dialect import parse_mc
 
     try:
         statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
-    except Exception:
+    except Exception:  # noqa: BLE001 — arbitrary user SQL must not crash the cost gate
         return None
     if len(statements) != 1 or not isinstance(statements[0], sqlglot.exp.Expression):
         return None
@@ -55,6 +60,8 @@ def _parse_single_statement(sql: str) -> sqlglot.exp.Expression | None:
 
 
 def _has_top_level_limit_zero(statement: sqlglot.exp.Expression) -> bool:
+    import sqlglot
+
     limit = statement.args.get("limit")
     if not isinstance(limit, sqlglot.exp.Limit):
         return False
@@ -71,6 +78,8 @@ def _is_information_schema_table(table: sqlglot.exp.Table) -> bool:
 
 
 def _all_table_refs_are_information_schema(statement: sqlglot.exp.Expression) -> bool:
+    import sqlglot
+
     tables = list(statement.find_all(sqlglot.exp.Table))
     if not tables:
         return False

@@ -67,7 +67,6 @@ import sys
 from typing import TYPE_CHECKING, NoReturn
 
 import click
-import sqlglot
 
 from maxcompute_semantic._lib.status import emit_status
 from maxcompute_semantic.auth.context import (
@@ -89,6 +88,8 @@ from maxcompute_semantic.mc_client.sql_preprocess import split_set_hints
 from maxcompute_semantic.mc_client.tier import get_tier
 
 if TYPE_CHECKING:
+    import sqlglot
+
     from maxcompute_semantic.auth.schema import Profile
     from maxcompute_semantic.build.storage import PackageDB
     from maxcompute_semantic.mc_client.client import MaxComputeClient
@@ -96,11 +97,14 @@ if TYPE_CHECKING:
 
 def _parse_tables(sql: str) -> list[sqlglot.exp.Table]:
     """Flat list of ``Table`` references in *sql*; ``[]`` on parse failure."""
+    # Lazy: sqlglot + the dialect package must stay off the CLI startup chain.
+    import sqlglot
+
     try:
         from maxcompute_semantic.dialect import parse_mc
 
         statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.IGNORE)
-    except Exception:
+    except Exception:  # noqa: BLE001 — arbitrary user SQL must not crash table extraction
         return []
     tables: list[sqlglot.exp.Table] = []
     for statement in statements:
@@ -165,6 +169,8 @@ def _resolve_source_keys(sql: str, profile: Profile) -> set[str]:
     dev project (the typical DataWorks standard-mode shape). Returns
     ``set()`` when ``package.db`` is missing or nothing resolves.
     """
+    import sqlite3
+
     from maxcompute_semantic._internal.paths import profile_data_dir
     from maxcompute_semantic.build.storage import PackageDB
 
@@ -198,7 +204,7 @@ def _resolve_source_keys(sql: str, profile: Profile) -> set[str]:
                 if sk:
                     source_keys.add(sk)
                     break
-    except Exception:
+    except (McsError, OSError, sqlite3.Error):
         return set()
     finally:
         if db is not None:
@@ -490,7 +496,7 @@ def execute_cmd(
             return  # _emit_mcs_error is NoReturn (sys.exit); this is for readers + linters
         try:
             status = client.get_instance_status(instance_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 — timeout handoff must degrade, never crash
             status = {
                 "instance_id": instance_id,
                 "logview_url": e.context.get("logview_url", ""),

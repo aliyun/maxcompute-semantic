@@ -16,7 +16,13 @@ from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic._internal.paths import profile_data_dir
 from maxcompute_semantic.auth.errors import ProfileNotFoundError
 from maxcompute_semantic.auth.profile_store import get, load_all, remove
-from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, ProcessAuth, Profile
+from maxcompute_semantic.auth.schema import (
+    AkAuth,
+    CostThresholds,
+    DataSource,
+    ProcessAuth,
+    Profile,
+)
 from maxcompute_semantic.commands._identity import live_identity
 from maxcompute_semantic.mc_client.client import MaxComputeClient
 from maxcompute_semantic.mc_client.errors import (
@@ -34,7 +40,10 @@ from maxcompute_semantic.versioning import (
 )
 
 if TYPE_CHECKING:
-    from maxcompute_semantic.commands._import_creds import ImportedCreds, McsProfileCandidate
+    from maxcompute_semantic.commands._import_creds import (
+        ImportedCreds,
+        McsProfileCandidate,
+    )
 
 
 @click.group(name="profile")
@@ -1631,7 +1640,7 @@ def list_ncs_identities_cmd(ctx: click.Context) -> None:
 
     try:
         auths = ncs_mod.list_odps_authorizations()
-    except Exception:
+    except Exception:  # noqa: BLE001 — shape-stable JSON contract: never raise (see docstring)
         r.success(
             {
                 "available": False,
@@ -1862,7 +1871,7 @@ def _build_endpoint_from_region(region: str) -> str:
     If the input already starts with ``http``, return it as-is.
     Otherwise, interpolate into ``_PUBLIC_ENDPOINT_TEMPLATE``.
     """
-    if region.startswith("http://") or region.startswith("https://"):
+    if region.startswith(("http://", "https://")):
         return region
     return _PUBLIC_ENDPOINT_TEMPLATE.format(region=region)
 
@@ -2340,7 +2349,7 @@ def _discover_compute_project(
     try:
         with _Spinner("Listing projects..."):
             project_list = client.list_projects()
-    except Exception:
+    except Exception:  # noqa: BLE001 — any listing failure falls back to manual entry
         project_list = None
 
     picked = _pick_project(
@@ -2960,9 +2969,9 @@ def update_cmd(
 # vocabulary stays grouped while keeping the implementation file
 # focused on archive plumbing.
 
-from maxcompute_semantic.commands.profile_export import (  # noqa: E402, I001
-    export_cmd as _export_cmd,  # noqa: I001
-    import_cmd as _import_cmd,  # noqa: I001
+from maxcompute_semantic.commands.profile_export import (  # noqa: I001
+    export_cmd as _export_cmd,
+    import_cmd as _import_cmd,
 )
 
 profile_group.add_command(_export_cmd, name="export")
@@ -2978,16 +2987,16 @@ profile_group.add_command(_import_cmd, name="import")
 # config-dump verb above. ``reset`` is the destructive rollback
 # half of the recovery story.
 
-from maxcompute_semantic.commands.profile_fork import (  # noqa: E402, I001
-    cmd_profile_fork as _fork_cmd,  # noqa: I001
-    cmd_profile_fork_list as _fork_list_cmd,  # noqa: I001
-    cmd_profile_fork_remove as _fork_remove_cmd,  # noqa: I001
+from maxcompute_semantic.commands.profile_fork import (  # noqa: I001
+    cmd_profile_fork as _fork_cmd,
+    cmd_profile_fork_list as _fork_list_cmd,
+    cmd_profile_fork_remove as _fork_remove_cmd,
 )
-from maxcompute_semantic.commands.profile_history import (  # noqa: E402, I001
-    cmd_profile_diff as _diff_cmd,  # noqa: I001
-    cmd_profile_log as _log_cmd,  # noqa: I001
-    cmd_profile_reset as _reset_cmd,  # noqa: I001
-    cmd_profile_show_sha as _log_show_cmd,  # noqa: I001
+from maxcompute_semantic.commands.profile_history import (
+    cmd_profile_diff as _diff_cmd,
+    cmd_profile_log as _log_cmd,
+    cmd_profile_reset as _reset_cmd,
+    cmd_profile_show_sha as _log_show_cmd,
 )
 
 profile_group.add_command(_log_cmd, name="log")

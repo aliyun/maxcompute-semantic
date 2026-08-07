@@ -8,9 +8,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ruamel.yaml import YAML
+
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.osi.export import dump_yaml, to_osi_dict
-from ruamel.yaml import YAML
 
 
 def _build_profile_with_metrics(tmp_path: Path) -> PackageDB:

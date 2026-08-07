@@ -32,7 +32,9 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import profile_data_dir
+from maxcompute_semantic._internal.update_check import LatestMetadata
 from maxcompute_semantic.auth.profile_store import get as get_profile
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
@@ -43,14 +45,13 @@ from maxcompute_semantic.commands.doctor import (
     _check_forks_healthy,
     _check_git_available,
     _check_inference_logic_current,
-    _check_update_channel_reachable,
-    _check_update_version_current,
     _check_package_sql_parses,
     _check_profile_versioned,
+    _check_update_channel_reachable,
+    _check_update_version_current,
     _check_working_tree_clean,
     _run_update_check_fetch,
 )
-from maxcompute_semantic._internal.update_check import LatestMetadata
 from maxcompute_semantic.versioning.errors import GitNotAvailable
 from maxcompute_semantic.versioning.git_repo import GitRepo
 
@@ -105,7 +106,7 @@ def test_git_available_warn_when_binary_missing(monkeypatch: pytest.MonkeyPatch)
         raise FileNotFoundError(2, "No such file or directory: 'git'")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    name, status, detail = _check_git_available()
+    _name, status, detail = _check_git_available()
     assert status == "warn"
     assert "MCS_NO_VERSIONING" in detail
 
@@ -162,7 +163,7 @@ def test_profile_versioned_warn_when_data_dir_has_no_git(
         sources=(DataSource(project="acme", schema="default", tables="*"),),
     )
     upsert(p)
-    name, status, detail = _check_profile_versioned(p)
+    _name, status, detail = _check_profile_versioned(p)
     assert status == "warn"
     assert "enable-versioning" in detail
 
@@ -184,7 +185,7 @@ def test_profile_versioned_fail_on_double_orphan_fork(
         package_path=isolated_config / "ghost_wt",
     )
     upsert(fork)
-    name, status, detail = _check_profile_versioned(fork)
+    _name, status, detail = _check_profile_versioned(fork)
     assert status == "fail"
     assert "double-orphan" in detail
 
@@ -192,7 +193,7 @@ def test_profile_versioned_fail_on_double_orphan_fork(
 def test_profile_versioned_skip_when_no_resolved_profile() -> None:
     """When the upstream profile_resolution check failed, the
     versioned check skips."""
-    name, status, detail = _check_profile_versioned(None)
+    _name, status, _detail = _check_profile_versioned(None)
     assert status == "skip"
 
 
@@ -203,7 +204,7 @@ def test_working_tree_clean_pass_when_no_pending_changes(
     versioned_profile: Profile,
 ) -> None:
     """A fresh profile-create leaves the working tree clean."""
-    name, status, detail = _check_working_tree_clean(versioned_profile, "pass")
+    name, status, _detail = _check_working_tree_clean(versioned_profile, "pass")
     assert name == "working_tree_clean"
     assert status == "pass"
 
@@ -214,7 +215,7 @@ def test_working_tree_clean_warn_when_dirty(
     """An uncommitted file in the data-dir surfaces as a warn."""
     pdir = profile_data_dir(versioned_profile)
     (pdir / "_dirty.md").write_text("scratch\n", encoding="utf-8")
-    name, status, detail = _check_working_tree_clean(versioned_profile, "pass")
+    _name, status, detail = _check_working_tree_clean(versioned_profile, "pass")
     assert status == "warn"
     assert "uncommitted" in detail
 
@@ -295,7 +296,7 @@ def test_forks_healthy_pass_with_one_healthy_fork(
     """A live fork whose worktree dir exists → all-healthy pass."""
     runner = CliRunner()
     _make_fork(runner, versioned_profile, "alive")
-    name, status, detail = _check_forks_healthy()
+    _name, status, detail = _check_forks_healthy()
     assert status == "pass"
     assert "1 fork" in detail
 
@@ -425,7 +426,7 @@ def test_package_sql_parses_skip_when_absent(
     sql_path = pdir / "package.sql"
     if sql_path.exists():
         sql_path.unlink()
-    name, status, detail = _check_package_sql_parses(versioned_profile)
+    name, status, _detail = _check_package_sql_parses(versioned_profile)
     assert name == "package_sql_parses"
     assert status == "skip"
 

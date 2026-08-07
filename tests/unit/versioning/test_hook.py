@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from maxcompute_semantic._internal.paths import (
     profile_data_dir,
     profile_git_dir,
@@ -343,7 +344,7 @@ def test_concurrent_hook_calls_serialize_via_lock(
                 action=ACTION_BUILD,
                 summary="contending",
             )
-        except BaseException as e:
+        except BaseException as e:  # noqa: BLE001 — test captures any contender failure
             contention_result.append(e)
         finally:
             contention_done.set()

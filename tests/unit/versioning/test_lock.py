@@ -23,6 +23,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.mc_client.errors import McsError
 from maxcompute_semantic.versioning.errors import (
     LockedByOtherProcessError,

@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.info_schema import (
     build_history_sql,

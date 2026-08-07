@@ -16,7 +16,11 @@ import logging
 from pathlib import Path
 
 import pytest
-from maxcompute_semantic.auth.errors import NoProfilesConfiguredError, ProfileNotFoundError
+
+from maxcompute_semantic.auth.errors import (
+    NoProfilesConfiguredError,
+    ProfileNotFoundError,
+)
 from maxcompute_semantic.auth.link_store import set_link
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.resolver import resolve_profile

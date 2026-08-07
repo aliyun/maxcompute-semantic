@@ -15,6 +15,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from maxcompute_semantic.auth.schema import (
     AkAuth,
     CostThresholds,
@@ -280,7 +281,10 @@ class TestFormatAuthAndPrincipal:
         """Short ids (≤8 chars) collapse to ``***`` — no first-4/last-4
         leak when masking would leave nothing in the middle.
         """
-        from maxcompute_semantic.commands._profile_editor import _format_auth, _mask_ak_id
+        from maxcompute_semantic.commands._profile_editor import (
+            _format_auth,
+            _mask_ak_id,
+        )
 
         assert _mask_ak_id("ABCDEFGH") == "***"  # exactly 8
         assert _mask_ak_id("AB") == "***"  # very short
@@ -721,6 +725,7 @@ class TestSectionEditorAbortPropagates:
 
     def test_compute_project_abort_propagates(self) -> None:
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import _edit_compute_project
 
         with (
@@ -734,6 +739,7 @@ class TestSectionEditorAbortPropagates:
 
     def test_endpoint_abort_propagates(self) -> None:
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import _edit_endpoint
 
         with (
@@ -747,6 +753,7 @@ class TestSectionEditorAbortPropagates:
 
     def test_tags_abort_propagates(self) -> None:
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import _edit_tags
 
         with (
@@ -760,6 +767,7 @@ class TestSectionEditorAbortPropagates:
 
     def test_cost_thresholds_abort_propagates(self) -> None:
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import _edit_cost_thresholds
 
         with (
@@ -1265,6 +1273,7 @@ class TestEditProfileCtrlCIsEsc:
     def test_ctrl_c_at_top_level_continues(self) -> None:
         """Ctrl+C at top-level menu is a no-op (same as Esc)."""
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import edit_profile
 
         profile = self._make_profile()
@@ -1281,6 +1290,7 @@ class TestEditProfileCtrlCIsEsc:
     def test_ctrl_c_in_section_editor_goes_back_to_menu(self) -> None:
         """Ctrl+C in a section editor's click.prompt returns to the top menu."""
         import click as _click
+
         from maxcompute_semantic.commands._profile_editor import edit_profile
 
         profile = self._make_profile()

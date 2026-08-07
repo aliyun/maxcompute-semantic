@@ -8,11 +8,12 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.memory.embedding import (
     _ensure_hf_endpoint,

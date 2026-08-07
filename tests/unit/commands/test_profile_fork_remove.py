@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import profile_data_dir, profiles_yaml_path
 from maxcompute_semantic.auth.errors import ProfileNotFoundError
 from maxcompute_semantic.auth.profile_store import get as get_profile

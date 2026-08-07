@@ -13,6 +13,8 @@ grammar.  Function mappings come from the MaxCompute documentation.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from sqlglot.dialects.hive import Hive
 from sqlglot.tokens import TokenType
 
@@ -29,7 +31,7 @@ class MaxCompute(Hive):
 
     class Tokenizer(Hive.Tokenizer):
         # Keywords extracted from the official MaxCompute SQL grammar.
-        KEYWORDS = {
+        KEYWORDS: ClassVar[dict[str, TokenType]] = {
             **Hive.Tokenizer.KEYWORDS,
             # ── DDL / table properties ──
             "LIFECYCLE": TokenType.KEY,
@@ -156,7 +158,7 @@ class MaxCompute(Hive):
             # ── MINUS is already mapped to EXCEPT by Hive ──
         }
 
-        NUMERIC_LITERALS = {
+        NUMERIC_LITERALS: ClassVar[dict[str, str]] = {
             **Hive.Tokenizer.NUMERIC_LITERALS,
             "BD": "DECIMAL",
         }

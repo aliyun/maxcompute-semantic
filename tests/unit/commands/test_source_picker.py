@@ -8,6 +8,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import click
+
 from maxcompute_semantic.auth.schema import DataSource, TableSpec
 from maxcompute_semantic.commands._source_picker import (
     _is_dev_name,
@@ -482,6 +483,7 @@ class TestPickerEcho:
 
     def test_pick_choice_echoes_title_not_value(self, capsys) -> None:
         import questionary
+
         from maxcompute_semantic.commands._source_picker import _pick_choice
 
         choices = [
@@ -499,7 +501,11 @@ class TestPickerEcho:
 
     def test_pick_choice_records_fzf_query(self) -> None:
         import questionary
-        from maxcompute_semantic.commands._source_picker import _pick_choice, last_fzf_query
+
+        from maxcompute_semantic.commands._source_picker import (
+            _pick_choice,
+            last_fzf_query,
+        )
 
         choices = [questionary.Choice(title="orders", value="orders")]
         with patch("maxcompute_semantic.commands._source_picker._iterfzf") as mock_fzf:
@@ -541,6 +547,7 @@ class TestPickerEcho:
 
     def test_pick_choice_questionary_fallback_uses_select(self) -> None:
         import questionary
+
         from maxcompute_semantic.commands._source_picker import _pick_choice
 
         custom_style = object()
@@ -589,6 +596,7 @@ class TestPickerKeyboardInterrupt:
 
     def test_pick_choice_ctrl_c_returns_none(self) -> None:
         import questionary
+
         from maxcompute_semantic.commands._source_picker import _pick_choice
 
         with patch("maxcompute_semantic.commands._source_picker._iterfzf") as mock_fzf:
@@ -621,7 +629,7 @@ class TestPickColumnsToHide:
     """fzf-multi mark-to-hide column picker — marks become exclude list."""
 
     def _client_with_cols(
-        self, cols: list[tuple[str, str]], part_cols: list[str] = None
+        self, cols: list[tuple[str, str]], part_cols: list[str] | None = None
     ) -> MagicMock:
         client = MagicMock()
         client.describe_table.return_value = {

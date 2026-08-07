@@ -40,13 +40,6 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-# Dual silence: ``import-untyped`` is needed for package-local mypy
-# (pyodps ships no ``py.typed`` marker), ``unused-ignore`` is needed
-# for workspace-root mypy (the root ``pyproject.toml`` carries an
-# ``ignore_missing_imports = true`` override for ``odps.*``, which
-# pre-silences the import and makes the first code redundant).
-from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
-
 from maxcompute_semantic._internal.paths import tier_cache_path
 from maxcompute_semantic.auth.schema import Profile
 
@@ -239,6 +232,15 @@ def _probe(client: MaxComputeClient, project: str) -> str:
 
     The function returns the single-character tier identifier.
     """
+    # Dual silence: ``import-untyped`` is needed for package-local mypy
+    # (pyodps ships no ``py.typed`` marker), ``unused-ignore`` is needed
+    # for workspace-root mypy (the root ``pyproject.toml`` carries an
+    # ``ignore_missing_imports = true`` override for ``odps.*``, which
+    # pre-silences the import and makes the first code redundant).
+    from odps import (  # type: ignore[import-untyped, unused-ignore]
+        errors as odps_errors,
+    )
+
     odps = client._ensure_odps()
     try:
         schemas = list(odps.list_schemas(project=project))

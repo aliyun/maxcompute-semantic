@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, ProcessAuth, Profile
 from maxcompute_semantic.commands.doctor import (
     _check_auth,
@@ -754,6 +755,7 @@ class TestUpdateChannelChecks:
         setter(pypi_project_payload("9.9.9"))
 
         from click.testing import CliRunner
+
         from maxcompute_semantic._internal.update_check import (
             cache_path,
             read_cache,
@@ -859,6 +861,7 @@ class TestCheckNcsAvailable:
         import json
 
         from click.testing import CliRunner
+
         from maxcompute_semantic.auth.profile_store import upsert
         from maxcompute_semantic.auth.schema import ProcessAuth
         from maxcompute_semantic.cli import cli as mcs_cli

@@ -278,7 +278,7 @@ def _annotate_source(
                         return
         finally:
             db.close()
-    except Exception:
+    except Exception:  # noqa: BLE001 — silent no-op enrichment; see docstring
         return
 
 

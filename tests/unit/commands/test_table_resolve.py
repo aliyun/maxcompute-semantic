@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.commands._table_resolve import (

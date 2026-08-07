@@ -14,13 +14,14 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from odps import errors as odps_errors
+
 from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
 from maxcompute_semantic.mc_client.client import MaxComputeClient
 from maxcompute_semantic.mc_client.errors import (
     PermissionDeniedError,
     TableNotFoundError,
 )
-from odps import errors as odps_errors
 
 
 def _profile(project: str) -> Profile:

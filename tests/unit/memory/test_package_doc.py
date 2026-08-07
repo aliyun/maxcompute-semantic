@@ -122,7 +122,7 @@ class TestGeneratePackageDocs:
         )
         generate_package_docs(db)
         entries = db.list_memories(kind="package_doc")
-        table_entry = [e for e in entries if "card_games" in e["retrieval_text"]][0]
+        table_entry = next(e for e in entries if "card_games" in e["retrieval_text"])
         payload = json.loads(table_entry["payload_json"])
         assert payload["table_or_udf_name"] == "card_games"
         assert "game_id" in payload["summary"]
@@ -148,7 +148,7 @@ class TestGeneratePackageDocs:
         entries = db.list_memories(kind="package_doc")
         text = entries[0]["retrieval_text"]
         assert "PermissionDenied" not in text
-        assert "phase" not in text or "phase" in "id BIGINT"
+        assert "phase" not in text
         assert "errors_json" not in text
 
     def test_udf_summary_includes_signature(self, tmp_path: Path) -> None:
@@ -161,7 +161,7 @@ class TestGeneratePackageDocs:
         )
         generate_package_docs(db)
         entries = db.list_memories(kind="package_doc")
-        udf_entry = [e for e in entries if "my_agg" in e["retrieval_text"]][0]
+        udf_entry = next(e for e in entries if "my_agg" in e["retrieval_text"])
         payload = json.loads(udf_entry["payload_json"])
         assert payload["table_or_udf_name"] == "my_agg"
         assert "java" in payload["summary"]

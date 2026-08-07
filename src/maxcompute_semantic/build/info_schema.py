@@ -103,7 +103,7 @@ def _probe_info_schema(
         # block a build over a 1-row availability probe.
         client.execute_sql(sql, timeout=30, hints=probe_hints, assume_yes=True)
         return "available"
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — probe must classify any failure, never raise
         return _classify_pyodps_exception(exc)
 
 

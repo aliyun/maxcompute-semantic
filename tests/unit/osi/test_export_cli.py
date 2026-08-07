@@ -15,11 +15,12 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from ruamel.yaml import YAML
+
 from maxcompute_semantic.auth import profile_store
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.commands.profile_export import export_cmd
-from ruamel.yaml import YAML
 
 from ._osi_validators import validate_all
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.link_store import set_link
 from maxcompute_semantic.auth.profile_store import upsert
 from maxcompute_semantic.auth.resolver import resolve_profile

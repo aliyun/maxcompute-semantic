@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.cli import cli
 from maxcompute_semantic.commands.skill import (
     _SKILL_NAME,

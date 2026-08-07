@@ -97,7 +97,7 @@ def _build_wm_concat(args: list) -> exp.GroupConcat:
 class MaxComputeParser(HiveParser):
     LOG_DEFAULTS_TO_LN = True
 
-    ALTER_PARSERS = {
+    ALTER_PARSERS: t.ClassVar = {
         **HiveParser.ALTER_PARSERS,
         "ENABLE": lambda self: self._parse_odps_alter_lifecycle(enable=True),
         "DISABLE": lambda self: self._parse_odps_alter_lifecycle(enable=False),
@@ -106,7 +106,7 @@ class MaxComputeParser(HiveParser):
         "CLUSTERED": lambda self: self._parse_odps_alter_clustered_by(),
     }
 
-    FUNCTIONS = {
+    FUNCTIONS: t.ClassVar[dict[str, t.Callable]] = {
         **HiveParser.FUNCTIONS,
         # ------------------------------------------------------------------
         # Date arithmetic
@@ -225,7 +225,7 @@ class MaxComputeParser(HiveParser):
         "GET_USER_ID": lambda args: exp.CurrentUser(),
     }
 
-    PROPERTY_PARSERS = {
+    PROPERTY_PARSERS: t.ClassVar[dict[str, t.Callable]] = {
         **HiveParser.PROPERTY_PARSERS,
         "LIFECYCLE": lambda self: exp.Property(
             this=exp.var("LIFECYCLE"),
@@ -258,20 +258,20 @@ class MaxComputeParser(HiveParser):
             this=exp.Schema(expressions=schema),
         )
 
-    def _parse_property(self) -> t.Optional[exp.Expression]:
+    def _parse_property(self) -> exp.Expression | None:
         if self._match_text_seq("RANGE"):
             return self._parse_range_clustered_by()
         if self._match_text_seq("AUTO"):
             return self._parse_auto_partition()
         return super()._parse_property()  # type: ignore[return-value]
 
-    def _parse_named_expression(self) -> t.Optional[exp.Expression]:
+    def _parse_named_expression(self) -> exp.Expression | None:
         """Parse ``expr [AS alias]`` for AUTO PARTITIONED BY."""
         this = self._parse_assignment()
         if self._match(TokenType.ALIAS):
             alias = self._parse_id_var()
             return exp.Alias(this=this, alias=alias)
-        return t.cast(t.Optional[exp.Expression], this)
+        return t.cast(exp.Expression | None, this)
 
     # ── ALTER TABLE extensions (from MaxCompute grammar) ──────────────
 

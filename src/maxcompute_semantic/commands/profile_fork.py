@@ -432,7 +432,7 @@ def cmd_profile_fork_list(ctx: click.Context, parent_name: str | None, skip_heal
                 pruned_parents.add(parent.name)
             try:
                 unregister_fork(fork.name)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — per-fork failure must not abort the audit
                 rows.append(
                     (
                         fork.name,

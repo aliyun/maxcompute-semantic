@@ -10,10 +10,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
+from odps import errors as odps_errors  # type: ignore[import-untyped]
+
 from maxcompute_semantic.auth.credential import Credentials
 from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
 from maxcompute_semantic.mc_client.client import MaxComputeClient
-from odps import errors as odps_errors  # type: ignore[import-untyped]
 
 
 def _make_profile(*, cost_thresholds: CostThresholds | None = None) -> Profile:
@@ -65,7 +66,7 @@ def test_ensure_odps_creates_once_and_caches() -> None:
         patch(
             "maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds
         ) as resolve_mock,
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance),
+        patch("odps.ODPS", return_value=odps_instance),
     ):
         result1 = c._ensure_odps()
         assert resolve_mock.call_count == 1
@@ -83,7 +84,7 @@ def test_ak_always_valid() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance),
+        patch("odps.ODPS", return_value=odps_instance),
     ):
         c._ensure_odps()
         assert c._creds_still_valid() is True
@@ -129,7 +130,7 @@ def test_expired_creds_trigger_refetch() -> None:
         patch(
             "maxcompute_semantic.mc_client.client.resolve_credentials", return_value=new_creds
         ) as resolve_mock,
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=new_odps),
+        patch("odps.ODPS", return_value=new_odps),
     ):
         result = c._ensure_odps()
         assert resolve_mock.call_count == 1
@@ -150,8 +151,8 @@ def test_security_token_passed_to_odps() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance) as odps_cls,
-        patch("maxcompute_semantic.mc_client.client.StsAccount") as sts_cls,
+        patch("odps.ODPS", return_value=odps_instance) as odps_cls,
+        patch("odps.accounts.StsAccount") as sts_cls,
     ):
         c._ensure_odps()
         # StsAccount should be called with the three STS fields
@@ -332,7 +333,8 @@ def test_dt_to_iso_naive_datetime() -> None:
     """_dt_to_iso adds UTC timezone for naive datetime."""
     from maxcompute_semantic.mc_client.client import _dt_to_iso
 
-    dt = datetime(2024, 1, 15, 10, 0, 0)
+    # Intentionally naive: _dt_to_iso must attach UTC itself.
+    dt = datetime(2024, 1, 15, 10, 0, 0)  # noqa: DTZ001
     result = _dt_to_iso(dt)
     assert result is not None
     assert "+00:00" in result
@@ -1242,7 +1244,7 @@ def test_ensure_odps_no_security_token() -> None:
     odps_instance = MagicMock()
     with (
         patch("maxcompute_semantic.mc_client.client.resolve_credentials", return_value=creds),
-        patch("maxcompute_semantic.mc_client.client.ODPS", return_value=odps_instance) as odps_cls,
+        patch("odps.ODPS", return_value=odps_instance) as odps_cls,
     ):
         c._ensure_odps()
         call_kwargs = odps_cls.call_args[1]

@@ -166,7 +166,7 @@ def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # exercise it patch the module's discover_creds directly.
     monkeypatch.setattr(
         "maxcompute_semantic.commands._import_creds.discover_creds",
-        lambda: [],
+        list,
     )
     return tmp_path
 
@@ -257,10 +257,10 @@ def pypi_json_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     class Handler(BaseHTTPRequestHandler):
         # Silence the default stderr access log so test output stays clean.
-        def log_message(self, *_a, **_kw) -> None:  # noqa: D401
+        def log_message(self, *_a, **_kw) -> None:
             return
 
-        def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler interface)
+        def do_GET(self) -> None:
             if self.path != "/pypi/maxcompute-semantic/json":
                 self.send_error(404, "not found")
                 return

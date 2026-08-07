@@ -8,6 +8,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+
 from maxcompute_semantic.auth.schema import CostThresholds
 from maxcompute_semantic.mc_client.cost_gate import enforce_cost_gate
 from maxcompute_semantic.mc_client.errors import (

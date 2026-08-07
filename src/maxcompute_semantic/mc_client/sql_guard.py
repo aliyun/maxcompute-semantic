@@ -9,43 +9,61 @@ gets the same fail-closed default, not just the ``mcs sql`` CLI entrypoint.
 
 from __future__ import annotations
 
-import sqlglot
+from functools import cache
 
-from maxcompute_semantic.dialect import parse_mc
 from maxcompute_semantic.mc_client.errors import WriteOpRejectedError
 
-_READ_EXPR_TYPES: tuple[type[sqlglot.exp.Expression], ...] = (
-    sqlglot.exp.Select,
-    sqlglot.exp.Union,
-    sqlglot.exp.Intersect,
-    sqlglot.exp.Except,
-    sqlglot.exp.Subquery,
-    sqlglot.exp.Describe,
-    sqlglot.exp.Use,
-)
+# sqlglot (and the dialect package) is imported lazily: both sit on the
+# CLI startup chain and cost tens of milliseconds per ``mcs`` invocation
+# even for commands that never touch SQL.
+
+
+@cache
+def _read_expr_types() -> tuple[type, ...]:
+    import sqlglot
+
+    return (
+        sqlglot.exp.Select,
+        sqlglot.exp.Union,
+        sqlglot.exp.Intersect,
+        sqlglot.exp.Except,
+        sqlglot.exp.Subquery,
+        sqlglot.exp.Describe,
+        sqlglot.exp.Use,
+    )
+
 
 # SET mutates session state (e.g. odps.sql.allow.fullscan), so it requires
 # an explicit write allowance.
-_WRITE_SESSION_EXPR_TYPES: tuple[type[sqlglot.exp.Expression], ...] = (sqlglot.exp.Set,)
+@cache
+def _write_session_expr_types() -> tuple[type, ...]:
+    import sqlglot
 
-_WRITE_EXPR_TYPES: tuple[type[sqlglot.exp.Expression], ...] = (
-    sqlglot.exp.Insert,
-    sqlglot.exp.Update,
-    sqlglot.exp.Delete,
-    sqlglot.exp.Merge,
-    sqlglot.exp.Create,
-    sqlglot.exp.Drop,
-    sqlglot.exp.Alter,
-    sqlglot.exp.TruncateTable,
-    *(
-        t
-        for t in (
-            getattr(sqlglot.exp, "Grant", None),
-            getattr(sqlglot.exp, "Revoke", None),
-        )
-        if t is not None
-    ),
-)
+    return (sqlglot.exp.Set,)
+
+
+@cache
+def _write_expr_types() -> tuple[type, ...]:
+    import sqlglot
+
+    return (
+        sqlglot.exp.Insert,
+        sqlglot.exp.Update,
+        sqlglot.exp.Delete,
+        sqlglot.exp.Merge,
+        sqlglot.exp.Create,
+        sqlglot.exp.Drop,
+        sqlglot.exp.Alter,
+        sqlglot.exp.TruncateTable,
+        *(
+            t
+            for t in (
+                getattr(sqlglot.exp, "Grant", None),
+                getattr(sqlglot.exp, "Revoke", None),
+            )
+            if t is not None
+        ),
+    )
 
 _READ_COMMAND_KEYWORDS: frozenset[str] = frozenset({"SHOW", "DESC", "DESCRIBE", "EXPLAIN"})
 _WRITE_COMMAND_KEYWORDS: frozenset[str] = frozenset({"GRANT", "REVOKE"})
@@ -60,18 +78,22 @@ _last_parse_error = _LastParseError()
 
 def classify_sql(sql: str) -> str:
     """Return ``"read"``, ``"write"``, or ``"unparseable"`` for *sql*."""
+    import sqlglot
+
+    from maxcompute_semantic.dialect import parse_mc
+
     _last_parse_error.error = ""
     try:
         statements = parse_mc(sql, error_level=sqlglot.ErrorLevel.RAISE)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — arbitrary user SQL must not crash the classifier
         _last_parse_error.error = str(exc)
         return "unparseable"
     if not statements or any(s is None for s in statements):
         return "unparseable"
     for stmt in statements:
-        if isinstance(stmt, (*_WRITE_EXPR_TYPES, *_WRITE_SESSION_EXPR_TYPES)):
+        if isinstance(stmt, (*_write_expr_types(), *_write_session_expr_types())):
             return "write"
-        if isinstance(stmt, _READ_EXPR_TYPES):
+        if isinstance(stmt, _read_expr_types()):
             continue
         if isinstance(stmt, sqlglot.exp.Command):
             keyword = (stmt.name or "").upper()

@@ -37,6 +37,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.cli import cli
 from maxcompute_semantic.commands.meta import meta_group
 from maxcompute_semantic.commands.sql import sql_group
@@ -89,7 +90,12 @@ def _invoke_meta(args: list[str], obj: dict | None = None) -> object:
 
 def _mock_profile(name: str = "my_proj", project: str = "my_proj"):
     """Create a mock Profile."""
-    from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
+    from maxcompute_semantic.auth.schema import (
+        AkAuth,
+        CostThresholds,
+        DataSource,
+        Profile,
+    )
 
     return Profile(
         name=name,
@@ -1304,7 +1310,7 @@ class TestSqlMetaListTables:
 
         assert result.exit_code == 0
         # The first positional arg to get_tier is profile; second is target project.
-        args, kwargs = get_tier_mock.call_args
+        args, _kwargs = get_tier_mock.call_args
         assert args[1] == "data_proj"
 
     def test_single_source_auto_fills_project_from_source(self, isolated_config: Path) -> None:
@@ -1314,7 +1320,12 @@ class TestSqlMetaListTables:
         when ``--project`` was omitted, which breaks profiles where the data source
         lives in a different project than the compute project.
         """
-        from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
+        from maxcompute_semantic.auth.schema import (
+            AkAuth,
+            CostThresholds,
+            DataSource,
+            Profile,
+        )
 
         profile = Profile(
             name="test",
@@ -2355,7 +2366,12 @@ def _dev_prod_profile(*, dev: str = "dev_proj", prod: str = "prod_proj", schema:
     against tables in *prod* failed because the client defaulted to
     *dev*.
     """
-    from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
+    from maxcompute_semantic.auth.schema import (
+        AkAuth,
+        CostThresholds,
+        DataSource,
+        Profile,
+    )
 
     return Profile(
         name="dev_prod",
@@ -2378,7 +2394,12 @@ def _two_source_profile(
     Used to verify cross-source SQL keeps ``compute_project`` rather
     than picking one source arbitrarily.
     """
-    from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
+    from maxcompute_semantic.auth.schema import (
+        AkAuth,
+        CostThresholds,
+        DataSource,
+        Profile,
+    )
 
     return Profile(
         name="two_sources",

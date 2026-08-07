@@ -8,7 +8,10 @@ from __future__ import annotations
 from sqlglot import exp
 
 from maxcompute_semantic.commands.sql import _classify_sql
-from maxcompute_semantic.commands.sql_review.rules._common import cte_names, parse_statements
+from maxcompute_semantic.commands.sql_review.rules._common import (
+    cte_names,
+    parse_statements,
+)
 
 
 def _qualified_name(table: exp.Table) -> str:

@@ -14,6 +14,7 @@ here.
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, CostThresholds, DataSource, Profile
 from maxcompute_semantic.commands._schema_resolve import (
     resolve_project_for_profile,

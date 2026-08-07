@@ -7,6 +7,7 @@ import json
 import sqlite3
 
 import pytest
+
 from maxcompute_semantic.build.proposals import (
     SemanticProposalError,
     apply_semantic_proposal,

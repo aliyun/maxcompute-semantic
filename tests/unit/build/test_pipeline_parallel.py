@@ -105,7 +105,7 @@ class TestParallelSamplingProfiling:
         from maxcompute_semantic.mc_client.errors import McsError
 
         table_names = ["t1", "t2", "t3"]
-        pipeline, mock_sampling, mock_profiling, _ = _build_with(tmp_path, table_names, parallel=2)
+        pipeline, mock_sampling, _mock_profiling, _ = _build_with(tmp_path, table_names, parallel=2)
 
         def sampling_side_effect(
             client, db, profile, source, table_name, *_args, **_kw
@@ -129,7 +129,7 @@ class TestParallelSamplingProfiling:
     def test_auto_parallel_scales_to_table_count(self, tmp_path: Path) -> None:
         """parallel=None (auto) scales workers to min(table_count, 32)."""
         table_names = [f"t{i}" for i in range(10)]
-        pipeline, mock_sampling, mock_profiling, _ = _build_with(
+        pipeline, mock_sampling, _mock_profiling, _ = _build_with(
             tmp_path, table_names, parallel=None
         )
         try:
@@ -146,7 +146,7 @@ class TestParallelSamplingProfiling:
         from maxcompute_semantic.build.pipeline import _AUTO_PARALLEL_CAP
 
         table_names = [f"t{i}" for i in range(50)]
-        pipeline, mock_sampling, _, _ = _build_with(tmp_path, table_names, parallel=None)
+        pipeline, _mock_sampling, _, _ = _build_with(tmp_path, table_names, parallel=None)
         try:
             summary = pipeline.run()
         finally:

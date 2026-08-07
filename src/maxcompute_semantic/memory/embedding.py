@@ -17,6 +17,7 @@ and skip the probe entirely.
 
 from __future__ import annotations
 
+import http.client
 import logging
 import os
 import urllib.request
@@ -41,7 +42,7 @@ def _probe_endpoint(url: str, timeout: int = _PROBE_TIMEOUT_SEC) -> bool:
         req = urllib.request.Request(url, method="HEAD")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return bool(resp.status < 400)
-    except Exception:
+    except (OSError, ValueError, http.client.HTTPException):
         return False
 
 

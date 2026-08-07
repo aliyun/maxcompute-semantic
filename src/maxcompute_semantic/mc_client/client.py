@@ -10,14 +10,12 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
-from odps import ODPS  # type: ignore[import-untyped]
-from odps import errors as odps_errors
-from odps.accounts import StsAccount  # type: ignore[import-untyped]
-
-try:
-    from odps.rest import default_user_agent as _pyodps_ua  # type: ignore[import-untyped]
-except ImportError:
-    _pyodps_ua = None
+# pyodps is imported lazily (inside the methods that need it): importing
+# ``odps`` eagerly pulls pandas/numpy/pyarrow into every CLI startup, and
+# local-only commands (profile list, link, doctor) would pay that cost
+# without ever touching MaxCompute.
+if TYPE_CHECKING:
+    from odps import ODPS  # type: ignore[import-untyped, unused-ignore]
 
 from maxcompute_semantic import __version__ as _mcs_version
 from maxcompute_semantic.auth.credential import resolve_credentials
@@ -27,13 +25,24 @@ from maxcompute_semantic.mc_client.cost_gate import enforce_cost_gate
 from maxcompute_semantic.mc_client.sql_guard import ensure_sql_write_allowed
 
 _MCS_UA_SUFFIX = f"maxcompute-semantic/{_mcs_version}"
-if _pyodps_ua is not None:
+
+
+def _mcs_user_agent() -> str:
+    """Compose the pyodps ``user_agent`` rest-client kwarg lazily.
+
+    Reading pyodps's default user agent requires importing ``odps.rest``,
+    which would defeat the lazy-import design above.
+    """
     try:
-        _MCS_USER_AGENT = f"{_pyodps_ua()} {_MCS_UA_SUFFIX}"
-    except Exception:
-        _MCS_USER_AGENT = _MCS_UA_SUFFIX
-else:
-    _MCS_USER_AGENT = _MCS_UA_SUFFIX
+        from odps.rest import (  # type: ignore[import-untyped, unused-ignore]
+            default_user_agent as _pyodps_ua,
+        )
+    except ImportError:
+        return _MCS_UA_SUFFIX
+    try:
+        return f"{_pyodps_ua()} {_MCS_UA_SUFFIX}"
+    except Exception:  # noqa: BLE001 — cosmetic UA suffix; fall back silently
+        return _MCS_UA_SUFFIX
 
 if TYPE_CHECKING:
     from maxcompute_semantic.mc_client.envelope import Envelope
@@ -151,6 +160,11 @@ class MaxComputeClient:
         """Return cached ODPS instance, refreshing if creds expired."""
         if self._odps is not None and self._creds_still_valid():
             return self._odps
+        from odps import ODPS  # type: ignore[import-untyped, unused-ignore]
+        from odps.accounts import (  # type: ignore[import-untyped, unused-ignore]
+            StsAccount,
+        )
+
         creds = resolve_credentials(self._profile.auth)
         if creds.security_token:
             # pyodps doesn't accept security_token as a standalone kwarg;
@@ -171,7 +185,7 @@ class MaxComputeClient:
                 access_id=account,
                 project=self._profile.compute_project,
                 endpoint=self._profile.endpoint,
-                rest_client_kwargs={"user_agent": _MCS_USER_AGENT},
+                rest_client_kwargs={"user_agent": _mcs_user_agent()},
             )
         else:
             self._odps = ODPS(
@@ -179,7 +193,7 @@ class MaxComputeClient:
                 secret_access_key=creds.access_key_secret,
                 project=self._profile.compute_project,
                 endpoint=self._profile.endpoint,
-                rest_client_kwargs={"user_agent": _MCS_USER_AGENT},
+                rest_client_kwargs={"user_agent": _mcs_user_agent()},
             )
         self._creds_expiration = creds.expiration
         return self._odps
@@ -265,7 +279,7 @@ class MaxComputeClient:
                 instance_id = str(getattr(instance, "id", "") or "")
                 try:
                     logview = instance.get_logview_address()
-                except Exception:
+                except Exception:  # noqa: BLE001 — best-effort; the timeout error must still raise
                     logview = ""
                 raise McsTimeoutError(
                     f"SQL execution exceeded the synchronous {timeout}s wait; "
@@ -345,18 +359,46 @@ class MaxComputeClient:
         effective_max_rows = _resolve_result_max_rows(max_rows)
         effective_offset = _resolve_result_offset(result_offset)
         with instance.open_reader() as reader:
-            col_names = [c.name for c in reader.schema.columns]
-            schema = [{"name": c.name, "type": str(c.type)} for c in reader.schema.columns]
+            # Tunnel readers expose a public ``schema``; the REST result
+            # reader pyodps falls back to (CsvRecordReader) does not — its
+            # schema, when the service provides one, lives on ``_schema``.
+            reader_schema = getattr(reader, "schema", None)
+            tunnel_reader = reader_schema is not None
+            if reader_schema is None:
+                reader_schema = getattr(reader, "_schema", None)
+            if not tunnel_reader:
+                logger.warning(
+                    "instance tunnel unavailable; pyodps fell back to the "
+                    "limited REST result reader (the server may cap results, "
+                    "typically at 10000 rows); column types %s",
+                    "not provided by the server (reported as string)"
+                    if reader_schema is None
+                    else "taken from the result descriptor",
+                )
             total_row_count = _reader_total_count(reader)
-            rows: list[dict[str, Any]] = []
-            has_more = False
             read_count = effective_max_rows + 1 if effective_max_rows is not None else None
-            records = self._read_record_window(reader, offset=effective_offset, count=read_count)
-            for record in records:
-                if effective_max_rows is not None and len(rows) == effective_max_rows:
-                    has_more = True
-                    break
-                rows.append({col_names[i]: record[i] for i in range(len(col_names))})
+            if reader_schema is not None:
+                col_names = [c.name for c in reader_schema.columns]
+                schema = [
+                    {"name": c.name, "type": str(c.type)} for c in reader_schema.columns
+                ]
+                rows: list[dict[str, Any]] = []
+                has_more = False
+                records = self._read_record_window(
+                    reader, offset=effective_offset, count=read_count
+                )
+                for record in records:
+                    if effective_max_rows is not None and len(rows) == effective_max_rows:
+                        has_more = True
+                        break
+                    rows.append({col_names[i]: record[i] for i in range(len(col_names))})
+            else:
+                rows, schema, has_more = self._read_schemaless_rows(
+                    reader,
+                    offset=effective_offset,
+                    count=read_count,
+                    max_rows=effective_max_rows,
+                )
 
         if (
             not has_more
@@ -371,10 +413,61 @@ class MaxComputeClient:
             "next_offset": effective_offset + len(rows) if has_more else None,
             "truncated": has_more,
             "has_more": has_more,
+            "fetch_path": "instance_tunnel" if tunnel_reader else "rest_fallback",
         }
         if total_row_count is not None:
             meta["total_row_count"] = total_row_count
         return rows, schema, meta
+
+    @staticmethod
+    def _read_schemaless_rows(
+        reader: Any,
+        *,
+        offset: int,
+        count: int | None,
+        max_rows: int | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, str]], bool]:
+        """Read rows from a reader that exposes no typed schema.
+
+        pyodps returns such a reader (``CsvRecordReader``) when the instance
+        tunnel is unavailable and the service provides no result descriptor:
+        column names come from the CSV header row and every value is a
+        string. Column metadata only exists after the header has been
+        consumed, so the window is materialized first.
+        """
+        try:
+            records = list(
+                MaxComputeClient._read_record_window(reader, offset=offset, count=count)
+            )
+        except TypeError:
+            # pyodps's CsvRecordReader raises TypeError on an empty result
+            # body (its header parse iterates a None row).
+            logger.debug("REST result reader produced no parseable body", exc_info=True)
+            records = []
+        has_more = max_rows is not None and len(records) > max_rows
+        if has_more:
+            records = records[:max_rows]
+        columns = (
+            getattr(reader, "_columns", None)
+            or getattr(reader, "_csv_columns", None)
+            or (getattr(records[0], "_columns", None) if records else None)
+        )
+        if columns:
+            col_names = [str(c.name) for c in columns]
+            schema = [{"name": str(c.name), "type": str(c.type)} for c in columns]
+        elif records:
+            col_names = [f"col_{i}" for i in range(len(records[0]))]
+            schema = [{"name": name, "type": "string"} for name in col_names]
+            logger.warning(
+                "REST result reader exposes no column names; using positional names"
+            )
+        else:
+            col_names = []
+            schema = []
+        rows = [
+            {col_names[i]: record[i] for i in range(len(col_names))} for record in records
+        ]
+        return rows, schema, has_more
 
     @staticmethod
     def _read_record_window(reader: Any, *, offset: int, count: int | None) -> Any:
@@ -420,7 +513,9 @@ class MaxComputeClient:
         query to any project the AK has Describe-level cross-project
         access to.
         """
-        from odps import errors as odps_errors  # type: ignore[import-untyped, unused-ignore]
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
 
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
@@ -749,6 +844,10 @@ class MaxComputeClient:
         self, keyword: str, *, schema: str | None = None, project: str | None = None
     ) -> list[dict[str, Any]]:
         """Client-side table search — iterates all tables, substring match."""
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
+
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
         tokens = [t.lower() for t in keyword.split() if t.strip()] or [keyword.lower()]
@@ -830,6 +929,10 @@ class MaxComputeClient:
             Sorted list of dicts with keys: table_name, column_name, type,
             comment, score.
         """
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
+
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
         tokens = [t.lower() for t in keyword.split() if t.strip()] or [keyword.lower()]
@@ -955,8 +1058,8 @@ class MaxComputeClient:
                         break
                 except TypeError:
                     continue
-                except Exception:
-                    pass
+                except Exception:  # best-effort probe; fall back below
+                    logger.debug("get_max_partition probe failed; falling back", exc_info=True)
         if latest_partition is None and partitions:
             latest_partition = partitions[-1]
 
@@ -1029,8 +1132,8 @@ class MaxComputeClient:
                         break
                 except TypeError:
                     continue
-                except Exception:
-                    pass
+                except Exception:  # best-effort probe; fall back below
+                    logger.debug("get_max_partition probe failed; falling back", exc_info=True)
 
         # If no get_max_partition, use last partition from iteration.
         if latest_partition is None:
@@ -1156,7 +1259,7 @@ class MaxComputeClient:
                 values = [row[col_name] for row in rows]
                 null_count = sum(1 for v in values if v is None)
                 non_null = [v for v in values if v is not None]
-                distinct_count = len(set(str(v) for v in non_null))
+                distinct_count = len({str(v) for v in non_null})
 
                 col_stat: dict[str, Any] = {
                     "column_name": col_name,
@@ -1429,6 +1532,10 @@ class MaxComputeClient:
         """
         import time
 
+        from odps import (  # type: ignore[import-untyped, unused-ignore]
+            errors as odps_errors,
+        )
+
         from maxcompute_semantic.errors import TimeoutError as McsTimeoutError
         from maxcompute_semantic.mc_client.hints import build_hints
         from maxcompute_semantic.mc_client.tier import get_tier
@@ -1462,7 +1569,7 @@ class MaxComputeClient:
             results = instance.get_task_results()
             if results:
                 # get_task_results returns a dict of task_name -> result_text
-                for _task_name, result in results.items():
+                for result in results.values():
                     plan_text += result
         except odps_errors.ODPSError:
             logger.debug("get_task_results failed, falling back to open_reader", exc_info=True)
@@ -1492,7 +1599,7 @@ def _safe_function_attr(function: Any, attr: str) -> str | None:
     """
     try:
         value = getattr(function, attr)
-    except Exception:
+    except Exception:  # noqa: BLE001 — pyodps lazy-load may raise; see docstring
         return None
     if value is None:
         return None

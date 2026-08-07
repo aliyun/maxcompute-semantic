@@ -151,7 +151,9 @@ def detect_install_mode() -> InstallMode:
     try:
         user_bin = Path(site.getuserbase()) / "bin"
         user_bin_win = Path(site.getuserbase()) / "Scripts"
-    except Exception:
+    except RuntimeError:
+        # site.getuserbase() raises RuntimeError when the user base
+        # directory can't be determined on this platform.
         user_bin = Path("")
         user_bin_win = Path("")
     if argv0:

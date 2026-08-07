@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.build.storage import PackageDB
 from maxcompute_semantic.errors.annotate import (
     AnnotateNotFoundError,

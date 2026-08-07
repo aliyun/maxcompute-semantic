@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.storage import PackageDB
 

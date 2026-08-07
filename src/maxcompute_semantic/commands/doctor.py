@@ -43,7 +43,10 @@ from maxcompute_semantic._internal.update_check import (
     write_cache,
 )
 from maxcompute_semantic.auth.context import resolve_profile_for_project
-from maxcompute_semantic.auth.errors import NoProfilesConfiguredError, ProfileNotFoundError
+from maxcompute_semantic.auth.errors import (
+    NoProfilesConfiguredError,
+    ProfileNotFoundError,
+)
 from maxcompute_semantic.auth.resolver import resolve_profile
 from maxcompute_semantic.commands.skill import _skill_root
 from maxcompute_semantic.mc_client.errors import McsError
@@ -91,7 +94,7 @@ def _check_profiles_yaml() -> CheckResult:
         if not names:
             return ("profiles_yaml", "fail", "profiles.yaml exists but defines no profiles")
         return ("profiles_yaml", "pass", f"{len(names)} profile(s): {', '.join(names)}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         return ("profiles_yaml", "fail", f"cannot read profiles.yaml: {exc}")
 
 
@@ -171,9 +174,9 @@ def _check_env_fallback_endpoint(profile_name: str | None = None) -> CheckResult
     return (
         "env_fallback_endpoint",
         "warn",
-        "custom env fallback endpoint detected; custom/internal endpoints are supported, "
+        ("custom env fallback endpoint detected; custom/internal endpoints are supported, "
         "but verify MAXCOMPUTE_ENDPOINT if this was not intentional: "
-        f"{endpoint}",
+        f"{endpoint}"),
     )
 
 
@@ -216,7 +219,7 @@ def _check_profile_resolution(profile_name: str | None) -> tuple[CheckResult, ob
             try:
                 raw = json.loads(link_json_path().read_text())
                 slot = "cwd-link" if raw.get(os.getcwd()) else "env-vars"
-            except Exception:
+            except (OSError, ValueError):
                 slot = "env-vars"
         elif os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID"):
             slot = "env-vars"
@@ -246,7 +249,7 @@ def _check_auth(p: object) -> CheckResult:
         return ("auth", "pass", detail)
     except McsError as exc:
         return ("auth", "fail", exc.message)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         return ("auth", "fail", str(exc))
 
 
@@ -267,7 +270,7 @@ def _check_connectivity(p: object) -> CheckResult:
         return ("connectivity", "fail", f"SELECT 1 returned status={envelope.status}")
     except McsError as exc:
         return ("connectivity", "fail", f"{exc.code}: {exc.message}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         msg = str(exc)
         if len(msg) > 100:
             msg = msg[:100] + "..."
@@ -299,7 +302,7 @@ def _check_tier(p: object) -> CheckResult:
         return ("tier", "pass", f"tier={tier}-level (live probe)")
     except McsError as exc:
         return ("tier", "fail", f"{exc.code}: {exc.message}")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         msg = str(exc)
         if len(msg) > 100:
             msg = msg[:100] + "..."
@@ -331,12 +334,12 @@ def _check_build_data(p: object) -> CheckResult:
     md_count = sum(len(list(d.glob("*.md"))) for d in source_dirs)
     pieces.append(f"{md_count} table .md files across {len(source_dirs)} source(s)")
 
-    try:
+    # The build timestamp is a best-effort detail; a missing or corrupt
+    # _state.json just drops the "built …" piece from the summary.
+    with contextlib.suppress(OSError, ValueError):
         state_data = json.loads(state.read_text()) if state.exists() else {}
         last_built = state_data.get("last_built_at", "—")
         pieces.append(f"built {last_built}")
-    except Exception:
-        pass
 
     return ("build_data", "pass", ", ".join(pieces))
 
@@ -480,7 +483,7 @@ def _check_profile_versioned(p: object) -> CheckResult:
     try:
         head_sha = repo.rev_parse("HEAD")
         subject = repo.commit_subject(head_sha)
-    except Exception:
+    except McsError:
         return (
             "profile_versioned",
             "pass",
@@ -531,7 +534,7 @@ def _check_working_tree_clean(p: object, prev_status: str) -> CheckResult:
     repo = GitRepo(profile_data_dir(target))
     try:
         dirty = repo.has_uncommitted_changes()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         return ("working_tree_clean", "fail", f"cannot read working tree: {exc}")
     if not dirty:
         return ("working_tree_clean", "pass", "profile working tree is clean")
@@ -541,7 +544,7 @@ def _check_working_tree_clean(p: object, prev_status: str) -> CheckResult:
 
         status_out = _GR(profile_data_dir(target))._run("status", "--porcelain", check=True)
         n = sum(1 for ln in status_out.splitlines() if ln.strip())
-    except Exception:
+    except McsError:
         n = 0
     return (
         "working_tree_clean",
@@ -569,7 +572,7 @@ def _check_forks_healthy() -> CheckResult:
 
     try:
         all_profiles = load_all_profiles()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         return ("forks_healthy", "skip", f"cannot read profiles.yaml: {exc}")
     forks = [f for f in all_profiles.values() if f.kind == "fork"]
     if not forks:
@@ -606,7 +609,7 @@ def _check_forks_healthy() -> CheckResult:
                 "skip",
                 "git binary not available; fork-state determination skipped",
             )
-        except Exception:
+        except McsError:
             ok = False
         if ok:
             healthy += 1
@@ -657,7 +660,7 @@ def _check_inference_logic_current() -> CheckResult:
 
     try:
         all_profiles = load_all_profiles()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — doctor checks report failures, never raise
         return ("inference_logic_current", "skip", f"cannot read profiles.yaml: {exc}")
     if not all_profiles:
         return (
@@ -675,7 +678,7 @@ def _check_inference_logic_current() -> CheckResult:
             continue
         try:
             db = PackageDB(db_path)
-        except Exception:
+        except Exception:  # noqa: BLE001, S112 — skip unreadable db of any error family
             continue
         try:
             stored = db.get_inference_logic_version()
@@ -748,7 +751,9 @@ def _check_package_sql_parses(p: object) -> CheckResult:
         repo = GitRepo(pdir)
         target_hint = ""
         if repo.exists():
-            try:
+            # The rollback hint is a best-effort aside; a git failure
+            # just drops it from the fail message.
+            with contextlib.suppress(McsError):
                 history = repo.log(limit=2, paths=("package.sql",))
                 if len(history) >= 2:
                     target_hint = (
@@ -756,8 +761,6 @@ def _check_package_sql_parses(p: object) -> CheckResult:
                         f"`mcs profile reset --to {history[1].short_sha} "
                         f"--profile {p.name}`."
                     )
-            except Exception:
-                pass
         return (
             "package_sql_parses",
             "fail",
@@ -824,6 +827,8 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
     from maxcompute_semantic import __version__
     from maxcompute_semantic._internal.update_check import (
         LatestMetadata as _LM,
+    )
+    from maxcompute_semantic._internal.update_check import (
         MalformedMetadataError,
     )
 
@@ -856,7 +861,8 @@ def _run_update_check_fetch() -> tuple[LatestMetadata | None, str]:
             return (None, f"{url} response shape is not the expected metadata")
         except MalformedMetadataError as e:
             return (None, f"malformed metadata: {e}")
-        except Exception as e:
+        except ValueError as e:
+            # UTF-8 decode failure or JSON parse error on the fetched body.
             return (None, f"unparseable response from {url}: {e}")
 
     # Successful fetch — warm the banner cache so the next foreground

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic.auth.errors import (
     AuthBinaryMissingError,
     AuthFailedError,

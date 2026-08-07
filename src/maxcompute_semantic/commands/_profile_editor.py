@@ -633,7 +633,7 @@ def _edit_source(draft: Profile, idx: int, client: MaxComputeClient) -> Profile:
                 fg="yellow",
                 err=True,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — wizard must degrade to manual-add, never crash
             _listing_failed = True
             click.secho(
                 f"  ⚠ list_tables failed ({type(e).__name__}: {e}).\n"
@@ -773,7 +773,7 @@ def _edit_source(draft: Profile, idx: int, client: MaxComputeClient) -> Profile:
                 _available = []
                 _listing_failed = True
                 continue
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — wizard must degrade to manual-add, never crash
                 click.secho(f"  ⚠ list_tables failed: {e}", fg="yellow", err=True)
                 _available = []
                 _listing_failed = True

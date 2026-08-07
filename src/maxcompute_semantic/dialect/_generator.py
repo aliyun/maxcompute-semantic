@@ -9,14 +9,16 @@ here to ensure parse → AST → generate round-trips correctly.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from sqlglot import exp
 from sqlglot.dialects.dialect import rename_func, unit_to_str
 from sqlglot.generators.hive import HiveGenerator
 from sqlglot.transforms import (
-    remove_unique_constraints,
     ctas_with_tmp_tables_to_create_tmp_view,
-    preprocess,
     move_schema_columns_to_partitioned_by,
+    preprocess,
+    remove_unique_constraints,
 )
 
 
@@ -140,7 +142,7 @@ def _datatype_sql(self: MaxComputeGenerator, expression: exp.DataType) -> str:
 
 class MaxComputeGenerator(HiveGenerator):
     # MaxCompute uses DATETIME as a distinct type, not an alias for TIMESTAMP.
-    TYPE_MAPPING = {
+    TYPE_MAPPING: ClassVar[dict[exp.DType, str]] = {
         **HiveGenerator.TYPE_MAPPING,
         exp.DType.DATETIME: "DATETIME",
         exp.DType.VARCHAR: "STRING",
@@ -151,7 +153,7 @@ class MaxComputeGenerator(HiveGenerator):
         exp.DType.TIMESTAMPNTZ: "TIMESTAMP_NTZ",
     }
 
-    TRANSFORMS = {
+    TRANSFORMS: ClassVar = {
         **HiveGenerator.TRANSFORMS,
         # ── DDL ──
         exp.Create: preprocess(

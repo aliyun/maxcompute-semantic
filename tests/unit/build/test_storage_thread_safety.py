@@ -48,7 +48,7 @@ def test_concurrent_upsert_columns_no_programming_error(tmp_path: Path) -> None:
                         }
                     ],
                 )
-        except BaseException as exc:
+        except BaseException as exc:  # noqa: BLE001 — test captures any worker failure
             errors.append(exc)
 
     threads = [
@@ -83,7 +83,7 @@ def test_concurrent_reader_and_writer(tmp_path: Path) -> None:
             while not stop.is_set():
                 row = db.get_table("src__default", "t0")
                 assert row is not None
-        except BaseException as exc:
+        except BaseException as exc:  # noqa: BLE001 — test captures any worker failure
             errors.append(exc)
 
     def writer() -> None:

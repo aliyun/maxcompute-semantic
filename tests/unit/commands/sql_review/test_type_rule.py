@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
+
 from maxcompute_semantic.commands.sql_review.rules.type_check import (
     check_string_date_compare,
 )

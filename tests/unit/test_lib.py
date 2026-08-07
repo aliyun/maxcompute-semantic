@@ -14,6 +14,7 @@ respectively. Their tests live alongside the live modules.
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic._lib.schema_hash import schema_hash
 from maxcompute_semantic._lib.status import die, emit_status
 from maxcompute_semantic._lib.yaml import (

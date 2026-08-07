@@ -266,7 +266,7 @@ def _resolve_conflicts(candidates: list[JoinCandidate]) -> None:
         gk = f"{c.left_source_key}.{c.left_table}->{c.right_source_key}.{c.right_table}"
         groups.setdefault(gk, []).append(c)
 
-    for _gk, group in groups.items():
+    for group in groups.values():
         if len(group) <= 1:
             continue
         best = max(c.confidence for c in group)

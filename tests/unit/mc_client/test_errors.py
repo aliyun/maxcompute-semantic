@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import pytest
+
 from maxcompute_semantic.mc_client.errors import (
     AuthFailedError,
     EndpointUnreachableError,

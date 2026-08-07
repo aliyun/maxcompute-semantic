@@ -13,6 +13,7 @@ from pathlib import Path
 import click
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic.cli import _cli_main, cli
 
 

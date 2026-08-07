@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic._internal.paths import profile_data_dir
 from maxcompute_semantic.auth.context import ProfileContext

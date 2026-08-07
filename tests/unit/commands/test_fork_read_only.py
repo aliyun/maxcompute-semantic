@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import pytest
 from click.testing import CliRunner
+
 from maxcompute_semantic._internal.paths import profile_data_dir
 from maxcompute_semantic.auth.profile_store import upsert as upsert_profile
 from maxcompute_semantic.auth.schema import Profile

@@ -214,17 +214,15 @@ def show_cmd(pctx: ProfileContext, name: str) -> None:
             exit_code=5,
         )
 
-    # Try to enrich from pyodps if available.
+    # Try to enrich from pyodps if available. Enrichment is optional —
+    # local data is sufficient, so any failure is swallowed.
     enriched = dict(udf_entry)
-    try:
+    with contextlib.suppress(Exception):
         client = MaxComputeClient(prof)
         odps = client._ensure_odps()
         mc_func = odps.get_function(name, project=prof.compute_project)
         enriched["owner"] = getattr(mc_func, "owner", "")
         enriched["creation_time"] = str(getattr(mc_func, "creation_time", ""))
-    except Exception:
-        # Enrichment is optional — local data is sufficient.
-        pass
 
     pctx.renderer.success({"udf": enriched})
 

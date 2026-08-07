@@ -244,10 +244,10 @@ class TestPersistSampleSqls:
             db,
             {
                 "legalities": [
-                    "SELECT c.id FROM cards c JOIN legalities l ON c.uuid = l.uuid "
-                    "WHERE l.format = 'commander'",
-                    "SELECT c.id FROM cards c JOIN legalities l ON c.id = l.id "
-                    "WHERE l.format = 'commander'",
+                    ("SELECT c.id FROM cards c JOIN legalities l ON c.uuid = l.uuid "
+                    "WHERE l.format = 'commander'"),
+                    ("SELECT c.id FROM cards c JOIN legalities l ON c.id = l.id "
+                    "WHERE l.format = 'commander'"),
                 ]
             },
             _SK,

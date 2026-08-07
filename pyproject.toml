@@ -18,7 +18,9 @@ dependencies = [
     "iterfzf>=0.5",
     "jieba>=0.42",
     "packaging>=21.0",
-    "pyodps>=0.11",
+    # 0.13 imports pandas lazily; older pyodps pulled pandas/numpy into
+    # every ``import odps``, adding seconds to query-path startup.
+    "pyodps>=0.13",
     "questionary>=2.0",
     "ruamel.yaml>=0.18",
     "sqlglot>=25.0",

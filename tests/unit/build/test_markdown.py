@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.markdown import (
     MarkdownRenderer,

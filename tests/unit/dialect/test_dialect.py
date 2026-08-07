@@ -16,7 +16,6 @@ from sqlglot import exp
 
 from maxcompute_semantic.dialect import parse_mc_one
 
-
 # ── Registration ──────────────────────────────────────────────────────
 
 
@@ -375,25 +374,33 @@ class TestSqlReviewRulesRegression:
         )
 
     def test_iif_still_detected(self):
-        from maxcompute_semantic.commands.sql_review.rules.dialect import check_sqlite_iif
+        from maxcompute_semantic.commands.sql_review.rules.dialect import (
+            check_sqlite_iif,
+        )
 
         issues = check_sqlite_iif(self._ctx("SELECT IIF(x > 0, 'yes', 'no') FROM t"))
         assert len(issues) == 1
 
     def test_strftime_still_detected(self):
-        from maxcompute_semantic.commands.sql_review.rules.dialect import check_sqlite_strftime
+        from maxcompute_semantic.commands.sql_review.rules.dialect import (
+            check_sqlite_strftime,
+        )
 
         issues = check_sqlite_strftime(self._ctx("SELECT STRFTIME('%Y', dt) FROM t"))
         assert len(issues) == 1
 
     def test_julianday_still_detected(self):
-        from maxcompute_semantic.commands.sql_review.rules.dialect import check_sqlite_julianday
+        from maxcompute_semantic.commands.sql_review.rules.dialect import (
+            check_sqlite_julianday,
+        )
 
         issues = check_sqlite_julianday(self._ctx("SELECT JULIANDAY(dt) FROM t"))
         assert len(issues) == 1
 
     def test_substr_neg_still_detected(self):
-        from maxcompute_semantic.commands.sql_review.rules.dialect import check_sqlite_substr_neg
+        from maxcompute_semantic.commands.sql_review.rules.dialect import (
+            check_sqlite_substr_neg,
+        )
 
         issues = check_sqlite_substr_neg(self._ctx("SELECT SUBSTR(s, -3) FROM t"))
         assert len(issues) == 1

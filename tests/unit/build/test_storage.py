@@ -21,6 +21,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from maxcompute_semantic.build.errors import RebuildRequiredError
 from maxcompute_semantic.build.storage import _SCHEMA_VERSION, PackageDB
 
