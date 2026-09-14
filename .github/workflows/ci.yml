@@ -16,7 +16,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Codecov tokenless (OIDC) upload — required for protected branches
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -24,12 +23,19 @@ concurrency:
 
 jobs:
   test:
+    # id-token stays here rather than at workflow level: only the Codecov
+    # upload below needs OIDC, and granting it workflow-wide makes every
+    # other job in this file (install-smoke, and anything added later)
+    # unexpectedly privileged too.
+    permissions:
+      contents: read
+      id-token: write  # Codecov tokenless (OIDC) upload — required for protected branches
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -121,3 +127,54 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
           disable_telem: true
+
+  # Installs the built wheel into a venv carrying *only* the declared runtime
+  # dependencies, then starts the CLI. Every other job here runs
+  # `uv sync --extra dev`, and that extra brings mypy → typing-extensions, so
+  # importing an undeclared package looks perfectly fine in CI while the wheel
+  # raises ModuleNotFoundError for a user before mcs prints anything. 0.18.1
+  # broke on Python 3.13 exactly that way (issue #31); the static sibling of
+  # this check lives in tests/unit/test_declared_runtime_dependencies.py.
+  install-smoke:
+    name: Clean-install smoke / py${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two ends of the supported range: the floor is where backport
+        # shims accumulate, the ceiling is where a dependency stops providing
+        # a transitively-imported module.
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+
+      - name: Set up Python
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: uv python install "$PYTHON_VERSION"
+
+      - name: Build wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Install runtime deps only, then start mcs
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          set -euo pipefail
+          # Resolve the wheel path in the shell: passing a quoted glob hands
+          # the literal "…-*.whl" to uv, which rejects it as an invalid wheel
+          # filename.
+          wheel=$(ls dist/*.whl)
+          uv venv --python "$PYTHON_VERSION" .venv-smoke
+          VIRTUAL_ENV=.venv-smoke uv pip install "$wheel"
+          .venv-smoke/bin/python -c 'import maxcompute_semantic.cli'
+          .venv-smoke/bin/mcs --version
+          .venv-smoke/bin/mcs --help > /dev/null
