@@ -8,24 +8,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- **Profile validation no longer aborts on two-level (flat-namespace)
-  projects that answer the tier probe with a DDL-task error.** The tier
-  probe runs `ODPS.list_schemas`, which falls back to
-  `SHOW SCHEMAS IN <project>` as a DDL task when the REST `/schemas`
-  endpoint is unsupported. On a two-level project that task fails with
-  `ODPS-0110061: Invalid database operations on two-tier model`, which
-  pyodps raises as the *base* `ODPSError` — the probe caught only
-  `InternalServerError` (for the older "not 3-tier model project"
-  wording), so the error escaped unclassified, `mcs profile create` /
-  `update` died at step 2 with code `Unknown`, and — because a failed
-  probe never writes the tier cache — every later `mcs sql` / `build` /
-  `meta` / `doctor` call re-probed and re-failed. The probe now matches
-  the flat-namespace wording through one shared predicate
-  (`errors.is_two_tier_error`, also used by `MaxComputeClient.list_schemas`
-  and the profile wizard's schema picker, replacing four divergent
-  copies of the keyword test) and caches `2` as it always should have.
-  Matching stays on message text, not on the `ODPS-0110061` code, since
-  that code also covers unrelated DDL failures on three-level projects.
+- **Two-level (flat-namespace) projects no longer break the tier probe.**
+  Two shapes of one bug, both fixed:
+  - **The probe now asks the schema endpoint directly.** `GET
+    /projects/<name>/schemas` answers in one metadata read: a
+    flat-namespace project replies `InvalidParameter: Project <name> is
+    not 3-tier model project`, which the probe maps to `2` without
+    submitting anything. It previously went through pyodps's
+    `list_schemas`, whose `with_schema_api_fallback` decorator catches
+    that accurate error and re-asks with `SHOW SCHEMAS IN <project>` — a
+    DDL task a two-level project always rejects. So the SDK traded a
+    typed signal for an untyped one and left a failed job in the user's
+    instance list on every cold probe; verified against a live two-level
+    project, where the old path reaches
+    `execute_sql("SHOW SCHEMAS IN <project>")` and the new one submits
+    nothing. Enumeration remains as the fallback for services that
+    predate the REST schema API (where the legacy path does work) and for
+    counting schemas, and any other stage-1 outcome — including a pyodps
+    too old to expose these accessors — defers to it, so the added stage
+    cannot break a probe that used to answer.
+  - **The untyped DDL failure is now recognized too.** Where the
+    enumeration path still runs, `ODPS-0110061: Invalid database
+    operations on two-tier model` now classifies as `2`. pyodps has no
+    class entry for `ODPS-0110061` and raises the base `ODPSError`, which
+    the probe's `except InternalServerError` never matched, so the error
+    escaped unclassified, `mcs profile create` / `update` died at step 2
+    with code `Unknown`, and — because a failed probe never writes the
+    tier cache — every later `mcs sql` / `build` / `meta` / `doctor` call
+    re-probed and re-failed. The flat-namespace wordings are now matched
+    through one shared predicate (`errors.is_two_tier_error`, also used
+    by `MaxComputeClient.list_schemas` and the profile wizard's schema
+    picker, replacing four divergent copies of the keyword test).
+    Matching stays on message text, not on the `ODPS-0110061` code, since
+    that code also covers unrelated DDL failures on three-level projects.
 - **An unrecognized step-2 probe failure is now reported as a step-2
   failure.** A raw pyodps exception bypassed `_run_auth_test`'s
   `except McsError` and surfaced as an anonymous error envelope from the
