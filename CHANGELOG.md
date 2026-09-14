@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Profile validation no longer aborts on two-level (flat-namespace)
+  projects that answer the tier probe with a DDL-task error.** The tier
+  probe runs `ODPS.list_schemas`, which falls back to
+  `SHOW SCHEMAS IN <project>` as a DDL task when the REST `/schemas`
+  endpoint is unsupported. On a two-level project that task fails with
+  `ODPS-0110061: Invalid database operations on two-tier model`, which
+  pyodps raises as the *base* `ODPSError` — the probe caught only
+  `InternalServerError` (for the older "not 3-tier model project"
+  wording), so the error escaped unclassified, `mcs profile create` /
+  `update` died at step 2 with code `Unknown`, and — because a failed
+  probe never writes the tier cache — every later `mcs sql` / `build` /
+  `meta` / `doctor` call re-probed and re-failed. The probe now matches
+  the flat-namespace wording through one shared predicate
+  (`errors.is_two_tier_error`, also used by `MaxComputeClient.list_schemas`
+  and the profile wizard's schema picker, replacing four divergent
+  copies of the keyword test) and caches `2` as it always should have.
+  Matching stays on message text, not on the `ODPS-0110061` code, since
+  that code also covers unrelated DDL failures on three-level projects.
+- **An unrecognized step-2 probe failure is now reported as a step-2
+  failure.** A raw pyodps exception bypassed `_run_auth_test`'s
+  `except McsError` and surfaced as an anonymous error envelope from the
+  top-level CLI handler, with no `[2/3]` line and no hint that
+  `MCS_TIER_OVERRIDE` exists. Such errors are classified at the step and
+  the output now names the `MCS_TIER_OVERRIDE=2|3` escape hatch.
+
 ## [0.18.1] — 2026-08-07
 
 ### Fixed

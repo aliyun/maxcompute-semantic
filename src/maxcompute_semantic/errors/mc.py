@@ -166,6 +166,58 @@ class WriteOpRejectedError(McsError):
     exit_code = 2
 
 
+_TWO_TIER_MESSAGE_SIGNATURES: tuple[str, ...] = (
+    "not 3-tier",
+    "not 3 tier",
+    "not a 3-tier",
+    "two-tier model",
+    "2-tier model",
+)
+
+
+def is_two_tier_error(exc_or_message: BaseException | str) -> bool:
+    """True when a MaxCompute error says the project has no schema layer.
+
+    MaxCompute answers "this project is flat-namespace" with more than one
+    server-side wording, and which one arrives depends on which metadata
+    path pyodps took:
+
+    - ``GET .../schemas`` unsupported → pyodps falls back to running
+      ``SHOW SCHEMAS IN <project>`` as a DDL task, which fails with
+      ``ODPS-0110061: Failed to run ddltask - ... Invalid database
+      operations on two-tier model``. pyodps's code→class map has no
+      entry for ``ODPS-0110061``, so this surfaces as the *base*
+      ``ODPSError``, not an ``InternalServerError``.
+    - Older service builds answer ``Project <name> is not 3-tier model
+      project`` on an ``InternalServerError``.
+
+    Classification is on message text, deliberately not on the ODPS code:
+    ``ODPS-0110061`` is the generic "failed to run ddltask" code and also
+    covers real DDL failures on 3-level projects (a bad ``CREATE TABLE``,
+    a column-count mismatch), so code-only matching would misclassify
+    those as flat-namespace and make the CLI emit bare table references
+    the project rejects.
+
+    Residual limitation: substring matching can't distinguish "this
+    project *is* two-tier" from an unrelated error that merely *mentions*
+    the two-tier model. That is why callers consult this predicate only
+    on the schema-enumeration path (the tier probe and ``list_schemas``),
+    where any two-tier answer means the project genuinely has no schema
+    layer to enumerate. Don't promote it to a general-purpose classifier
+    for arbitrary SQL failures.
+
+    Accepts a pyodps exception, an :class:`McsError` (whose ``message``
+    carries the raw pyodps text through ``map_pyodps_exception``), or a
+    bare string.
+    """
+    if isinstance(exc_or_message, str):
+        text = exc_or_message
+    else:
+        text = str(getattr(exc_or_message, "message", "") or "") or str(exc_or_message)
+    low = text.lower()
+    return any(signature in low for signature in _TWO_TIER_MESSAGE_SIGNATURES)
+
+
 def map_pyodps_exception(
     exc: Exception, *, sql: str | None = None, source_key: str | None = None
 ) -> McsError:

@@ -66,6 +66,7 @@ from maxcompute_semantic.errors.mc import (
     TimeoutError,
     UnknownError,
     WriteOpRejectedError,
+    is_two_tier_error,
     map_pyodps_exception,
 )
 from maxcompute_semantic.errors.memory import MemoryNotFoundError
@@ -130,6 +131,7 @@ __all__ = [
     "WhoAmIFailedError",
     "WorkingDirectoryError",
     "WriteOpRejectedError",
+    "is_two_tier_error",
     "map_pyodps_exception",
     "maps_pyodps_errors",
 ]

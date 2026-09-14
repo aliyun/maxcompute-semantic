@@ -162,6 +162,78 @@ def test_probe_internal_server_error_other_raises() -> None:
         raise AssertionError("expected InternalServerError to propagate")
 
 
+# What pyodps's REST /schemas fallback produces: it runs
+# `SHOW SCHEMAS IN <project>` as a DDL task, and a flat-namespace project
+# answers with the generic ddltask failure.
+_TWO_TIER_DDL_FALLBACK_MESSAGE = (
+    "ODPS-0110061: InstanceId: 20260101000000000aaaaaa000001\n"
+    "ODPS-0110061: Failed to run ddltask - "
+    "odps_metadata/ddlengine/ddl/sql_ddl_action.cpp(4102): ExceptionBase: "
+    "Invalid database operations on two-tier model\n"
+)
+
+
+def _build_two_tier_ddl_error():
+    from odps import errors as odps_errors
+
+    exc = odps_errors.parse_instance_error(_TWO_TIER_DDL_FALLBACK_MESSAGE)
+    # Guard the shape this test exists for: pyodps has no class entry for
+    # ODPS-0110061, so it raises the *base* ODPSError. If a future pyodps
+    # starts typing it, this assert flags that the probe's catch net can
+    # be narrowed back.
+    assert type(exc) is odps_errors.ODPSError
+    return exc
+
+
+def test_probe_2_level_show_schemas_ddl_fallback() -> None:
+    """A 2-level project that answers the schema enumeration with a
+    ddltask failure must still probe as "2".
+
+    Regression: the probe caught only ``InternalServerError`` for the
+    "not 3-tier" wording, so this base-``ODPSError`` shape escaped
+    unclassified and hard-aborted every cold-path verb — and because a
+    failed probe never writes the tier cache, every later call re-probed
+    and re-failed.
+    """
+    odps_mock = MagicMock()
+    odps_mock.list_schemas.side_effect = _build_two_tier_ddl_error()
+    client = _make_client_with_odps(odps_mock)
+    assert _probe(client, _TEST_PROJECT) == "2"
+
+
+def test_probe_2_level_ddl_fallback_written_to_cache(isolated_config) -> None:
+    """The recognized 2-level answer must be cached like any other, so the
+    next command skips the probe."""
+    p = _make_profile()
+    odps_mock = MagicMock()
+    odps_mock.list_schemas.side_effect = _build_two_tier_ddl_error()
+    client = _make_client_with_odps(odps_mock)
+
+    assert get_tier(p, _TEST_PROJECT, client=client) == "2"
+
+    cache_path = tier_cache_path(p.name, _TEST_PROJECT)
+    assert cache_path.exists()
+    assert cache_path.read_text(encoding="utf-8").strip() == "2"
+
+
+def test_probe_unrecognized_odps_error_raises() -> None:
+    """An ``ODPSError`` with no two-tier signature is not guessed at."""
+    from odps import errors as odps_errors
+
+    odps_mock = MagicMock()
+    # Same ODPS code as the two-tier case, different reason for failing.
+    odps_mock.list_schemas.side_effect = odps_errors.ODPSError(
+        "ODPS-0110061: Failed to run ddltask - column count mismatch"
+    )
+    client = _make_client_with_odps(odps_mock)
+    try:
+        _probe(client, _TEST_PROJECT)
+    except odps_errors.ODPSError:
+        pass  # expected
+    else:
+        raise AssertionError("expected ODPSError to propagate")
+
+
 def test_probe_written_to_cache(isolated_config) -> None:
     p = _make_profile()
     odps_mock = MagicMock()

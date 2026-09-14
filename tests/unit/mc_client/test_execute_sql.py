@@ -505,6 +505,47 @@ def test_list_schemas_returns_default_for_2_level_internal_server_error() -> Non
     assert result == ["default"]
 
 
+def test_list_schemas_returns_default_for_2_level_ddl_fallback() -> None:
+    """The other two-tier wording: pyodps's ``SHOW SCHEMAS IN <project>``
+    fallback fails with a generic ddltask error raised as the base
+    ``ODPSError``, which the old ``except InternalServerError`` net missed
+    entirely.
+    """
+    from odps import errors as odps_errors
+
+    c = _make_client()
+    odps_mock = MagicMock()
+    odps_mock.list_schemas.side_effect = odps_errors.parse_instance_error(
+        "ODPS-0110061: InstanceId: 20260101000000000aaaaaa000001\n"
+        "ODPS-0110061: Failed to run ddltask - ExceptionBase: Invalid "
+        "database operations on two-tier model\n"
+    )
+    c._odps = odps_mock
+
+    assert c.list_schemas(project="flat_project") == ["default"]
+
+
+def test_list_schemas_raises_mapped_error_on_unrelated_ddl_failure() -> None:
+    """An ODPS-0110061 that is *not* about the tier stays an error."""
+    from odps import errors as odps_errors
+
+    from maxcompute_semantic.errors import McsError
+
+    c = _make_client()
+    odps_mock = MagicMock()
+    odps_mock.list_schemas.side_effect = odps_errors.ODPSError(
+        "ODPS-0110061: Failed to run ddltask - column count mismatch"
+    )
+    c._odps = odps_mock
+
+    try:
+        c.list_schemas(project="acme")
+    except McsError as exc:
+        assert "column count mismatch" in exc.message
+    else:
+        raise AssertionError("expected McsError to propagate")
+
+
 # ─── list_tables ───
 
 

@@ -15,12 +15,14 @@ The probe itself is a pyodps ``list_schemas(project=<name>)`` call
 against the named project (passed explicitly so a single MaxCompute
 client connection — bound to the AK's compute_project — can
 metadata-query any of the profile's source projects via the standard
-pyodps cross-project metadata API). A ``NotSupportedError`` or
-``InternalServerError`` with "not 3-tier" maps to ``"2"``;
+pyodps cross-project metadata API). A ``NotSupportedError``, or any
+``ODPSError`` whose message :func:`is_two_tier_error` recognizes as the
+"project is flat-namespace" wording, maps to ``"2"``;
 ``NoPermission`` defaults to ``"3"`` with a warning (assume-3-level
 errs on the operationally-safe side because the SQL session's
 ``odps.namespace.schema`` hint is harmless on a 2-level project but
-required on a 3-level project).
+required on a 3-level project). An unrecognized server error is
+re-raised rather than guessed.
 
 The ``MCS_TIER_OVERRIDE`` env-var is the highest-priority pin and
 applies as a global override across all projects the helper is asked
@@ -202,12 +204,18 @@ def _probe(client: MaxComputeClient, project: str) -> str:
 
     - ``NotSupportedError`` from pyodps (the project doesn't have
       the schema-enable flag set on its project-config) → ``"2"``.
-    - ``InternalServerError`` with a message containing "not
-      3-tier" or "not 3 tier" → ``"2"``. This is the historical
-      MaxCompute error format for the "the named project is in the
-      flat-namespace mode" case; the message text varies across
-      MaxCompute service-side versions, hence the two-pattern
-      check.
+    - Any other ``ODPSError`` whose message matches
+      :func:`~maxcompute_semantic.errors.mc.is_two_tier_error` →
+      ``"2"``. That predicate is the single source of truth for the
+      "project is flat-namespace" wording, which it has to be because
+      the server wording depends on which metadata path pyodps took: the
+      historical ``InternalServerError`` carrying "not 3-tier model
+      project", and — when pyodps's REST ``/schemas`` call is unsupported
+      and it falls back to running ``SHOW SCHEMAS IN <project>`` as a DDL
+      task — ``ODPS-0110061: Invalid database operations on two-tier
+      model``, which pyodps raises as the *base* ``ODPSError`` class.
+      Catching only ``InternalServerError`` let that second shape escape
+      the probe unclassified and abort the caller.
     - ``NoPermission`` (the AK doesn't have list-schemas on the
       named project) → ``"3"`` with a warning. The
       assume-3-level-on-ambiguity choice means the SQL session's
@@ -218,8 +226,9 @@ def _probe(client: MaxComputeClient, project: str) -> str:
       operator can manually pin via the ``MCS_TIER_OVERRIDE`` env
       to override the auto-fallback if the project is actually
       2-level.
-    - Any other ``InternalServerError`` is re-raised so the caller
-      surfaces it as a real probe failure.
+    - An ``ODPSError`` with no two-tier signature is re-raised so the
+      caller surfaces it as a real probe failure — the probe never
+      guesses on an unrecognized server error.
     - The success case (the AK can list_schemas and the call
       returns) is "3" if the returned schema list is non-empty,
       "2" if it's empty (which is the corner case of a 3-level
@@ -241,16 +250,13 @@ def _probe(client: MaxComputeClient, project: str) -> str:
         errors as odps_errors,
     )
 
+    from maxcompute_semantic.errors import is_two_tier_error
+
     odps = client._ensure_odps()
     try:
         schemas = list(odps.list_schemas(project=project))
     except odps_errors.NotSupportedError:
         return "2"
-    except odps_errors.InternalServerError as e:
-        msg = str(e).lower()
-        if "not 3-tier" in msg or "not 3 tier" in msg:
-            return "2"
-        raise
     except odps_errors.NoPermission:
         logger.warning(
             "no list-schemas permission on project %r; assuming 3-level "
@@ -259,4 +265,8 @@ def _probe(client: MaxComputeClient, project: str) -> str:
             project,
         )
         return "3"
+    except odps_errors.ODPSError as exc:
+        if is_two_tier_error(exc):
+            return "2"
+        raise
     return "3" if schemas else "2"
