@@ -6,6 +6,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`mcs` no longer fails to start on Python 3.13** (`ModuleNotFoundError: No
+  module named 'typing_extensions'`, reported in #31). 0.18.1 added a
+  module-level `from typing_extensions import Self` in
+  `versioning/lock.py` and `commands/_source_picker.py`, but
+  `typing_extensions` has never been a declared runtime dependency and is
+  not installed on 3.13 by any declared dependency either (`httpx`'s
+  transitive `anyio` requires it only below 3.13). Since that import sits in
+  the CLI's eager import chain, the process died before printing anything —
+  every command, including `mcs --version`. It is now imported under
+  `if TYPE_CHECKING:`, which is sound because both modules use
+  `from __future__ import annotations` and `Self` appears only as a
+  `__enter__` return annotation. 0.18.0 is unaffected; 0.18.1 and 0.18.2
+  break on 3.13.
+- **A declared-runtime-dependency guard so the above cannot recur**
+  (`tests/unit/test_declared_runtime_dependencies.py`). Every third-party
+  module imported at import time must now appear in
+  `[project.dependencies]`. The check scans source rather than imports, so
+  its verdict does not depend on the environment — which matters here,
+  because `uv sync --extra dev` installs mypy, which pulls
+  `typing_extensions`, so no existing test could have noticed the missing
+  declaration. Optional backends (`sentence_transformers`, `sqlite_vec`) are
+  exempt only while their imports stay inside a `try`/`except ImportError`,
+  and the pyproject parse the guard relies on is itself pinned by a test so
+  it cannot silently degrade to a no-op.
+
+### Changed
+
+- **Python 3.13 and 3.14 are now tested and declared supported versions**,
+  and the supported range is explicitly bounded: `requires-python` becomes
+  `">=3.10,<3.15"` with `3.13`/`3.14` classifiers added, and the CI test
+  matrix spans 3.10–3.14. Previously `">=3.10"` had no upper bound while CI
+  tested only 3.10–3.12, so newer interpreters were permitted but never
+  exercised — the mismatch that let #31 reach a user.
+  Note on what the bound enforces: pip refuses an out-of-range install
+  (measured against a `"<3.14,>=3.10"` build: `requires a different Python:
+  3.14.7 not in '<3.14,>=3.10'`), but `uv pip install` and
+  `uv tool install --python <version>` were measured (uv 0.12.13) to install
+  the wheel regardless. The bound is metadata honesty and pip-level
+  protection, not a hard gate for uv users.
+
+### Infrastructure
+
+- **New CI job: clean-install smoke.** Builds the wheel, installs it into a
+  fresh venv carrying only the declared runtime dependencies, and starts the
+  CLI (`import maxcompute_semantic.cli`, `mcs --version`, `mcs --help`) on
+  both ends of the supported range. This is the job that would have caught
+  #31: every other CI job runs `uv sync --extra dev`, whose mypy dependency
+  supplies the very package whose absence broke the wheel. Verified locally
+  against published artifacts — it fails on 0.18.1 and 0.18.2 under Python
+  3.13 and passes on 0.18.0 and this fix.
+
+### Testing
+
+- **`mcs doctor`'s config-permissions test no longer patches the global
+  `os.stat`.** `patch("…doctor.os.stat")` mutates the shared `os` module, so
+  it also rebinds what stdlib calls; Python 3.14's `Path.exists()` routes
+  through `os.stat`, which flipped the check's existence guard to False and
+  turned the expected `warn` into a silent `skip`. The test now rebinds only
+  the `os` name inside the doctor module. No product behavior changed — the
+  underlying check was correct on every version.
+
 ## [0.18.2] — 2026-09-14
 
 ### Fixed
