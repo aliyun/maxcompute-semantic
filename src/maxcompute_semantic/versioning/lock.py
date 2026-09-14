@@ -63,15 +63,20 @@ import threading
 import warnings
 from pathlib import Path
 from types import TracebackType
+from typing import TYPE_CHECKING
 
 from filelock import BaseFileLock, FileLock
 from filelock import Timeout as FileLockTimeout
-from typing_extensions import Self
 
 from maxcompute_semantic.versioning.errors import (
     LockedByOtherProcessError,
     StaleLockClearedWarning,
 )
+
+if TYPE_CHECKING:
+    # Annotation-only; a module-level import needs typing_extensions at
+    # runtime, which is not a declared dependency (issue #31).
+    from typing_extensions import Self
 
 # Suffix for the hidden filelock OS-anchor sibling. ``.mcs-lock``
 # stays as the user-facing PID body file; ``.mcs-lock.flock`` is the

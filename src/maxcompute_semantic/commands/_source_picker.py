@@ -30,13 +30,19 @@ from typing import TYPE_CHECKING, Any
 import click
 import questionary
 from questionary import Style
-from typing_extensions import Self
 
 from maxcompute_semantic.auth.schema import DataSource, TableSpec
 from maxcompute_semantic.errors import is_two_tier_error
 from maxcompute_semantic.mc_client.errors import McsError
 
 if TYPE_CHECKING:
+    # Annotation-only: ``Self`` is stdlib since 3.11 and with PEP 563 the
+    # ``__enter__`` return type is never evaluated at runtime. Importing it at
+    # module scope instead requires declaring typing_extensions as a runtime
+    # dependency — which 0.18.1 did not, and the CLI would not start on
+    # Python 3.13 as a result (issue #31).
+    from typing_extensions import Self
+
     from maxcompute_semantic.mc_client.client import MaxComputeClient
 
 # ── fzf availability ──────────────────────────────────────────────────
