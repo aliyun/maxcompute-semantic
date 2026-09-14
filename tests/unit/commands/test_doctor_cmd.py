@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -190,13 +191,20 @@ class TestLocalConfigChecks:
         original_stat = os.stat
 
         def fail_direct_config_stat(path, *args, **kwargs):
-            if kwargs.get("follow_symlinks") is True:
-                return original_stat(path, *args, **kwargs)
             if Path(path) in {ypath.parent, ypath}:
                 raise OSError("no stat")
             return original_stat(path, *args, **kwargs)
 
-        with patch("maxcompute_semantic.commands.doctor.os.stat", side_effect=fail_direct_config_stat):
+        # Rebind the ``os`` name inside the doctor module instead of
+        # patching ``os.stat``. That attribute lives on the globally shared
+        # ``os`` module, so patching it also rebinds what stdlib calls: on
+        # Python 3.14 ``Path.exists()`` routes through ``os.stat``, so the
+        # check's ``if not ypath.exists()`` guard started answering False and
+        # the expected ``warn`` silently became ``skip``. The check only uses
+        # ``os.stat``.
+        with patch(
+            "maxcompute_semantic.commands.doctor.os", SimpleNamespace(stat=fail_direct_config_stat)
+        ):
             name, status, detail = _check_config_permissions()
 
         assert name == "config_permissions"
