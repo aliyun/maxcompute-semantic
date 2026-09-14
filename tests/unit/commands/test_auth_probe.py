@@ -3,8 +3,9 @@
 
 """Unit tests for commands/_auth_probe._run_auth_test.
 
-Focused on Step 3 (the SELECT 1 probe) — Steps 1 and 2 are covered via
-the wizard integration tests in test_profile_create.py.
+Focused on Step 3 (the SELECT 1 probe) and Step 2's failure attribution —
+the happy paths for both are covered via the wizard integration tests in
+test_profile_create.py.
 
 The fallback was added after a docs review of MaxCompute Query
 Accelerator (MCQA v1 / MaxQA 2.0): the interactive channel needs a
@@ -17,6 +18,7 @@ projects without interactive quota.
 
 from __future__ import annotations
 
+from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from maxcompute_semantic._internal.output import Renderer
@@ -109,3 +111,71 @@ def test_both_channels_fail_returns_exit_code_from_batch() -> None:
 
     assert rc == 7
     assert client.execute_sql.call_count == 2
+
+
+# ─── Step 2 failure attribution ───
+
+
+def _two_tier_ddl_error():
+    """The base ``ODPSError`` pyodps raises when a flat-namespace project
+    answers the tier probe's schema enumeration with a generic ddltask
+    failure (no pyodps class entry exists for ODPS-0110061)."""
+    from odps import errors as odps_errors
+
+    return odps_errors.parse_instance_error(
+        "ODPS-0110061: InstanceId: 20260101000000000aaaaaa000001\n"
+        "ODPS-0110061: Failed to run ddltask - ExceptionBase: Invalid "
+        "database operations on two-tier model\n"
+    )
+
+
+def test_step2_unclassified_pyodps_error_still_reports_step_2(capsys) -> None:
+    """An untyped probe failure must print as a [2/3] failure.
+
+    Step 2 originally caught only ``McsError``, so a raw pyodps
+    ``ODPSError`` escaped ``_run_auth_test`` entirely: the caller saw an
+    anonymous error envelope from the top-level CLI handler with no
+    indication that the tier probe was what died, and no pointer at the
+    ``MCS_TIER_OVERRIDE`` escape hatch.
+    """
+    stderr_buf = StringIO()
+    renderer = Renderer(format="plain", stderr=stderr_buf)
+
+    with (
+        patch("maxcompute_semantic.commands._auth_probe.resolve_credentials"),
+        patch(
+            "maxcompute_semantic.commands._auth_probe.get_tier",
+            side_effect=_two_tier_ddl_error(),
+        ),
+        patch("maxcompute_semantic.commands._auth_probe.MaxComputeClient"),
+    ):
+        rc = _run_auth_test(_profile(), renderer)
+
+    assert rc == 1
+    captured = capsys.readouterr().err
+    assert "[2/3]" in captured
+    assert "probe tier" in captured
+    assert "MCS_TIER_OVERRIDE" in captured
+    # The raw server text survives into the rendered error rather than
+    # being replaced by a generic message.
+    assert "two-tier model" in stderr_buf.getvalue()
+
+
+def test_step2_classified_error_is_not_double_wrapped() -> None:
+    """An already-classified ``McsError`` keeps its own code and exit code."""
+    stderr_buf = StringIO()
+    renderer = Renderer(format="plain", stderr=stderr_buf)
+
+    with (
+        patch("maxcompute_semantic.commands._auth_probe.resolve_credentials"),
+        patch(
+            "maxcompute_semantic.commands._auth_probe.get_tier",
+            side_effect=McsError("project not found", code="ProjectNotFound", exit_code=5),
+        ),
+        patch("maxcompute_semantic.commands._auth_probe.MaxComputeClient"),
+    ):
+        rc = _run_auth_test(_profile(), renderer)
+
+    assert rc == 5
+    rendered = stderr_buf.getvalue()
+    assert "project not found" in rendered

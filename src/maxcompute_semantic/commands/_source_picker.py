@@ -33,6 +33,7 @@ from questionary import Style
 from typing_extensions import Self
 
 from maxcompute_semantic.auth.schema import DataSource, TableSpec
+from maxcompute_semantic.errors import is_two_tier_error
 from maxcompute_semantic.mc_client.errors import McsError
 
 if TYPE_CHECKING:
@@ -713,7 +714,8 @@ def _pick_schema(
 
     Three failure tiers:
     - **2-level project** (the project doesn't have a schema layer at
-      all — MaxCompute returns ``"is not 3-tier model project"``):
+      all — see :func:`~maxcompute_semantic.errors.mc.is_two_tier_error`
+      for the server wordings that mean this):
       auto-pick ``"default"`` without prompting. This is the standard
       MC convention for 2-level projects: bare-table refs land in the
       synthetic ``default`` slot.
@@ -735,8 +737,7 @@ def _pick_schema(
         with _Spinner("Listing schemas..."):
             schemas = client.list_schemas(project=project)
     except McsError as e:
-        msg = e.message
-        if "not 3-tier" in msg or "not a 3-tier" in msg or "is not 3-tier" in msg:
+        if is_two_tier_error(e):
             click.secho(
                 f"  ⓘ {project!r} is a 2-level project (no schema layer). Using 'default' slot.",
                 fg="cyan",
@@ -752,8 +753,7 @@ def _pick_schema(
         )
         return _prompt_schema_name(existing.schema if existing else "default")
     except Exception as e:  # noqa: BLE001 — wizard falls back to manual entry, never crashes
-        msg = str(e)
-        if "not 3-tier" in msg or "not a 3-tier" in msg or "is not 3-tier" in msg:
+        if is_two_tier_error(e):
             click.secho(
                 f"  ⓘ {project!r} is a 2-level project (no schema layer). Using 'default' slot.",
                 fg="cyan",

@@ -517,6 +517,7 @@ class MaxComputeClient:
             errors as odps_errors,
         )
 
+        from maxcompute_semantic.errors import is_two_tier_error
         from maxcompute_semantic.mc_client.errors import map_pyodps_exception
 
         odps = self._ensure_odps()
@@ -525,9 +526,8 @@ class MaxComputeClient:
             return [s.name for s in odps.list_schemas(project=proj)]
         except odps_errors.NotSupportedError:
             return ["default"]
-        except odps_errors.InternalServerError as exc:
-            msg = str(exc).lower()
-            if "not 3-tier" in msg or "not 3 tier" in msg:
+        except odps_errors.ODPSError as exc:
+            if is_two_tier_error(exc):
                 return ["default"]
             raise map_pyodps_exception(exc, source_key=self._source_key(proj, None)) from exc
         except Exception as exc:

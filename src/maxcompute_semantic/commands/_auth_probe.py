@@ -24,7 +24,10 @@ failure, returning the failing exception's ``McsError.exit_code``:
      stuck or missing env var before any network traffic.
   2. ``get_tier`` — the cached "is this 2-level or 3-level?" probe,
      which is also the cheapest possible authenticated metadata
-     call.
+     call. A failure here is reported as a step-2 failure whether or
+     not the probe classified it (see :func:`_classify_probe_failure`),
+     so an unrecognized server error can't escape the step and surface
+     as an anonymous stack dump.
   3. ``execute_sql("SELECT 1", use_interactive=True)`` — confirms the
      AK has session-level access to the compute project. The interactive
      channel (MCQA on legacy projects, MaxQA on post-2025-11 projects)
@@ -55,9 +58,34 @@ import click
 from maxcompute_semantic._internal.output import Renderer
 from maxcompute_semantic.auth.credential import resolve_credentials
 from maxcompute_semantic.auth.schema import Profile
+from maxcompute_semantic.errors import map_pyodps_exception
 from maxcompute_semantic.mc_client.client import MaxComputeClient
 from maxcompute_semantic.mc_client.errors import McsError
 from maxcompute_semantic.mc_client.tier import get_tier
+
+_TIER_PIN_HINT = (
+    "      if the project's tier is known, pin it and skip this probe: "
+    "export MCS_TIER_OVERRIDE=2 (flat namespace) or =3 (schema-enabled)"
+)
+
+
+def _classify_probe_failure(exc: Exception) -> McsError:
+    """Return an McsError for a failed step-2 tier probe, whatever raised.
+
+    ``get_tier`` maps the probe's *recognized* MaxCompute failures to
+    ``McsError`` subclasses, but an unrecognized one — e.g. the bare
+    ``ODPSError`` pyodps raises when a two-tier project answers a schema
+    enumeration with a generic DDL-task failure — propagates untyped. The
+    original handler caught only ``McsError``, so such an error escaped
+    the probe entirely: the ``[2/3]`` line never printed and the user got
+    an anonymous stack dump from the top-level CLI handler instead of a
+    step-attributed failure. Classifying here keeps the diagnosis
+    attached to the step that failed and adds the ``MCS_TIER_OVERRIDE``
+    escape hatch to the output.
+    """
+    if isinstance(exc, McsError):
+        return exc
+    return map_pyodps_exception(exc)
 
 
 def _run_auth_test(profile: Profile, r: Renderer, *, emit_summary: bool = True) -> int:
@@ -105,16 +133,18 @@ def _run_auth_test(profile: Profile, r: Renderer, *, emit_summary: bool = True) 
             click.echo(f"{step(2)} probe tier ({tier}-level) {ok} ({elapsed_ms}ms)")
         results["step2_tier"] = tier
         results["step2_probe_ms"] = elapsed_ms
-    except McsError as e:
+    except Exception as exc:  # noqa: BLE001 — see _classify_probe_failure
+        mapped = _classify_probe_failure(exc)
         if not is_envelope:
             click.echo(
-                f"{step(2)} probe tier                            {fail}  {e.code}", err=True
+                f"{step(2)} probe tier                            {fail}  {mapped.code}", err=True
             )
-            click.echo(f"      {e.message}", err=True)
-            if e.remediation:
-                click.echo(f"      remediation: {e.remediation}", err=True)
-        r.error(e)
-        return e.exit_code
+            click.echo(f"      {mapped.message}", err=True)
+            if mapped.remediation:
+                click.echo(f"      remediation: {mapped.remediation}", err=True)
+            click.echo(_TIER_PIN_HINT, err=True)
+        r.error(mapped)
+        return mapped.exit_code
 
     # Step 3: SELECT 1. The cheapest end-to-end "the AK actually has
     # session permission on this project" check. Prefer the interactive

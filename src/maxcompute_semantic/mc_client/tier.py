@@ -11,16 +11,30 @@ under the profile's data directory's ``tier_cache/`` subdir. The
 file's single-character content (``"2"`` or ``"3"``) is the cached
 probe result.
 
-The probe itself is a pyodps ``list_schemas(project=<name>)`` call
-against the named project (passed explicitly so a single MaxCompute
-client connection — bound to the AK's compute_project — can
-metadata-query any of the profile's source projects via the standard
-pyodps cross-project metadata API). A ``NotSupportedError`` or
-``InternalServerError`` with "not 3-tier" maps to ``"2"``;
+The probe is two-stage (see :func:`_probe`): it first asks the
+``/projects/<name>/schemas`` endpoint directly whether it answers — a
+pure metadata read that submits no SQL instance — and only then falls
+back to a pyodps ``list_schemas(project=<name>)`` enumeration, which is
+the pre-existing mechanism and handles every case stage 1 cannot settle
+definitively. The enumeration is routed through the named project
+(passed explicitly so a single MaxCompute client connection — bound to
+the AK's compute_project — can metadata-query any of the profile's
+source projects via the standard pyodps cross-project metadata API). A
+flat-namespace answer at either stage, recognized by
+:func:`~maxcompute_semantic.errors.mc.is_two_tier_error` because the
+server wording differs by which path it came down, maps to ``"2"``;
 ``NoPermission`` defaults to ``"3"`` with a warning (assume-3-level
 errs on the operationally-safe side because the SQL session's
 ``odps.namespace.schema`` hint is harmless on a 2-level project but
-required on a 3-level project).
+required on a 3-level project). An unrecognized server error is
+re-raised rather than guessed.
+
+The direct-endpoint stage is not an optimization. pyodps's
+``list_schemas`` swallows the accurate ``InvalidParameter: Project <p> is
+not 3-tier model project`` and substitutes a ``SHOW SCHEMAS`` DDL task
+that a two-tier project always rejects, so a probe built on it reports a
+worse error and leaves a failed job in the user's instance list on every
+cold probe.
 
 The ``MCS_TIER_OVERRIDE`` env-var is the highest-priority pin and
 applies as a global override across all projects the helper is asked
@@ -38,7 +52,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from maxcompute_semantic._internal.paths import tier_cache_path
 from maxcompute_semantic.auth.schema import Profile
@@ -192,71 +206,136 @@ def get_tier(
 def _probe(client: MaxComputeClient, project: str) -> str:
     """Live tier probe for one named MaxCompute project.
 
-    Runs ``odps.list_schemas(project=<name>)`` through the given
-    client's pyodps connection. The connection is bound to the AK's
-    compute_project, but pyodps's ``list_schemas`` accepts a
-    ``project=`` keyword that routes the metadata query to any
-    project the AK has Describe-level cross-project access to (the
-    standard MaxCompute cross-project metadata pattern). The
-    return-value-shape contract:
+    Two stages, deliberately in this order:
 
-    - ``NotSupportedError`` from pyodps (the project doesn't have
-      the schema-enable flag set on its project-config) → ``"2"``.
-    - ``InternalServerError`` with a message containing "not
-      3-tier" or "not 3 tier" → ``"2"``. This is the historical
-      MaxCompute error format for the "the named project is in the
-      flat-namespace mode" case; the message text varies across
-      MaxCompute service-side versions, hence the two-pattern
-      check.
-    - ``NoPermission`` (the AK doesn't have list-schemas on the
-      named project) → ``"3"`` with a warning. The
-      assume-3-level-on-ambiguity choice means the SQL session's
-      ``odps.namespace.schema=true`` hint gets injected, which is
-      harmless on a 2-level project (the hint is ignored) but
-      required on a 3-level project (without the hint, the
-      session's bare-table-name references fail to resolve). The
-      operator can manually pin via the ``MCS_TIER_OVERRIDE`` env
-      to override the auto-fallback if the project is actually
-      2-level.
-    - Any other ``InternalServerError`` is re-raised so the caller
-      surfaces it as a real probe failure.
-    - The success case (the AK can list_schemas and the call
-      returns) is "3" if the returned schema list is non-empty,
-      "2" if it's empty (which is the corner case of a 3-level
-      project whose only schemas the AK can see are zero — empty
-      means the AK has list-schemas privilege but the AK's
-      visible-schema-set within the project is empty, which is
-      indistinguishable from the 2-level case where the schema
-      concept doesn't exist, so the conservative default is "2"
-      because the SQL session-hint wouldn't help in either case).
+    1. **Metadata-first.** ``GET {endpoint}/projects/<project>/schemas`` —
+       the schema-collection endpoint itself, asked once whether it
+       answers. This is the question the tier actually is, and it is a
+       pure metadata read: no SQL instance, no DDL task, no logview.
+    2. **Enumeration** (:func:`_probe_by_enumeration`), reached only when
+       the service does not implement the REST schema API at all, or when
+       it answered cleanly and the schema set has to be counted.
+
+    Stage 1 exists because pyodps's ``list_schemas`` cannot be used as a
+    tier probe on its own. ``Schemas.iterate`` is wrapped by
+    ``with_schema_api_fallback``, which catches both ``MethodNotAllowed``
+    (service predates the API — the legacy path genuinely works there)
+    and ``InvalidParameter`` — and the two-tier answer is the latter:
+    ``InvalidParameter: Project <p> is not 3-tier model project``. That is
+    not "the service lacks the API", it is "this project has no schema
+    layer", yet the decorator treats them alike and falls back to
+    ``SHOW SCHEMAS IN <p>``. On a two-tier project that DDL task is
+    guaranteed to fail (``ODPS-0110061: Invalid database operations on
+    two-tier model``, arriving as the base ``ODPSError`` class), so the
+    fallback cannot succeed for the very input that triggers it — it only
+    trades an accurate typed signal for an untyped one, plus a failed job
+    in the user's instance list, and the ``_check_schema_api`` cache skips
+    the REST call on later iterations but not the fallback. Asking the
+    endpoint directly keeps the accurate answer and submits nothing.
+
+    The response body is deliberately not parsed. Stage 1 reads only the
+    *absence* of a tier-naming error; counting schemas goes through
+    pyodps's own deserializer in stage 2 rather than a hand-rolled parse
+    of a payload shape this probe has no reason to pin down.
+
+    Stage 1 is strictly additive: it can only short-circuit the two
+    answers that are already definitive here (flat-namespace → ``"2"``,
+    no-permission → ``"3"``), and every other outcome — API absent, the
+    request rejected for an unrelated reason, a transport failure, even an
+    ``AttributeError`` from a pyodps too old to expose these accessors —
+    defers to stage 2, which is the mechanism that predates this one and
+    still works. Adding stage 1 therefore cannot turn a probe that used to
+    answer into one that fails.
 
     The function returns the single-character tier identifier.
     """
-    # Dual silence: ``import-untyped`` is needed for package-local mypy
-    # (pyodps ships no ``py.typed`` marker), ``unused-ignore`` is needed
-    # for workspace-root mypy (the root ``pyproject.toml`` carries an
-    # ``ignore_missing_imports = true`` override for ``odps.*``, which
-    # pre-silences the import and makes the first code redundant).
     from odps import (  # type: ignore[import-untyped, unused-ignore]
         errors as odps_errors,
     )
 
+    from maxcompute_semantic.errors import is_two_tier_error
+
     odps = client._ensure_odps()
+
+    # ``get_project`` is lazy and ``resource()`` only builds a URL, so
+    # stage 1 costs exactly one HTTP GET. The URL building is inside the
+    # guard on purpose: a pyodps too old to expose these accessors raises
+    # while assembling the call, and that must defer to stage 2 rather
+    # than break a probe that used to work.
+    try:
+        schemas_url = odps.get_project(project).resource() + "/schemas"
+        odps.rest.get(schemas_url, params={"expectmarker": "true"})
+    except Exception as exc:  # noqa: BLE001 — every miss defers to stage 2
+        if is_two_tier_error(exc):
+            return "2"
+        if isinstance(exc, odps_errors.NoPermission):
+            # Enumeration reads the same URL under the same privilege, so
+            # asking it again could only repeat this answer.
+            return _assume_three_level(project, stage="schema endpoint")
+    return _probe_by_enumeration(odps, project)
+
+
+def _assume_three_level(project: str, *, stage: str) -> str:
+    """Apply the assume-3-level-on-no-permission policy from a probe stage.
+
+    ``odps.namespace.schema=true`` — the session hint a ``"3"`` verdict
+    buys — is ignored by a 2-level project but required by a 3-level one,
+    so guessing high is the operationally safe direction. ``MCS_TIER_OVERRIDE=2``
+    pins the other way when the operator knows better.
+    """
+    logger.warning(
+        "no permission to read schemas on project %r (%s); assuming 3-level "
+        "(set MCS_TIER_OVERRIDE=2 to pin to 2-level if the project is "
+        "actually flat-namespace and the AK should fall back).",
+        project,
+        stage,
+    )
+    return "3"
+
+
+def _probe_by_enumeration(odps: Any, project: str) -> str:
+    """Tier verdict from a schema enumeration: the pre-stage-1 mechanism.
+
+    Runs ``odps.list_schemas(project=<name>)``, which the connection bound
+    to the AK's compute_project routes to any project the AK has
+    Describe-level cross-project access to (the standard MaxCompute
+    cross-project metadata pattern).
+
+    Return-value contract:
+
+    - ``NotSupportedError`` (the project doesn't have the schema-enable
+      flag set on its project-config) → ``"2"``.
+    - ``NoPermission`` (the AK can't enumerate schemas here) → ``"3"`` via
+      :func:`_assume_three_level`.
+    - Any other ``ODPSError`` whose message
+      :func:`~maxcompute_semantic.errors.mc.is_two_tier_error` recognizes →
+      ``"2"``. That predicate is the single source of truth for the
+      flat-namespace wording, which it has to be because the wording
+      follows whichever metadata path pyodps took — and the DDL-fallback
+      shape is a base ``ODPSError``, so an ``InternalServerError``-only
+      catch let it escape unclassified and abort the caller.
+    - An ``ODPSError`` with no two-tier signature is re-raised so the
+      caller surfaces it as a real probe failure — the probe never guesses
+      on an unrecognized server error.
+    - Success: ``"3"`` if the schema list is non-empty, ``"2"`` if empty
+      (a 3-level project whose visible-schema set is empty is
+      indistinguishable from the flat-namespace case, and the SQL
+      session-hint helps in neither).
+    """
+    from odps import (  # type: ignore[import-untyped, unused-ignore]
+        errors as odps_errors,
+    )
+
+    from maxcompute_semantic.errors import is_two_tier_error
+
     try:
         schemas = list(odps.list_schemas(project=project))
     except odps_errors.NotSupportedError:
         return "2"
-    except odps_errors.InternalServerError as e:
-        msg = str(e).lower()
-        if "not 3-tier" in msg or "not 3 tier" in msg:
+    except odps_errors.NoPermission:
+        return _assume_three_level(project, stage="enumeration")
+    except odps_errors.ODPSError as exc:
+        if is_two_tier_error(exc):
             return "2"
         raise
-    except odps_errors.NoPermission:
-        logger.warning(
-            "no list-schemas permission on project %r; assuming 3-level "
-            "(set MCS_TIER_OVERRIDE=2 to pin to 2-level if the project is "
-            "actually flat-namespace and the AK should fall back).",
-            project,
-        )
-        return "3"
     return "3" if schemas else "2"
