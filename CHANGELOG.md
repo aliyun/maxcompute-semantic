@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.18.3] — 2026-09-14
+
 ### Fixed
 
 - **`mcs` no longer fails to start on Python 3.13** (`ModuleNotFoundError: No
