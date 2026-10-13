@@ -1,0 +1,285 @@
+{
+  "benchmarks": {
+    "native_json": "{\"questions\":[{\"id\":\"q1\",\"status\":\"ACTIVE\",\"question\":\"synthetic\",\"expectedSemantics\":{\"metricName\":\"gmv\",\"dimensionNames\":[\"country\"],\"timeWindow\":{\"type\":\"ROLLING_DAYS\",\"value\":1},\"dimensionFilters\":[{\"dimensionName\":\"country\",\"op\":\"EQ\",\"value\":\"A\"}]},\"expectedSql\":\"select 1\",\"expectedResultMatchMode\":\"NONE\",\"tags\":[\"synthetic\"]}]}",
+    "snapshot": {
+      "content": {
+        "questions": [
+          {
+            "expectedResultMatchMode": "NONE",
+            "expectedSemantics": {
+              "dimensionFilters": [
+                {
+                  "dimensionName": "country",
+                  "op": "EQ",
+                  "value": "A"
+                }
+              ],
+              "dimensionNames": [
+                "country"
+              ],
+              "metricName": "gmv",
+              "timeWindow": {
+                "type": "ROLLING_DAYS",
+                "value": 1
+              }
+            },
+            "expectedSql": "select 1",
+            "id": "q1",
+            "question": "synthetic",
+            "status": "ACTIVE",
+            "tags": [
+              "synthetic"
+            ]
+          }
+        ]
+      },
+      "content_hash": "sha256:447150e7347cc4d6d17f9826fc1d2b13c734661f6449ec2a06908ac359cb4bdb",
+      "present": true,
+      "section": "benchmarks",
+      "size_bytes": 335
+    }
+  },
+  "dataReferences": {
+    "native_json": "[{\"project\":\"warehouse\",\"schema\":\"default\",\"table\":\"orders\",\"tableId\":\"table-1\"}]",
+    "snapshot": {
+      "content": [
+        {
+          "project": "warehouse",
+          "schema": "default",
+          "table": "orders",
+          "tableId": "table-1"
+        }
+      ],
+      "content_hash": "sha256:33a5b88c2363a4a6844737b448d2b77f8a572ee7a719af5b2d41012e7940d0d9",
+      "present": true,
+      "section": "dataReferences",
+      "size_bytes": 81
+    }
+  },
+  "futureModel": {
+    "native_json": "{\"logicalTables\":[{\"name\":\"orders\",\"baseTable\":\"warehouse.default.orders\"}],\"serverExtension\":{\"a\":{\"a\":\"first\",\"z\":\"last\"},\"z\":\"last\"}}",
+    "snapshot": {
+      "content": {
+        "logicalTables": [
+          {
+            "baseTable": "warehouse.default.orders",
+            "name": "orders"
+          }
+        ],
+        "serverExtension": {
+          "a": {
+            "a": "first",
+            "z": "last"
+          },
+          "z": "last"
+        }
+      },
+      "content_hash": "sha256:91f6471bb19eac4b20726c85d2ca3cc00f9a99d67c81d16a6003e40883b2561e",
+      "present": true,
+      "section": "futureModel",
+      "size_bytes": 136
+    }
+  },
+  "glossary": {
+    "native_json": "[{\"term\":\"业务\",\"definition\":\"synthetic\",\"alsoKnownAs\":[\"term\"],\"applicableTables\":[\"orders\"],\"linkedMetric\":\"gmv\",\"usage\":\"synthetic\"}]",
+    "snapshot": {
+      "content": [
+        {
+          "alsoKnownAs": [
+            "term"
+          ],
+          "applicableTables": [
+            "orders"
+          ],
+          "definition": "synthetic",
+          "linkedMetric": "gmv",
+          "term": "业务",
+          "usage": "synthetic"
+        }
+      ],
+      "content_hash": "sha256:8fb8320d5fd650802c9fe3714a17f26150f3f45eddae100101f55bd240c57d90",
+      "present": true,
+      "section": "glossary",
+      "size_bytes": 138
+    }
+  },
+  "instructions": {
+    "native_json": "{\"generalGuidance\":\"synthetic \\u003c\\u0026\\u003e\",\"defaultFilters\":[{\"scope\":\"TABLE\",\"table\":\"orders\",\"sqlFragment\":\"paid = true\",\"description\":\"synthetic\"}],\"businessRules\":[{\"id\":\"r1\",\"description\":\"synthetic\",\"affectedMetrics\":[\"gmv\"]}]}",
+    "snapshot": {
+      "content": {
+        "businessRules": [
+          {
+            "affectedMetrics": [
+              "gmv"
+            ],
+            "description": "synthetic",
+            "id": "r1"
+          }
+        ],
+        "defaultFilters": [
+          {
+            "description": "synthetic",
+            "scope": "TABLE",
+            "sqlFragment": "paid = true",
+            "table": "orders"
+          }
+        ],
+        "generalGuidance": "synthetic \u003c\u0026\u003e"
+      },
+      "content_hash": "sha256:1d9ea3317b5d4130e80f78d9c49071422accb7095a047ae9d28fc8e3d6301b1e",
+      "present": true,
+      "section": "instructions",
+      "size_bytes": 240
+    }
+  },
+  "metricDefinitions": {
+    "native_json": "[{\"name\":\"gmv\",\"description\":\"synthetic\",\"semanticType\":\"MEASURE\",\"baseLogicalTable\":\"orders\",\"expr\":\"amount\",\"dataType\":\"DOUBLE\",\"defaultAggregation\":\"SUM\",\"format\":{\"type\":\"NUMBER\",\"decimalPlaces\":2,\"thousandsSeparator\":true}},{\"name\":\"ratio\",\"semanticType\":\"CALCULATED_METRIC\",\"derivedMetric\":{\"formula\":\"gmv / count\",\"refMetrics\":[\"gmv\",\"count\"],\"resultDataType\":\"DOUBLE\"}}]",
+    "snapshot": {
+      "content": [
+        {
+          "baseLogicalTable": "orders",
+          "dataType": "DOUBLE",
+          "defaultAggregation": "SUM",
+          "description": "synthetic",
+          "expr": "amount",
+          "format": {
+            "decimalPlaces": 2,
+            "thousandsSeparator": true,
+            "type": "NUMBER"
+          },
+          "name": "gmv",
+          "semanticType": "MEASURE"
+        },
+        {
+          "derivedMetric": {
+            "formula": "gmv / count",
+            "refMetrics": [
+              "gmv",
+              "count"
+            ],
+            "resultDataType": "DOUBLE"
+          },
+          "name": "ratio",
+          "semanticType": "CALCULATED_METRIC"
+        }
+      ],
+      "content_hash": "sha256:d263630d4a79dbe9093cf0e66dad23fe5d04cbd389d07148718938fbfc5caa3b",
+      "present": true,
+      "section": "metricDefinitions",
+      "size_bytes": 378
+    }
+  },
+  "semanticModel": {
+    "native_json": "{\"logicalTables\":[{\"name\":\"orders\",\"baseTable\":\"warehouse.default.orders\",\"primaryKey\":{\"columns\":[\"id\"]},\"dimensions\":[{\"name\":\"country\",\"expr\":\"country\",\"dataType\":\"STRING\",\"description\":\"synthetic \\u003c\\u0026\\u003e\\u2028\",\"enumValues\":[{\"value\":\"A\",\"labelCn\":\"甲\"}]}],\"timeDimensions\":[{\"name\":\"date\",\"expr\":\"date\",\"dataType\":\"DATE\"}]}],\"namedFilters\":[{\"name\":\"paid\",\"sqlFragment\":\"paid = true\",\"applicableTables\":[\"orders\"]}],\"approvedRelationships\":[{\"name\":\"owner\",\"leftTable\":\"orders\",\"rightTable\":\"customers\",\"relationshipColumns\":[{\"leftColumn\":\"owner_id\",\"rightColumn\":\"id\"}],\"sourceDetail\":{\"type\":\"MANUAL\",\"confidence\":0.9}}]}",
+    "snapshot": {
+      "content": {
+        "approvedRelationships": [
+          {
+            "leftTable": "orders",
+            "name": "owner",
+            "relationshipColumns": [
+              {
+                "leftColumn": "owner_id",
+                "rightColumn": "id"
+              }
+            ],
+            "rightTable": "customers",
+            "sourceDetail": {
+              "confidence": 0.9,
+              "type": "MANUAL"
+            }
+          }
+        ],
+        "logicalTables": [
+          {
+            "baseTable": "warehouse.default.orders",
+            "dimensions": [
+              {
+                "dataType": "STRING",
+                "description": "synthetic \u003c\u0026\u003e\u2028",
+                "enumValues": [
+                  {
+                    "labelCn": "甲",
+                    "value": "A"
+                  }
+                ],
+                "expr": "country",
+                "name": "country"
+              }
+            ],
+            "name": "orders",
+            "primaryKey": {
+              "columns": [
+                "id"
+              ]
+            },
+            "timeDimensions": [
+              {
+                "dataType": "DATE",
+                "expr": "date",
+                "name": "date"
+              }
+            ]
+          }
+        ],
+        "namedFilters": [
+          {
+            "applicableTables": [
+              "orders"
+            ],
+            "name": "paid",
+            "sqlFragment": "paid = true"
+          }
+        ]
+      },
+      "content_hash": "sha256:82137fb89b4203b4d7a70901c33a981a5d996e851db22690c8bd8b46a89a0f66",
+      "present": true,
+      "section": "semanticModel",
+      "size_bytes": 641
+    }
+  },
+  "verifiedQueries": {
+    "native_json": "[{\"name\":\"sample\",\"question\":\"synthetic fixture\",\"matchPolicy\":{\"requireExactQuestion\":true,\"similarityThreshold\":0.75,\"fallbackOnMiss\":\"NONE\"},\"sql\":\"select 1\",\"parameters\":[{\"name\":\"value\",\"type\":\"STRING\",\"required\":false,\"constraints\":{\"minValue\":0.000001,\"maxValue\":10,\"pattern\":\"synthetic\",\"nullable\":true}}],\"trusted\":true,\"verifiedAt\":1234,\"provenance\":\"SYNTHETIC_FIXTURE\",\"costEstimate\":{\"method\":\"STATIC\",\"complexity\":1e-7,\"udf\":0,\"inputBytes\":12,\"reference\":false}}]",
+    "snapshot": {
+      "content": [
+        {
+          "costEstimate": {
+            "complexity": 1e-7,
+            "inputBytes": 12,
+            "method": "STATIC",
+            "reference": false,
+            "udf": 0
+          },
+          "matchPolicy": {
+            "fallbackOnMiss": "NONE",
+            "requireExactQuestion": true,
+            "similarityThreshold": 0.75
+          },
+          "name": "sample",
+          "parameters": [
+            {
+              "constraints": {
+                "maxValue": 10,
+                "minValue": 0.000001,
+                "nullable": true,
+                "pattern": "synthetic"
+              },
+              "name": "value",
+              "required": false,
+              "type": "STRING"
+            }
+          ],
+          "provenance": "SYNTHETIC_FIXTURE",
+          "question": "synthetic fixture",
+          "sql": "select 1",
+          "trusted": true,
+          "verifiedAt": 1234
+        }
+      ],
+      "content_hash": "sha256:20f685291d3ea1c69849274805b69cfde54c7f71acffecbc0a968acdf9cfd864",
+      "present": true,
+      "section": "verifiedQueries",
+      "size_bytes": 476
+    }
+  }
+}

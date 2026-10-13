@@ -26,6 +26,8 @@ AI Agent 能调用 MaxCompute，但它不了解你的数仓。它会猜表名、
 - **记忆** - 验证过的查询、失败模式和领域笔记会随使用积累。相似问题可以复用跑通过的 SQL。
 - **SQL 护栏** - 费用估算、写保护、方言审查、tier 感知的 schema 解析，会在 SQL 到达 MaxCompute 前先跑一遍。
 - **Agent 接入** - 内置 skill 支持 Claude Code、Cursor、Codex、Gemini CLI、Qwen Code、OpenCode 等平台。
+- **共享语义** - 通过 MCP 连接已有 SemanticSpec，读取完整版本，审查本地改动后更新草稿。
+- **本地知识** - 管理 Markdown 和有来源的关系，按确认状态查看依赖路径与影响范围。
 
 ## 工作方式
 
@@ -96,10 +98,40 @@ mcs memory verify --question "上个月订单 GMV 同比怎么样" --sql "SELECT
 
 agent 会引导 profile 配置、绑定当前目录，并运行 `mcs build`。
 
+## 共享语义与本地知识
+
+本地知识库可以独立使用，无需 MaxCompute profile 或认证：
+
+```bash
+mcs knowledge init
+mcs knowledge ingest ./knowledge --scope sales
+mcs -f json knowledge search "活跃客户"
+mcs graph check
+```
+
+读取已有的服务端 SemanticSpec 时，单独配置 MCP 连接。`MCP_URL`、`MCP_REGION`
+使用自己的网关地址和路由 Region；OAuth 与 MaxCompute AK profile 分开：
+
+```bash
+mcs remote add team --mcp-url "$MCP_URL" --region "$MCP_REGION"
+mcs remote login team
+mcs package bind-remote team --name sales --workspace .mcs-remote
+mcs package pull --source PUBLISHED --workspace .mcs-remote
+mcs package export-semantic --output sales.snapshot.json --workspace .mcs-remote
+mcs knowledge ingest-semantic sales.snapshot.json
+```
+
+Markdown 中声明的知识和推断关系先成为候选。图路径表示记录的关联，回答问题时还要核对来源。
+共享时先生成投影，再审查完整草稿 diff，发布是单独一步。操作步骤和当前限制见
+[共享语义与知识工作流](docs/remote-semantic-knowledge.md)；Agent 可加载
+`mcs skill get knowledge` 或 `mcs skill get remote`。
+
 ## 安全与隐私
 
 - `mcs` 把 profile 和语义包存放在本地。语义包是 SQLite + markdown，不是托管服务。
 - 凭证保存在 profile 配置里。AK 可以用环境变量引用，不必写死明文。
+- MCP 连接使用独立的 OAuth 凭证，或明确指定的 bearer 环境变量。本地知识命令不解析
+  MaxCompute 凭证；共享时发送选中的原生语义 section，不上传整个知识库。
 - `mcs build` 只读取 profile 中声明的数据源；可选采样也只作用于这些表。
 - `mcs sql cost`、`mcs sql review` 和写保护会在执行前拦截高费用或不安全 SQL。
 - Agent 通过 `mcs` 这道闸门访问 MaxCompute，不需要在 profile 之外单独拿 MaxCompute 凭证。
@@ -119,6 +151,9 @@ agent 会引导 profile 配置、绑定当前目录，并运行 `mcs build`。
 | **召回** | `mcs memory recall '<q>'` | BM25 搜索已验证的 SQL + 笔记 |
 | **指标** | `mcs metric add ...` | 定义可复用的业务指标 |
 | **建议** | `mcs package propose --from-suggestions` | 把构建建议转成可审查的 package 变更 |
+| **共享语义** | `mcs remote ...` / `mcs package pull` | 通过 MCP 读取版本化 SemanticSpec |
+| **知识库** | `mcs knowledge ...` | 导入、搜索、审查和投影本地证据 |
+| **关系分析** | `mcs graph ...` | 查看有界路径、依赖和影响范围 |
 | **UDF** | `mcs udf ...` | 列出、查看、创建、测试和删除 UDF |
 | **诊断** | `mcs doctor` | 诊断 profile / 认证 / skill 状态 |
 

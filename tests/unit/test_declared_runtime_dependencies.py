@@ -56,27 +56,35 @@ _OPTIONAL_IMPORT_ROOTS = frozenset({"sentence_transformers", "sqlite_vec"})
 _STDLIB = set(sys.stdlib_module_names)
 
 
-def _declared_import_roots() -> set[str]:
+def _declared_import_roots(path: Path = PYPROJECT) -> set[str]:
     """Top-level import names of every runtime dependency.
 
-    Read with a regex rather than ``tomllib``: ``tomllib`` is 3.11+ and this
-    project supports 3.10, and a dependency guard that itself needs an
-    unavailable module would be the very bug it exists to catch. The parse is
-    pinned by :func:`test_declared_dependency_parse_is_not_vacuous` so a
-    broken pattern cannot silently downgrade the guard to a no-op.
+    Use the TOML parser so extras in a quoted requirement cannot terminate
+    the dependency array. Python 3.10 uses the explicitly declared dev-only
+    tomli backport; this test is not part of the runtime wheel import chain.
     """
-    text = PYPROJECT.read_text(encoding="utf-8")
-    project_block = re.search(r"^\[project\]\n(.*?)^\[", text, re.DOTALL | re.MULTILINE)
-    deps_block = re.search(
-        r"^dependencies = \[(.*?)\]", project_block.group(1) if project_block else "", re.DOTALL | re.MULTILINE
-    )
-    specs = re.findall(r'"([^"]+)"', deps_block.group(1) if deps_block else "")
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib
+    text = path.read_text(encoding="utf-8")
+    specs = tomllib.loads(text).get("project", {}).get("dependencies", [])
     roots: set[str] = set()
     for spec in specs:
         dist = re.split(r"[<>=!~;\[ ]", spec.strip(), maxsplit=1)[0].strip().lower()
         dist = dist.replace("-", "_")
         roots.add(_IMPORT_ALIASES.get(dist, dist))
     return roots
+
+
+def test_dependency_parser_preserves_requirements_after_extras(tmp_path: Path) -> None:
+    project = tmp_path / "pyproject.toml"
+    project.write_text('''[project]
+dependencies = ["httpx2[socks]>=2.13.1", "sqlglot>=25", "ruamel.yaml>=0.18"]
+[project.optional-dependencies]
+dev = ["not_a_runtime_dependency>=1"]
+''')
+    assert _declared_import_roots(project) == {"httpx2", "sqlglot", "ruamel"}
 
 
 def _imports_of(test: ast.expr) -> list[str]:

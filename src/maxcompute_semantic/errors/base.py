@@ -30,9 +30,13 @@ class ErrorCode(str, Enum):
     """
 
     UNKNOWN = "Unknown"
+    KNOWLEDGE = "KnowledgeError"
+    REMOTE = "RemoteError"
+    SEMANTIC_SYNC = "SemanticSyncError"
 
     # Auth / identity (typically exit 4)
     AUTH_FAILED = "AuthFailed"
+    REMOTE_AUTH_BUSY = "RemoteAuthBusy"
     AUTH_BINARY_MISSING = "AuthBinaryMissing"
     IDENTITY_NOT_AUTHORIZED = "IdentityNotAuthorized"
     WHO_AM_I_FAILED = "WhoAmIFailed"

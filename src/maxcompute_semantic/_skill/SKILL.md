@@ -1,6 +1,6 @@
 ---
 name: maxcompute-semantic
-description: 'Use when the user wants to run SQL against Alibaba Cloud MaxCompute (ODPS), inspect MaxCompute schemas, build or maintain a semantic package, enrich package semantics, manage MaxCompute UDFs, or record verified/failed SQL memory through the `mcs` CLI.'
+description: 'Use for MaxCompute SQL, schema and local semantic packages, query memory, UDFs, local document knowledge and evidence relations, or shared SemanticSpec through MCP with the mcs CLI.'
 ---
 
 # maxcompute-semantic
@@ -16,6 +16,8 @@ load the runtime workflow that matches the task:
 | Review / apply annotation suggestions, semantic-package proposals, or enrich semantics | `mcs skill get enrich` |
 | Create, link, edit, or diagnose profiles | `mcs skill get onboarding` |
 | Record or recall verified / failed SQL | `mcs skill get memory` |
+| Ingest local documents / review knowledge relations / trace dependencies or impact / project selected knowledge | `mcs skill get knowledge` |
+| Connect MCP with OAuth / pull shared SemanticSpec / review, update or publish its exact revision | `mcs skill get remote` |
 | Create or manage MaxCompute UDFs | `mcs skill get udf` |
 | File an upstream bug / issue against this skill | `mcs skill get report-issue` |
 
@@ -39,3 +41,6 @@ mcs skill catalog          # list available runtime workflows
 mcs skill get query        # load the query workflow
 mcs skill get query --full # include references
 ```
+
+The knowledge workflow operates locally without MaxCompute authentication.
+The remote workflow has its own MCP authentication and revision-bound writes.

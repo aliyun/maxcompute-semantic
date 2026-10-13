@@ -637,14 +637,53 @@ def phase_column_profiling(
 
 
 def _normalize_signature(sql: str) -> str:
-    """Normalize SQL for dedup: lowercase, collapse whitespace, strip comments."""
-    # Remove single-line comments.
-    sql = re.sub(r"--.*$", "", sql, flags=re.MULTILINE)
-    # Remove multi-line comments.
-    sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
-    # Collapse whitespace.
-    sql = re.sub(r"\s+", " ", sql).strip().lower()
-    return sql
+    """Build exact token identity without modifying literals or quoted names.
+
+    The dialect tokenizer discards ordinary comments and formatting, while
+    keeping optimizer hints as tokens. Only recognized keyword spellings are
+    case-normalized; every other token retains its original source text. This
+    is separate from the literal-insensitive shape used by sample SQL storage.
+    """
+    # Lazy: preserve the existing CLI import boundary for the SQL dialect.
+    from maxcompute_semantic.dialect import MaxCompute
+
+    tokenizer = MaxCompute.Tokenizer()
+    identity: list[tuple[str, str]] = []
+    for token in tokenizer.tokenize(sql):
+        spelling = sql[token.start : token.end + 1]
+        keyword = token.text.upper()
+        if tokenizer.KEYWORDS.get(keyword) == token.token_type:
+            spelling = keyword
+        identity.append((token.token_type.name, spelling))
+    return json.dumps(identity, ensure_ascii=False)
+
+
+def _history_table_names(sql: str) -> set[str]:
+    """Resolve physical references across all statements without promoting CTEs."""
+    # Lazy: SQL helpers must stay off the CLI startup chain.
+    from sqlglot import ErrorLevel, errors, exp
+    from sqlglot.optimizer.normalize_identifiers import normalize_identifiers
+    from sqlglot.optimizer.scope import Scope, traverse_scope
+
+    from maxcompute_semantic.dialect import parse_mc
+
+    statements = parse_mc(sql, error_level=ErrorLevel.RAISE)
+    if not any(statement is not None for statement in statements):
+        raise errors.ParseError("history SQL contains no parsed statements")
+    names: set[str] = set()
+    for statement in statements:
+        if statement is None:
+            continue
+        if any(isinstance(node, exp.Command) for node in statement.walk()):
+            raise errors.ParseError("history SQL contains unsupported command syntax")
+        normalized = normalize_identifiers(statement, dialect="maxcompute")
+        tables = {id(table): table for table in normalized.find_all(exp.Table)}
+        for scope in traverse_scope(normalized):
+            for node, source in scope.selected_sources.values():
+                if isinstance(source, Scope):
+                    tables.pop(id(node), None)
+        names.update(table.name.lower() for table in tables.values() if table.name)
+    return names
 
 
 def phase_mine_history(
@@ -710,44 +749,36 @@ def phase_mine_history(
             },
         )
 
-    # Build the source-table set (lowercase, for case-insensitive
-    # comparison against sqlglot-extracted bare table names) plus a
-    # case-preserving lookup so attribution keys match what the rest
-    # of PackageDB stores. Also build a regex fallback used only when
-    # sqlglot fails to parse an SQL string (sort longest-first so
-    # multi-word table names match first).
+    # Keep a case-preserving lookup for the source's physical table names.
     allowed_lower = {name.lower() for name in table_names_in_db}
     canonical_by_lower = {name.lower(): name for name in table_names_in_db}
-    table_pattern = "|".join(sorted(table_names_in_db, key=len, reverse=True))
-    table_re = re.compile(rf"\b({table_pattern})\b", re.IGNORECASE)
 
     # Extract mined sample-SQL candidates. These are successful historical
     # SQL tasks, not user-confirmed verified queries. Keep literal variants
     # so the persistence layer can aggregate frequency by normalized shape.
     sample_sql_candidates: dict[str, list[str]] = {}
     seen_exact_by_table: dict[str, set[str]] = {}
+    unresolved_sql_candidates: list[dict[str, str]] = []
+
+    from sqlglot import errors
 
     for row in rows:
         operation_text = row.get("operation_text", "")
         if not operation_text:
             continue
 
-        # sqlglot-based attribution: only count true ``exp.Table`` refs,
-        # not string literals / comments / column names that happen to
-        # collide with a source table name. On parse error, fall back
-        # to the regex (MaxCompute has non-standard syntax sqlglot
-        # occasionally rejects — losing those SQLs entirely would
-        # silently shrink mining coverage).
-        # Lazy: sql_pattern pulls sqlglot + the dialect package, which
-        # must stay off the CLI startup chain.
-        from maxcompute_semantic.memory.sql_pattern import analyze_sql_pattern
-
-        pattern = analyze_sql_pattern(operation_text)
-        if pattern.parse_error:
-            matched_tables = list(set(table_re.findall(operation_text)))
-        else:
-            matched_lower = set(pattern.tables) & allowed_lower
-            matched_tables = [canonical_by_lower[lc] for lc in matched_lower]
+        # Incomplete parsing cannot establish physical table references. Keep
+        # the raw candidate and failure visible, without a textual fallback.
+        try:
+            physical_tables = _history_table_names(operation_text)
+            exact_sig = _normalize_signature(operation_text)
+        except errors.SqlglotError as exc:
+            unresolved_sql_candidates.append(
+                {"sql": operation_text, "parse_error": str(exc)}
+            )
+            continue
+        matched_lower = physical_tables & allowed_lower
+        matched_tables = [canonical_by_lower[lc] for lc in sorted(matched_lower)]
 
         for table in matched_tables:
             table_row = db.get_table(sk, table)
@@ -766,7 +797,6 @@ def phase_mine_history(
             ):
                 continue
 
-            exact_sig = _normalize_signature(operation_text)
             seen_for_table = seen_exact_by_table.setdefault(table, set())
             if exact_sig in seen_for_table:
                 continue
@@ -774,13 +804,21 @@ def phase_mine_history(
 
             sample_sql_candidates.setdefault(table, []).append(operation_text)
 
+    warnings = []
+    if unresolved_sql_candidates:
+        warnings.append(
+            f"History mining left {len(unresolved_sql_candidates)} SQL candidates unresolved; "
+            "no table attribution was applied to them"
+        )
     return PhaseResult(
-        status="success",
+        status="partial_failure" if unresolved_sql_candidates else "success",
         data={
             "sample_sql_candidates": sample_sql_candidates,
             "verified_queries": sample_sql_candidates,
+            "unresolved_sql_candidates": unresolved_sql_candidates,
             "info_schema_source": info_source,
         },
+        warnings=warnings,
     )
 
 

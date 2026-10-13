@@ -20,7 +20,7 @@ class ErrorDetail:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "code": self.code,
+            "code": str(self.code),
             "message": self.message,
             "remediation": self.remediation,
             "context": self.context,

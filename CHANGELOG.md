@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- MCP connections with native OAuth or bearer environment references, separate
+  from MaxCompute profiles. Version-bound SemanticSpec workspaces support pull,
+  complete-section diffs, reviewed USER_DRAFT updates, native snapshot export,
+  and explicitly confirmed publication with read-back checks.
+- Local Markdown knowledge and evidence graphs: search, stable identities,
+  immutable source versions, candidate review, conflict/stale detection,
+  bounded paths, dependency impact, retraction, and JSON import/export.
+- Explicit bridges from existing local packages and remote SemanticSpec
+  snapshots into knowledge, and from selected confirmed knowledge into typed
+  section previews. Projection reports expose unmapped items and evidence gaps;
+  staging remains local, and local query verification does not elevate remote
+  query trust. New `knowledge` and `remote` runtime skills explain these flows.
+
+### Fixed
+
+- Historical SQL mining preserves literal values, literal case, quoted
+  identifiers, and the original query content when distinguishing candidates.
+  Parsing failures remain visible as unresolved candidates with warnings and
+  partial status; textual matching does not assign them to guessed tables.
+
+### Limitations
+
+- First USER_DRAFT writes are blocked until the server supplies an atomic
+  object-ID guard. Bootstrap and review an existing draft on the server before
+  using `mcs package push --apply`. Publication requires all seven sections at
+  the same reviewed USER_DRAFT revision.
+- Local relation paths are recorded assertions, not factual proof. The new
+  knowledge workflow does not call models or compile local metric expressions
+  into server metrics.
+
 ## [0.18.3] — 2026-09-14
 
 ### Fixed

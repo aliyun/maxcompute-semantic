@@ -1,0 +1,38 @@
+{
+  "auth": "existing Aliyun OAuth gateway_jwt",
+  "backend_auth": "caller-bound OBO",
+  "gateway": "loopback existing gateway",
+  "region": "cn-shanghai",
+  "remote_mutations": 0,
+  "completed": true,
+  "section_count": 7,
+  "present_sections": [
+    "dataReferences",
+    "semanticModel",
+    "metricDefinitions",
+    "verifiedQueries",
+    "glossary"
+  ],
+  "absent_sections": [
+    "instructions",
+    "benchmarks"
+  ],
+  "all_content_hashes_verified": true,
+  "snapshot_revision_pinned": true,
+  "projected_nodes": 101,
+  "projected_edges": 84,
+  "projected_evidence": 118,
+  "stored_edges": 75,
+  "knowledge_check_ok": true,
+  "knowledge_issue_kinds": [
+    "isolated_node"
+  ],
+  "knowledge_roundtrip_check_ok": true,
+  "knowledge_sources_retained": true,
+  "diff_read_only": true,
+  "diff_sections": 7,
+  "diff_conflict_count": 0,
+  "diff_ready": true,
+  "recorded_at_utc": "2026-10-13T04:58:54.733099+00:00",
+  "scope": "read-only; no real definitions, identities or credentials retained"
+}

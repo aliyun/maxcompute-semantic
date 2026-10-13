@@ -35,6 +35,10 @@ question.
   tier-aware schema resolution run before the query reaches MaxCompute.
 - **Agent integration** - the packaged skill works with Claude Code, Cursor,
   Codex, Gemini CLI, Qwen Code, OpenCode, and many other agent platforms.
+- **Shared semantics** - connect to an existing SemanticSpec through MCP,
+  inspect complete revisions, and review local changes before updating a draft.
+- **Local knowledge** - search Markdown and recorded relations with pinned
+  evidence, review states, dependency paths, and impact analysis.
 
 ## How it works
 
@@ -115,12 +119,44 @@ your business scenario:
 The agent will guide profile setup, bind the working directory, and run
 `mcs build`.
 
+## Shared semantics and local knowledge
+
+The knowledge database works without a MaxCompute profile or authentication:
+
+```bash
+mcs knowledge init
+mcs knowledge ingest ./knowledge --scope sales
+mcs -f json knowledge search "active customer"
+mcs graph check
+```
+
+To read an existing shared SemanticSpec, configure its MCP connection separately
+from your MaxCompute AK profile. Supply your gateway URL and routing region:
+
+```bash
+mcs remote add team --mcp-url "$MCP_URL" --region "$MCP_REGION"
+mcs remote login team
+mcs package bind-remote team --name sales --workspace .mcs-remote
+mcs package pull --source PUBLISHED --workspace .mcs-remote
+mcs package export-semantic --output sales.snapshot.json --workspace .mcs-remote
+mcs knowledge ingest-semantic sales.snapshot.json
+```
+
+Markdown declarations and inferred relationships start as candidates. A graph
+path records associations; inspect the evidence before using it as an answer.
+Sharing uses an explicit projection, an exact draft diff, and a separate publish
+step. See [the workflow and current limits](docs/remote-semantic-knowledge.md),
+or load `mcs skill get knowledge` / `mcs skill get remote`.
+
 ## Safety and privacy
 
 - `mcs` stores profiles and semantic packages locally. The semantic package is
   SQLite + markdown, not a hosted service.
 - Credentials stay in your profile configuration. You can store AK values as
   environment-variable references instead of literals.
+- MCP connections use their own OAuth credentials or an explicitly named bearer
+  environment variable. Local knowledge commands do not resolve MC credentials;
+  sharing sends selected native semantic sections, not the knowledge database.
 - `mcs build` reads metadata and optional samples only for the sources you put
   in the profile.
 - `mcs sql cost`, `mcs sql review`, and write protection are designed to catch
@@ -143,6 +179,9 @@ The agent will guide profile setup, bind the working directory, and run
 | **Recall** | `mcs memory recall '<q>'` | BM25 search across verified SQL + notes |
 | **Metrics** | `mcs metric add ...` | Define reusable business metrics |
 | **Proposals** | `mcs package propose --from-suggestions` | Turn build suggestions into reviewable package changes |
+| **Shared semantics** | `mcs remote ...` / `mcs package pull` | Read versioned SemanticSpec through MCP |
+| **Knowledge** | `mcs knowledge ...` | Ingest, search, review, and project local evidence |
+| **Relations** | `mcs graph ...` | Inspect bounded paths, dependencies, and impact |
 | **UDFs** | `mcs udf ...` | List, inspect, create, test, and remove UDFs |
 | **Doctor** | `mcs doctor` | Diagnose profile / auth / skill state |
 

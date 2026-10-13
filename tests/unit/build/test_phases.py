@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from maxcompute_semantic.auth.schema import AkAuth, DataSource, Profile
 from maxcompute_semantic.build.phases import (
     PhaseResult,
@@ -1018,6 +1020,82 @@ class TestPhaseMineHistory:
         ]
         assert result.data["verified_queries"] == result.data["sample_sql_candidates"]
 
+    @pytest.mark.parametrize(
+        ("first_sql", "second_sql"),
+        [
+            (
+                "SELECT id FROM games WHERE status = 'US'",
+                "SELECT id FROM games WHERE status = 'us'",
+            ),
+            (
+                "SELECT id FROM games WHERE status = 'A--x'",
+                "SELECT id FROM games WHERE status = 'A--y'",
+            ),
+            (
+                "SELECT id FROM games WHERE status = 'A/*x*/B'",
+                "SELECT id FROM games WHERE status = 'AB'",
+            ),
+            (
+                "SELECT id FROM games WHERE status = 'A  B'",
+                "SELECT id FROM games WHERE status = 'A B'",
+            ),
+            ("SELECT `MixedCase` FROM games", "SELECT `mixedcase` FROM games"),
+            (
+                "SELECT /*+ MAPJOIN(games) */ id FROM games",
+                "SELECT id FROM games",
+            ),
+        ],
+        ids=[
+            "literal-case",
+            "line-comment-in-literal",
+            "block-comment-in-literal",
+            "literal-whitespace",
+            "quoted-identifier",
+            "optimizer-hint",
+        ],
+    )
+    def test_history_exact_dedup_preserves_sql_values(
+        self, tmp_path: Path, first_sql: str, second_sql: str
+    ) -> None:
+        """Different literals, quoted identifiers and hints remain distinct candidates."""
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        db.upsert_table(_SK, "games", schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success(
+            {"rows": [{"operation_text": sql} for sql in [first_sql, second_sql, first_sql]]}
+        )
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
+        assert result.status == "success"
+        assert result.data["sample_sql_candidates"]["games"] == [first_sql, second_sql]
+
+    def test_history_exact_dedup_ignores_real_comments_and_layout(self, tmp_path: Path) -> None:
+        first_sql = "SELECT id FROM games WHERE status = 'US'"
+        equivalent_sqls = [
+            "select id from games where status='US' -- audit for games",
+            "/* games audit */ SELECT id\nFROM games WHERE /* filter */ status = 'US'",
+        ]
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        db.upsert_table(_SK, "games", schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success(
+            {"rows": [{"operation_text": sql} for sql in [first_sql, *equivalent_sqls]]}
+        )
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
+        assert result.status == "success"
+        assert result.data["sample_sql_candidates"] == {"games": [first_sql]}
+
     def test_history_acl_filter_is_noop_without_allowlist(self, tmp_path: Path) -> None:
         """Profile has no ``allow_columns`` field yet, so ACL filter must be a no-op.
 
@@ -1134,11 +1212,20 @@ class TestPhaseMineHistory:
         assert result.status == "success"
         assert result.data["sample_sql_candidates"] == {}
 
-    def test_history_attribution_parse_error_falls_back_to_regex(self, tmp_path: Path) -> None:
-        """MaxCompute supports non-standard syntax that sqlglot occasionally
-        rejects. When parsing fails, mining must fall back to the regex
-        path rather than silently shrinking coverage by dropping the SQL.
-        """
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "NOT VALID SQL AT ALL @@!! games",
+            "SELECT id FROM games; NOT VALID SQL AT ALL @@!! games",
+            "SELECT id FROM games WHERE status = 'A--x",
+            "SHOW UNRECOGNIZED games",
+        ],
+        ids=["parse-error", "invalid-second-statement", "token-error", "command-fallback"],
+    )
+    def test_history_unparseable_sql_remains_unattributed(
+        self, tmp_path: Path, sql: str
+    ) -> None:
+        """Unresolved history remains visible without inventing table references."""
         client = MagicMock()
         db = _make_db(tmp_path)
         profile = _make_profile()
@@ -1153,7 +1240,7 @@ class TestPhaseMineHistory:
                 {
                     "rows": [
                         {
-                            "operation_text": "NOT VALID SQL AT ALL @@!! games",
+                            "operation_text": sql,
                             "signature": "sig1",
                         }
                     ],
@@ -1163,10 +1250,101 @@ class TestPhaseMineHistory:
 
             result = phase_mine_history(client, db, profile, _SOURCE)
 
+        assert result.status == "partial_failure"
+        assert result.data["sample_sql_candidates"] == {}
+        assert result.data["verified_queries"] == {}
+        assert len(result.data["unresolved_sql_candidates"]) == 1
+        unresolved = result.data["unresolved_sql_candidates"][0]
+        assert unresolved["sql"] == sql
+        assert unresolved["parse_error"]
+        assert result.warnings
+
+    def test_history_attribution_resolves_cte_and_nested_sources(self, tmp_path: Path) -> None:
+        """CTE names cannot attribute history to a same-named physical table."""
+        sql = (
+            "WITH games AS (SELECT id FROM real_games) "
+            "SELECT id FROM games WHERE id IN (SELECT id FROM nested_games)"
+        )
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        for table in ["games", "real_games", "nested_games"]:
+            db.upsert_table(_SK, table, schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success({"rows": [{"operation_text": sql}]})
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
         assert result.status == "success"
-        # Regex fallback should still attribute by table-name match.
-        assert "games" in result.data["sample_sql_candidates"]
-        assert len(result.data["sample_sql_candidates"]["games"]) == 1
+        assert result.data["sample_sql_candidates"] == {
+            "real_games": [sql],
+            "nested_games": [sql],
+        }
+
+    def test_history_attribution_retains_physical_table_shadowed_by_cte(
+        self, tmp_path: Path
+    ) -> None:
+        """A non-recursive CTE can read a physical table with the same name."""
+        sql = "WITH Games AS (SELECT id FROM games) SELECT id FROM Games"
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        db.upsert_table(_SK, "games", schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success({"rows": [{"operation_text": sql}]})
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
+        assert result.status == "success"
+        assert result.data["sample_sql_candidates"] == {"games": [sql]}
+
+    def test_history_attribution_checks_every_statement(self, tmp_path: Path) -> None:
+        first_sql = "SELECT id FROM games; SELECT 'US' FROM other_games"
+        second_sql = "SELECT id FROM games; SELECT 'us' FROM other_games"
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        for table in ["games", "other_games"]:
+            db.upsert_table(_SK, table, schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success(
+            {"rows": [{"operation_text": sql} for sql in [first_sql, second_sql]]}
+        )
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
+        assert result.status == "success"
+        assert result.data["sample_sql_candidates"] == {
+            "games": [first_sql, second_sql],
+            "other_games": [first_sql, second_sql],
+        }
+
+    def test_history_keeps_valid_candidates_alongside_unresolved_sql(self, tmp_path: Path) -> None:
+        valid_sql = "SELECT id FROM games WHERE status = 'US'"
+        unresolved_sql = "SELECT id FROM games WHERE status = 'US"
+        client = MagicMock()
+        db = _make_db(tmp_path)
+        db.upsert_table(_SK, "games", schema_hash="abc123")
+        client.execute_sql.return_value = Envelope.success(
+            {"rows": [{"operation_text": sql} for sql in [valid_sql, unresolved_sql]]}
+        )
+
+        with patch(
+            "maxcompute_semantic.build.phases.detect_info_schema_source",
+            return_value="tenant",
+        ):
+            result = phase_mine_history(client, db, _make_profile(), _SOURCE)
+
+        assert result.status == "partial_failure"
+        assert result.data["sample_sql_candidates"] == {"games": [valid_sql]}
+        assert result.data["unresolved_sql_candidates"][0]["sql"] == unresolved_sql
+        assert len(result.warnings) == 1
 
     def test_history_attribution_cross_source_join_still_attributed(self, tmp_path: Path) -> None:
         """A SQL that JOINs an in-source table with an out-of-source one

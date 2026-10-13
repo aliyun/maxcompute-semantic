@@ -17,6 +17,7 @@ import contextlib
 import json
 import sys
 import traceback
+from typing import Any
 
 import click
 
@@ -31,12 +32,20 @@ from maxcompute_semantic._internal.update_check import (
 )
 from maxcompute_semantic.commands.build import build_cmd
 from maxcompute_semantic.commands.doctor import doctor_cmd
+from maxcompute_semantic.commands.graph import graph_group
+from maxcompute_semantic.commands.knowledge import knowledge_group
+from maxcompute_semantic.commands.knowledge_bridge import (
+    register_knowledge_bridge_commands,
+)
 from maxcompute_semantic.commands.link import link_group
 from maxcompute_semantic.commands.memory import memory_group
 from maxcompute_semantic.commands.meta import meta_group
 from maxcompute_semantic.commands.metric import metric_group
 from maxcompute_semantic.commands.package import package_group
+from maxcompute_semantic.commands.package_bridge import register_package_bridge_commands
+from maxcompute_semantic.commands.package_remote import register_package_remote_commands
 from maxcompute_semantic.commands.profile import profile_group
+from maxcompute_semantic.commands.remote import remote_group
 from maxcompute_semantic.commands.show import show_cmd
 from maxcompute_semantic.commands.skill import skill_group
 from maxcompute_semantic.commands.sql import sql_group
@@ -263,12 +272,15 @@ _COMMAND_ORDER = [
     # Config (setup)
     "profile",
     "link",
+    "remote",
     # Build (maintenance)
     "build",
     "status",
     # Semantic (package + metric)
     "package",
     "metric",
+    "knowledge",
+    "graph",
     # Memory (ongoing)
     "memory",
     # Skill (install)
@@ -291,6 +303,29 @@ class _OrderedGroup(click.Group):
         known = [c for c in _COMMAND_ORDER if c in self.commands]
         unknown = sorted(c for c in self.commands if c not in _COMMAND_ORDER)
         return known + unknown
+
+    def invoke(self, ctx: click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except click.ClickException as exc:
+            output_format = ctx.params.get("output_format", "plain")
+            if output_format not in {"json", "yaml"}:
+                raise
+            from maxcompute_semantic._internal.output import Renderer
+            from maxcompute_semantic.errors import McsError
+
+            # Argument values can be credentials. Describe the parameter or
+            # error category instead of echoing Click's raw input message.
+            message = "invalid command arguments"
+            if isinstance(exc, click.MissingParameter) and exc.param is not None:
+                message = f"missing required parameter: {exc.param.name}"
+            elif isinstance(exc, click.BadParameter) and exc.param is not None:
+                message = f"invalid value for parameter: {exc.param.name}"
+            Renderer(format=output_format).error(McsError(
+                message, code="UsageError", exit_code=exc.exit_code,
+                remediation="use the command's --help to inspect its arguments",
+            ))
+            ctx.exit(exc.exit_code)
 
 
 @click.group(cls=_OrderedGroup)
@@ -338,12 +373,18 @@ cli.add_command(meta_group)
 # Config (setup)
 cli.add_command(profile_group)
 cli.add_command(link_group)
+cli.add_command(remote_group)
 # Build (maintenance)
 cli.add_command(build_cmd)
 cli.add_command(status_cmd)
 # Semantic (package + metric)
 cli.add_command(package_group)
+register_package_remote_commands(package_group)
+register_package_bridge_commands(package_group)
 cli.add_command(metric_group)
+cli.add_command(knowledge_group)
+register_knowledge_bridge_commands(knowledge_group)
+cli.add_command(graph_group)
 # Memory (ongoing)
 cli.add_command(memory_group)
 # Skill (install)
