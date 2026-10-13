@@ -334,7 +334,7 @@ def test_dt_to_iso_naive_datetime() -> None:
     from maxcompute_semantic.mc_client.client import _dt_to_iso
 
     # Intentionally naive: _dt_to_iso must attach UTC itself.
-    dt = datetime(2024, 1, 15, 10, 0, 0)  # noqa: DTZ001
+    dt = datetime(2024, 1, 15, 10, 0, 0)
     result = _dt_to_iso(dt)
     assert result is not None
     assert "+00:00" in result
